@@ -41,6 +41,12 @@ defmodule LoomWeb.Router do
     delete "/agents/:id/output/*path", AgentOutputController, :delete
     get "/agents/:id/zip/*path", AgentOutputController, :zip
     get "/agents/:id/tree", AgentOutputController, :tree
+    get "/agents/:id/workspace/*path", AgentOutputController, :workspace
+
+    get "/projects", ProjectController, :index
+    post "/projects", ProjectController, :create
+    patch "/projects/:id", ProjectController, :update
+    delete "/projects/:id", ProjectController, :delete
     post "/agents/:id/canvas", CanvasController, :token
 
     get "/layout", LayoutController, :show

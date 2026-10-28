@@ -3,12 +3,15 @@ defmodule LoomWeb.LobbyChannel do
   The session list, pushed instead of polled. The topic is `agents`.
 
   Server → client:
-    - join reply : `%{sessions: [summary], nodes: [device]}`, both whole lists
+    - join reply : `%{sessions: [summary], nodes: [device], projects: [project]}`,
+                   all whole lists
     - "session"  : one summary, whenever that session's header changes
     - "removed"  : `%{id: _}`, when a session is stopped or deleted
     - "node"     : one device (`Loom.Nodes`), when it is added, renamed, or
                    comes online or goes offline
     - "node_removed" : `%{id: _}`, when a device is removed
+    - "project"  : one project (`Loom.Projects.view/1`), when it is made or changed
+    - "project_removed" : `%{id: _}`, when a project is deleted
 
   Client → server:
     - "watching" : `%{endpoint:, session:}`, which session this device is
@@ -33,7 +36,12 @@ defmodule LoomWeb.LobbyChannel do
     # Already subscribed to "agents" by `Phoenix.Channel.Server` — the session
     # broadcasts on exactly this topic, so no extra subscribe (it would deliver
     # everything twice; see `LoomWeb.AgentChannel`).
-    {:ok, %{sessions: Agent.list_sessions(), nodes: Loom.Nodes.list()}, socket}
+    {:ok,
+     %{
+       sessions: Agent.list_sessions(),
+       nodes: Loom.Nodes.list(),
+       projects: Enum.map(Loom.Projects.list(), &Loom.Projects.view/1)
+     }, socket}
   end
 
   @impl true
@@ -61,6 +69,16 @@ defmodule LoomWeb.LobbyChannel do
 
   def handle_info({:node_removed, id}, socket) do
     push(socket, "node_removed", %{id: id})
+    {:noreply, socket}
+  end
+
+  def handle_info({:project_summary, project}, socket) do
+    push(socket, "project", project)
+    {:noreply, socket}
+  end
+
+  def handle_info({:project_removed, id}, socket) do
+    push(socket, "project_removed", %{id: id})
     {:noreply, socket}
   end
 end

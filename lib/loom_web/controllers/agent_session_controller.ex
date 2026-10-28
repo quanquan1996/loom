@@ -15,10 +15,11 @@ defmodule LoomWeb.AgentSessionController do
   # own store, so switching later would mean abandoning the history. Better to
   # make the caller say which one than to quietly pick for them.
   #
-  # Deliberately takes no directory. A session has no project root: which
-  # project is being worked on is a fact in the conversation, and the model
-  # composes absolute paths from it. A channel only ever attaches to an existing
-  # session, so creation goes through here.
+  # Deliberately takes no directory. `project_id`, optional, puts the session
+  # in a project, whose workspace becomes its cwd for good (`Loom.Projects`).
+  # Without one a session has no root, and the model composes absolute paths
+  # from the conversation. A channel only ever attaches to an existing session,
+  # so creation goes through here.
   def create(conn, params) do
     case Loom.Agent.Backend.parse(params["backend"]) do
       {:ok, backend} -> create_session(conn, backend, params)
@@ -33,6 +34,9 @@ defmodule LoomWeb.AgentSessionController do
     case Agent.start_session(id, opts) do
       {:ok, _pid} ->
         conn |> put_status(:created) |> json(view(Agent.info(id)))
+
+      {:error, {:unknown_project, _}} ->
+        conn |> put_status(:unprocessable_entity) |> json(%{error: "no such project"})
 
       {:error, reason} ->
         conn |> put_status(:unprocessable_entity) |> json(%{error: inspect(reason)})
@@ -66,7 +70,11 @@ defmodule LoomWeb.AgentSessionController do
     send_resp(conn, :no_content, "")
   end
 
-  defp build_opts(params), do: maybe_put([], :title, params["title"])
+  defp build_opts(params) do
+    []
+    |> maybe_put(:title, params["title"])
+    |> maybe_put(:project, params["project_id"])
+  end
 
   defp maybe_put(opts, _key, nil), do: opts
   defp maybe_put(opts, key, val), do: [{key, val} | opts]
@@ -81,6 +89,7 @@ defmodule LoomWeb.AgentSessionController do
       title: info.title,
       backend: info.backend,
       backend_label: info.backend_label,
+      project_id: info.project_id,
       created_at: info.created_at,
       last_active_at: info.last_active_at,
       status: info.status,

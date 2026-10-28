@@ -39,6 +39,9 @@ defmodule Loom.Application do
       # application down with it. Disabled under test, where the protocol is
       # driven directly.
       {Loom.Agent.Codex.Server, spawn: Application.get_env(:loom, :codex_server, true)},
+      # Before the bootstrap: a restored session asks for its project's
+      # instructions.
+      Loom.Projects,
       # Must come after the registry and the session supervisor it populates.
       # Disabled under test so suites start from a clean slate.
       {Loom.Agent.Bootstrap, enabled: Application.get_env(:loom, :restore_agents, true)},

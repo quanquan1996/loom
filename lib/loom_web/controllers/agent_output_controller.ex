@@ -16,6 +16,7 @@ defmodule LoomWeb.AgentOutputController do
   alias Loom.Agent.Files
   alias Loom.Agent.Output
   alias Loom.Agent.Store
+  alias Loom.Projects
 
   # Built in a temp file, so memory stays flat; past this it is refused rather
   # than leaving the user waiting on a zip the size of a disk.
@@ -23,14 +24,41 @@ defmodule LoomWeb.AgentOutputController do
 
   # GET /api/agents/:id/tree — everything the session holds: what the user
   # attached (`files/`) and what the agent made (`output/`), for the canvas's
-  # file browser. Listed, not read; each file is then fetched by its own route.
+  # file browser, and, in a project, the workspace it shares with the project's
+  # other sessions. Listed, not read; each file is then fetched by its own route.
   def tree(conn, %{"id" => id}) do
     if Agent.exists?(id) do
-      json(conn, %{files: Files.list(id), output: Output.list(id)})
+      tree = %{files: Files.list(id), output: Output.list(id)}
+
+      tree =
+        case project(id) do
+          {:ok, project} ->
+            {files, truncated} = Projects.list_files(project)
+            Map.merge(tree, %{workspace: files, workspace_truncated: truncated})
+
+          :error ->
+            tree
+        end
+
+      json(conn, tree)
     else
       conn |> put_status(:not_found) |> json(%{error: "unknown session"})
     end
   end
+
+  # GET /api/agents/:id/workspace/*path — one file of the session's project
+  # workspace, by the same rules as the listing.
+  def workspace(conn, %{"id" => id, "path" => parts}) do
+    with true <- Agent.exists?(id),
+         {:ok, project} <- project(id),
+         {:ok, path} <- Projects.resolve_file(project, Path.join(parts)) do
+      send_download(conn, {:file, path}, filename: Path.basename(path))
+    else
+      _ -> conn |> put_status(:not_found) |> json(%{error: "no such workspace file"})
+    end
+  end
+
+  defp project(id), do: Projects.get(Agent.info(id).project_id)
 
   # GET /api/agents/:id/zip/*path — one output directory as a zip, stored
   # rather than compressed: what agents produce in bulk (images, video) is

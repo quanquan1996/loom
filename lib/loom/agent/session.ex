@@ -191,12 +191,14 @@ defmodule Loom.Agent.Session do
 
   defp start_fresh(id, opts) do
     with {:ok, backend} <- requested_backend(opts),
+         {:ok, project} <- requested_project(opts),
          {:ok, logs} <- Store.open_logs(id) do
       now = System.system_time(:millisecond)
 
       state = %{
         blank_state(id)
         | backend: backend,
+          project_id: project && project.id,
           title: Keyword.get(opts, :title),
           created_at: now,
           last_active_at: now,
@@ -204,7 +206,7 @@ defmodule Loom.Agent.Session do
           outputs: outputs(id)
       }
 
-      case Backend.impl(backend).start(id, backend_meta(id, opts)) do
+      case Backend.impl(backend).start(id, backend_meta(id, opts, project)) do
         {:ok, handle} ->
           state = %{state | handle: handle}
           persist_meta(state)
@@ -229,14 +231,44 @@ defmodule Loom.Agent.Session do
     end
   end
 
-  # `:cwd` is only ever a test or operator override. A session has no project
-  # root; the backend falls back to `:workspace` (or the user's home).
-  defp backend_meta(id, opts) do
-    %{
-      cc_cwd: Keyword.get(opts, :cwd),
-      codex_cwd: Keyword.get(opts, :cwd),
-      instructions: Output.instructions(id)
-    }
+  # Optional, and permanent like the backend: the project's workspace becomes
+  # the session's cwd, which the backend's conversation is tied to.
+  defp requested_project(opts) do
+    case Keyword.get(opts, :project) do
+      nil ->
+        {:ok, nil}
+
+      id ->
+        case Loom.Projects.get(id) do
+          {:ok, project} -> {:ok, project}
+          :error -> {:error, {:unknown_project, id}}
+        end
+    end
+  end
+
+  # A session in a project starts in its workspace. One outside any project has
+  # no root: the backend falls back to `:workspace` (or the user's home).
+  # `:cwd` is a test or operator override.
+  defp backend_meta(id, opts, project) do
+    cwd = Keyword.get(opts, :cwd) || (project && Loom.Projects.workspace(project))
+    if cwd, do: File.mkdir_p!(cwd)
+
+    %{cc_cwd: cwd, codex_cwd: cwd, instructions: instructions(id, project)}
+  end
+
+  # Loom's own, plus the project's when there is one. Built again on every
+  # restore, so a renamed project or edited instructions are what the backend
+  # is told next.
+  defp instructions(id, nil), do: Output.instructions(id)
+  defp instructions(id, project), do: Output.instructions(id) <> "\n" <> Loom.Projects.instructions(project)
+
+  defp project_of(nil), do: nil
+
+  defp project_of(id) do
+    case Loom.Projects.get(id) do
+      {:ok, project} -> project
+      :error -> nil
+    end
   end
 
   # The directory as the session starts. Made first, so the agent can write
@@ -250,14 +282,16 @@ defmodule Loom.Agent.Session do
   defp restore(id, meta) do
     with {:ok, backend} <- recorded_backend(meta),
          {:ok, logs} <- Store.open_logs(id),
+         project = project_of(meta[:project_id]),
          {:ok, handle} <-
-           reattach(backend, id, Map.put(meta, :instructions, Output.instructions(id)), logs) do
+           reattach(backend, id, Map.put(meta, :instructions, instructions(id, project)), logs) do
       transcript = Store.read_events(id, @transcript_limit)
 
       state = %{
         blank_state(id)
         | backend: backend,
           handle: handle,
+          project_id: meta[:project_id],
           title: meta[:title],
           created_at: meta[:created_at],
           last_active_at: last_active(transcript) || meta[:created_at],
@@ -321,6 +355,8 @@ defmodule Loom.Agent.Session do
       backend: nil,
       # Backend-private. Only `Backend.persist/1` knows what of it to keep.
       handle: nil,
+      # The project it was made in, if any; never changes. See `Loom.Projects`.
+      project_id: nil,
       title: nil,
       created_at: nil,
       # When the last message went either way; orders the sidebar. Derived from
@@ -459,6 +495,18 @@ defmodule Loom.Agent.Session do
   def handle_info(:reload_backend, state) do
     {:noreply, release_backend(state)}
   end
+
+  # The project's name or instructions changed. Both handles carry the text
+  # they hand the backend; Claude Code reads it on its next spawn, so the warm
+  # process is let go as `/reload` would. Codex only reads it when a thread is
+  # started or resumed, which is after the next app-server restart.
+  def handle_info(:refresh_instructions, %{handle: handle} = state) when is_map(handle) do
+    text = instructions(state.id, project_of(state.project_id))
+    state = %{state | handle: Map.replace(handle, :instructions, text)}
+    handle_info(:reload_backend, state)
+  end
+
+  def handle_info(:refresh_instructions, state), do: {:noreply, state}
 
   def handle_info({:EXIT, _from, _reason}, state), do: {:noreply, state}
 
@@ -830,6 +878,7 @@ defmodule Loom.Agent.Session do
     base = %{
       id: state.id,
       backend: state.backend,
+      project_id: state.project_id,
       title: state.title,
       created_at: state.created_at,
       status: state.status,
@@ -872,6 +921,7 @@ defmodule Loom.Agent.Session do
       id: state.id,
       backend: state.backend,
       backend_label: Backend.label(state.backend),
+      project_id: state.project_id,
       title: state.title,
       created_at: state.created_at,
       last_active_at: state.last_active_at,
