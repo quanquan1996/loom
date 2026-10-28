@@ -1227,3 +1227,133 @@
 .browser-type { display: flex; gap: 4px; align-items: center; padding: 4px 6px; border-bottom: 1px solid var(--line); }
 .browser-type input { flex: 1; min-width: 0; font: inherit; font-size: 16px; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); }
 .browser-screen { flex: 1; min-height: 0; background: #1a1a1a; }
+
+/* Projects in the sidebar: a row that folds its sessions away, with its own
+   "new session" and settings, then the sessions indented under it. */
+.sidebar-section {
+  padding: 10px 8px 4px;
+  color: var(--fg-dim);
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.project-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px 6px 4px;
+  border-radius: 6px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.project-row:hover {
+  background: var(--bg-card);
+}
+
+/* Folded, with the open session inside. */
+.project-row.active {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.project-fold,
+.project-icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  color: var(--fg-dim);
+}
+
+.project-fold svg,
+.project-icon {
+  width: 1rem;
+  height: 1rem;
+}
+
+.project-icon {
+  color: var(--accent);
+}
+
+.project-actions {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.project-row:hover .session-del {
+  visibility: visible;
+}
+
+.project-row .session-del:hover {
+  background: var(--blue);
+}
+
+.session.nested {
+  padding-left: 26px;
+}
+
+.project-empty {
+  padding: 4px 8px 6px 30px;
+  color: var(--fg-dim);
+  font-size: 0.846rem;
+}
+
+.modal.project-dialog {
+  width: min(34rem, 100%);
+}
+
+.project-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  overflow-y: auto;
+}
+
+.project-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.project-form label > span {
+  color: var(--fg-dim);
+  font-size: 0.846rem;
+}
+
+.project-form small {
+  color: var(--fg-dim);
+  font-size: 0.769rem;
+}
+
+.project-form input,
+.project-form textarea {
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  resize: vertical;
+}
+
+.project-path {
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: var(--bg-card);
+  color: var(--accent);
+  font-size: 0.846rem;
+  word-break: break-all;
+}
+
+.project-form .text-btn.primary {
+  color: var(--fg);
+}
+
+.project-form .text-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.project-delete {
+  margin-right: auto;
+}

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { Channel } from "phoenix"
 import { getSocket } from "./socket"
-import type { AgentInfo, Device } from "./api"
+import type { AgentInfo, Device, Project } from "./api"
 
 export type Watching = { endpoint: string; session: string | null }
 
@@ -11,6 +11,10 @@ type Lobby = {
   // as they connect and drop.
   devices: Device[]
   upsertDevice: (device: Device) => void
+  // Oldest first; pushed as they are made, edited and deleted.
+  projects: Project[]
+  upsertProject: (project: Project) => void
+  dropProject: (id: string) => void
   loaded: boolean
   // For the caller's own create/delete, so the sidebar does not wait for the
   // push. The push still arrives and is merged by `seq`.
@@ -38,6 +42,7 @@ export function useLobby(enabled: boolean, watching: Watching | null = null): Lo
   const [byId, setById] = useState<Map<string, AgentInfo>>(new Map())
   const [loaded, setLoaded] = useState(false)
   const [devices, setDevices] = useState<Map<string, Device>>(new Map())
+  const [projects, setProjects] = useState<Map<string, Project>>(new Map())
   const joinedChannel = useRef<Channel | null>(null)
   const watchingRef = useRef(watching)
   watchingRef.current = watching
@@ -50,6 +55,20 @@ export function useLobby(enabled: boolean, watching: Watching | null = null): Lo
 
   const dropDevice = useCallback((id: string) => {
     setDevices((current) => {
+      if (!current.has(id)) return current
+      const next = new Map(current)
+      next.delete(id)
+      return next
+    })
+  }, [])
+
+  // Like a device: one process owns them and sends them in order.
+  const upsertProject = useCallback((project: Project) => {
+    setProjects((current) => new Map(current).set(project.id, project))
+  }, [])
+
+  const dropProject = useCallback((id: string) => {
+    setProjects((current) => {
       if (!current.has(id)) return current
       const next = new Map(current)
       next.delete(id)
@@ -90,10 +109,14 @@ export function useLobby(enabled: boolean, watching: Watching | null = null): Lo
     channel.on("removed", ({ id }: { id: string }) => drop(id))
     channel.on("node", upsertDevice)
     channel.on("node_removed", ({ id }: { id: string }) => dropDevice(id))
+    channel.on("project", upsertProject)
+    channel.on("project_removed", ({ id }: { id: string }) => dropProject(id))
 
     channel
       .join()
-      .receive("ok", ({ sessions, nodes }: { sessions: AgentInfo[]; nodes: Device[] }) => {
+      .receive(
+        "ok",
+        ({ sessions, nodes, projects }: { sessions: AgentInfo[]; nodes: Device[]; projects?: Project[] }) => {
         joined = true
         if (leaveWhenJoined) {
           channel.leave()
@@ -103,8 +126,10 @@ export function useLobby(enabled: boolean, watching: Watching | null = null): Lo
         if (watchingRef.current) channel.push("watching", watchingRef.current)
         setById(new Map(sessions.map((s) => [s.id, s])))
         setDevices(new Map((nodes ?? []).map((d) => [d.id, d])))
+        setProjects(new Map((projects ?? []).map((p) => [p.id, p])))
         setLoaded(true)
-      })
+        },
+      )
       // Nothing to show either way; an empty list beats "connecting…" forever.
       .receive("error", () => setLoaded(true))
 
@@ -113,7 +138,7 @@ export function useLobby(enabled: boolean, watching: Watching | null = null): Lo
       if (joined) channel.leave()
       else leaveWhenJoined = true
     }
-  }, [enabled, upsert, drop, upsertDevice, dropDevice])
+  }, [enabled, upsert, drop, upsertDevice, dropDevice, upsertProject, dropProject])
 
   const endpoint = watching?.endpoint
   const session = watching?.session
@@ -130,7 +155,21 @@ export function useLobby(enabled: boolean, watching: Watching | null = null): Lo
     () => [...devices.values()].sort((a, b) => a.created_at.localeCompare(b.created_at)),
     [devices],
   )
-  return { sessions, devices: deviceList, upsertDevice, loaded, upsert, drop }
+  const projectList = useMemo(
+    () => [...projects.values()].sort((a, b) => a.created_at - b.created_at),
+    [projects],
+  )
+  return {
+    sessions,
+    devices: deviceList,
+    upsertDevice,
+    projects: projectList,
+    upsertProject,
+    dropProject,
+    loaded,
+    upsert,
+    drop,
+  }
 }
 
 export const lastActive = (s: AgentInfo) => s.last_active_at ?? s.created_at

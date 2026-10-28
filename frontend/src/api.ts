@@ -140,6 +140,9 @@ export type AgentInfo = {
   title: string | null
   backend: AgentBackend
   backend_label: string
+  // The project it was made in, for good; null outside any. Older servers do
+  // not send it.
+  project_id?: string | null
   created_at: number
   // The last message either way, as ms since the epoch: what orders the
   // sidebar and what its age shows. Older servers do not send it.
@@ -168,12 +171,13 @@ export async function listAgents(): Promise<AgentInfo[]> {
 }
 
 // `backend` is required and permanent: the conversation lives in that engine's
-// own store, so there is nothing to migrate if it changes later.
-export async function createAgent(backend: AgentBackend): Promise<AgentInfo> {
+// own store, so there is nothing to migrate if it changes later. So is the
+// project: its workspace becomes the session's working directory.
+export async function createAgent(backend: AgentBackend, projectId?: string | null): Promise<AgentInfo> {
   const res = await fetch("/api/agents", {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify({ backend }),
+    body: JSON.stringify(projectId ? { backend, project_id: projectId } : { backend }),
   })
   if (res.status === 401) throw unauthorized()
   if (!res.ok) throw new Error(`createAgent failed: ${res.status}`)
@@ -245,8 +249,19 @@ export type TreeFile = {
   mtime: number
 }
 
-/** Everything the session holds: what the user attached, and what the agent made. */
-export async function sessionTree(id: string): Promise<{ files: TreeFile[]; output: TreeFile[] }> {
+/**
+ * Everything the session holds: what the user attached, what the agent made,
+ * and, in a project, the workspace its sessions share — capped, so
+ * `workspace_truncated` says when there is more than was listed.
+ */
+export type SessionTree = {
+  files: TreeFile[]
+  output: TreeFile[]
+  workspace?: TreeFile[]
+  workspace_truncated?: boolean
+}
+
+export async function sessionTree(id: string): Promise<SessionTree> {
   const res = await fetch(`/api/agents/${id}/tree`, { headers: authHeaders() })
   if (res.status === 401) throw unauthorized()
   if (!res.ok) throw new Error(`could not list the files: ${res.status}`)
@@ -315,6 +330,12 @@ export function seedBlobUrl(url: string, objectUrl: string) {
  */
 export async function downloadAgentOutput(id: string, path: string): Promise<void> {
   await download(outputUrl(id, path), path.split("/").pop() ?? path)
+}
+
+/** One file of the session's project workspace, by its path there. */
+export async function downloadWorkspaceFile(id: string, path: string): Promise<void> {
+  const url = `/api/agents/${id}/workspace/${path.split("/").map(encodeURIComponent).join("/")}`
+  await download(url, path.split("/").pop() ?? path)
 }
 
 /** One attachment, by its stored name, handed to the browser as a download. */
@@ -481,6 +502,37 @@ export function deviceInstallCode(id: string): Promise<{ code: string }> {
 /** What to paste into a terminal on the device. */
 export function installCommand(code: string): string {
   return `curl -fsSL ${window.location.origin}/node/install/${code} | sh`
+}
+
+// ── Projects (see Loom.Projects) ──────────────────────────────────────────
+
+/**
+ * Sessions under one name, sharing a working directory and standing
+ * instructions. `dir` is set when the project is bound to a directory that
+ * already existed; otherwise Loom made `workspace` for it.
+ */
+export type Project = {
+  id: string
+  name: string
+  dir: string | null
+  instructions: string
+  created_at: number
+  workspace: string
+  bound: boolean
+}
+
+export function createProject(attrs: { name: string; dir?: string; instructions?: string }): Promise<Project> {
+  return apiCall("/api/projects", { method: "POST", body: JSON.stringify(attrs) })
+}
+
+/** The directory is fixed when it is made; only these change. */
+export function updateProject(id: string, attrs: { name?: string; instructions?: string }): Promise<Project> {
+  return apiCall(`/api/projects/${id}`, { method: "PATCH", body: JSON.stringify(attrs) })
+}
+
+/** The project and every session in it, and the workspace if Loom made it. */
+export function deleteProject(id: string): Promise<void> {
+  return apiCall(`/api/projects/${id}`, { method: "DELETE" })
 }
 
 // ── Notifications (see push.ts) ───────────────────────────────────────────

@@ -20,15 +20,21 @@ import {
   downloadAgentOutput,
   downloadAgentZip,
   downloadAttachment,
+  downloadWorkspaceFile,
   renameAgentOutputOrAttachment,
   sessionTree,
+  type SessionTree,
   type TreeFile,
 } from "./api"
 import { Confirm, RenameInput } from "./Confirm"
 import { itemForAttachment, itemForPath, viewerFor, type CanvasItem, type Viewer } from "./canvasItems"
 import { formatBytes } from "./format"
 
-type Section = "output" | "files"
+// The project's workspace is listed too, but only to find and download a
+// file: it is the agents' working directory, not this session's to rename or
+// delete in, and it has no canvas route.
+type Editable = "output" | "files"
+type Section = Editable | "workspace"
 
 /** The tree walked from the keyboard; see the keys in App.tsx. */
 export type TreeNav = {
@@ -57,7 +63,8 @@ type Node = {
 
 /**
  * Everything one session holds, as two trees: what the agent made (`output/`)
- * and what the user attached (`files/`). The cards in the chat only announce
+ * and what the user attached (`files/`) — three in a project, whose shared
+ * workspace is listed between them. The cards in the chat only announce
  * what each turn changed; this is where last week's report is found again.
  *
  * Newest first at every level, like the chat itself. The row of what the
@@ -90,9 +97,9 @@ export function FileBrowser({
   onOpen: (item: CanvasItem) => void
   walking: boolean
   nav: RefObject<TreeNav | null>
-  onMoved: (source: Section, from: string, to: string | null) => void
+  onMoved: (source: Editable, from: string, to: string | null) => void
 }) {
-  const [tree, setTree] = useState<{ files: TreeFile[]; output: TreeFile[] } | null>(null)
+  const [tree, setTree] = useState<SessionTree | null>(null)
   const [error, setError] = useState<string | null>(null)
   // Unfolded directories, as `section:path`.
   const [unfolded, setUnfolded] = useState<Set<string>>(() => new Set())
@@ -121,6 +128,7 @@ export function FileBrowser({
 
   const output = useMemo(() => (tree ? build(tree.output) : []), [tree])
   const files = useMemo(() => (tree ? build(tree.files) : []), [tree])
+  const workspace = useMemo(() => (tree?.workspace ? build(tree.workspace) : null), [tree])
 
   const fail = (e: Error) => setError(e.message)
 
@@ -138,6 +146,7 @@ export function FileBrowser({
       fold(key, !unfolded.has(key))
       return
     }
+    if (section === "workspace") return download(section, node)
     const item =
       section === "output"
         ? itemForPath(node.path)
@@ -147,12 +156,16 @@ export function FileBrowser({
   }
 
   const download = (section: Section, node: Node) => {
+    // A workspace folder has no zip: only files come down from there.
+    if (section === "workspace" && node.children) return
     const done =
-      section === "files"
-        ? downloadAttachment(sessionId, node.path)
-        : node.children
-          ? downloadAgentZip(sessionId, node.path)
-          : downloadAgentOutput(sessionId, node.path)
+      section === "workspace"
+        ? downloadWorkspaceFile(sessionId, node.path)
+        : section === "files"
+          ? downloadAttachment(sessionId, node.path)
+          : node.children
+            ? downloadAgentZip(sessionId, node.path)
+            : downloadAgentOutput(sessionId, node.path)
     done.catch(fail)
   }
 
@@ -167,6 +180,7 @@ export function FileBrowser({
     }
   }
   walk("output", output, null)
+  if (workspace) walk("workspace", workspace, null)
   walk("files", files, null)
 
   // Starts on what the canvas shows, or at the top.
@@ -205,14 +219,14 @@ export function FileBrowser({
       else if (showing[at + 1]?.parent === here.key) setCursor(showing[at + 1].key)
     },
     remove: () => {
-      if (here) setAsking(here)
+      if (here && here.section !== "workspace") setAsking(here)
     },
     rename: () => {
-      if (here) setRenaming(here.key)
+      if (here && here.section !== "workspace") setRenaming(here.key)
     },
   }
 
-  const remove = async (section: Section, node: Node) => {
+  const remove = async (section: Editable, node: Node) => {
     const key = `${section}:${node.path}`
     await deleteAgentOutputOrAttachment(sessionId, section, node.path)
     // The cursor goes to the next row that is not inside what went, else the
@@ -225,7 +239,7 @@ export function FileBrowser({
     setChanges((n) => n + 1)
   }
 
-  const rename = async (section: Section, node: Node, name: string | null) => {
+  const rename = async (section: Editable, node: Node, name: string | null) => {
     if (name === null) return setRenaming(null)
     const { path } = await renameAgentOutputOrAttachment(sessionId, section, node.path, name)
     const from = `${section}:${node.path}`
@@ -264,7 +278,7 @@ export function FileBrowser({
           </span>
           <Icon className="tree-icon" />
           {renaming === key ? (
-            <RenameInput value={node.name} onDone={(name) => rename(section, node, name)} />
+            <RenameInput value={node.name} onDone={(name) => rename(section as Editable, node, name)} />
           ) : (
             <span className="tree-name">{node.name}</span>
           )}
@@ -285,16 +299,18 @@ export function FileBrowser({
                 <AppWindow />
               </button>
             )}
-            <button
-              className="pane-btn download"
-              title={isDir ? `Download ${node.path} as a zip` : `Download ${node.name}`}
-              onClick={(e) => {
-                e.stopPropagation()
-                download(section, node)
-              }}
-            >
-              <Download />
-            </button>
+            {!(section === "workspace" && isDir) && (
+              <button
+                className="pane-btn download"
+                title={isDir ? `Download ${node.path} as a zip` : `Download ${node.name}`}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  download(section, node)
+                }}
+              >
+                <Download />
+              </button>
+            )}
           </span>
         </div>
       )
@@ -311,7 +327,7 @@ export function FileBrowser({
               ? `The folder ${asking.node.path} and everything in it. This cannot be undone.`
               : `${asking.node.path} — this cannot be undone.`
           }
-          onYes={() => remove(asking.section, asking.node)}
+          onYes={() => remove(asking.section as Editable, asking.node)}
           onClose={() => setAsking(null)}
         />
       )}
@@ -324,6 +340,21 @@ export function FileBrowser({
             rows("output", output, 0)
           ) : (
             <div className="tree-empty">Nothing made in this session yet.</div>
+          )}
+          {workspace && (
+            <>
+              <div className="tree-section" title="The project's working directory, shared by its sessions">
+                Workspace
+              </div>
+              {workspace.length ? (
+                rows("workspace", workspace, 0)
+              ) : (
+                <div className="tree-empty">The project's workspace is empty.</div>
+              )}
+              {tree.workspace_truncated && (
+                <div className="tree-empty">Only the first {tree.workspace!.length} files are listed.</div>
+              )}
+            </>
           )}
           <div className="tree-section">Uploads</div>
           {files.length ? (

@@ -8,7 +8,8 @@ import type { TreeNav } from "./FileBrowser"
 import { KeyHelp, useGlobalKey, useKeys, WhichKey, type Keymap } from "./keys"
 import { Login } from "./Login"
 import { usePush, useVisible } from "./push"
-import { Sidebar } from "./Sidebar"
+import { ProjectDialog } from "./Projects"
+import { Sidebar, sidebarOrder } from "./Sidebar"
 import { Terminal } from "./Terminal"
 // noVNC is only for the browser pane, so it loads when that is first opened.
 const Browser = lazy(() => import("./Browser").then((m) => ({ default: m.Browser })))
@@ -26,6 +27,7 @@ import {
   listSessions,
   onUnauthorized,
   type AgentBackend,
+  type Project,
 } from "./api"
 import { dropSocket } from "./socket"
 import "./App.css"
@@ -34,6 +36,7 @@ const SIDEBAR_KEY = "loom_sidebar_open"
 const CANVAS_KEY = "loom_canvas"
 const TREE_KEY = "loom_canvas_tree"
 const VIM_KEY = "loom_vim"
+const FOLDED_KEY = "loom_projects_folded"
 
 // The right-hand side shows one thing at a time: the terminals or the canvas.
 type Side = "terminal" | "canvas" | "browser" | null
@@ -64,7 +67,7 @@ function App() {
   // Opened from a notification: `?session=` names the session to show, and
   // goes from the address bar once read.
   const [activeId, setActiveId] = useState<string | null>(takeSessionParam)
-  const { sessions, devices, upsertDevice, loaded, upsert, drop } = useLobby(
+  const { sessions, devices, upsertDevice, projects, upsertProject, loaded, upsert, drop } = useLobby(
     authed,
     push.endpoint ? { endpoint: push.endpoint, session: visible ? activeId : null } : null,
   )
@@ -187,10 +190,33 @@ function App() {
     )
   }, [loaded, sessions])
 
+  // Projects whose sessions the sidebar hides. Remembered, like the sidebar.
+  const [folded, setFolded] = useState<Set<string>>(() => {
+    try {
+      return new Set(JSON.parse(localStorage.getItem(FOLDED_KEY) ?? "[]"))
+    } catch {
+      return new Set()
+    }
+  })
+  useEffect(() => {
+    localStorage.setItem(FOLDED_KEY, JSON.stringify([...folded]))
+  }, [folded])
+  const fold = (id: string, open?: boolean) =>
+    setFolded((f) => {
+      const next = new Set(f)
+      if (open ?? next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  // The project being made (`"new"`) or edited in its dialog.
+  const [projectDialog, setProjectDialog] = useState<Project | "new" | null>(null)
+
   // The backend is chosen here and never again: the conversation lives in that
-  // engine's own store, so there is nothing to migrate if it changes.
-  const create = async (backend: AgentBackend) => {
-    const session = await createAgent(backend)
+  // engine's own store, so there is nothing to migrate if it changes. The
+  // project too: its workspace is the session's working directory for good.
+  const create = async (backend: AgentBackend, projectId?: string) => {
+    const session = await createAgent(backend, projectId)
+    if (projectId) fold(projectId, true)
     upsert(session)
     setActiveId(session.id)
     setDrawerOpen(false)
@@ -333,7 +359,7 @@ function App() {
     const at = from === null ? -1 : ids.indexOf(from)
     return ids[at === -1 ? 0 : Math.min(ids.length - 1, Math.max(0, at + by))]
   }
-  const ids = sessions.map((s) => s.id)
+  const ids = sidebarOrder(sessions, projects, folded).map((s) => s.id)
 
   // Into the columns either side of the chat, opening them as needed: `h` and
   // `␣b` to the session list, `l` and `␣e` to the file tree.
@@ -435,6 +461,10 @@ function App() {
   const sidebar = (
     <Sidebar
       sessions={sessions}
+      projects={projects}
+      folded={folded}
+      onFold={(id) => fold(id)}
+      onEditProject={(project) => setProjectDialog(project ?? "new")}
       devices={devices}
       onUpsertDevice={upsertDevice}
       push={push}
@@ -623,6 +653,19 @@ function App() {
             drop(id)
           }}
           onClose={() => setDeleting(null)}
+        />
+      )}
+      {projectDialog && (
+        <ProjectDialog
+          project={projectDialog === "new" ? null : projectDialog}
+          sessionCount={
+            projectDialog === "new" ? 0 : sessions.filter((s) => s.project_id === projectDialog.id).length
+          }
+          onSaved={(project) => {
+            upsertProject(project)
+            if (projectDialog === "new") fold(project.id, true)
+          }}
+          onClose={() => setProjectDialog(null)}
         />
       )}
       <WhichKey pending={pending} keymap={keymap} groups={{ "Space n": "new session" }} />

@@ -1,14 +1,65 @@
-import { Bell, BellOff, Globe, Keyboard, KeyboardOff, MonitorSmartphone, PanelLeftClose, Plus, X } from "lucide-react"
+import {
+  Bell,
+  BellOff,
+  ChevronDown,
+  ChevronRight,
+  Folder,
+  FolderOpen,
+  FolderPlus,
+  Globe,
+  Keyboard,
+  KeyboardOff,
+  MonitorSmartphone,
+  PanelLeftClose,
+  Plus,
+  Settings,
+  X,
+} from "lucide-react"
 import { useEffect, useRef, useState } from "react"
-import type { AgentBackend, AgentInfo, Device } from "./api"
+import type { AgentBackend, AgentInfo, Device, Project } from "./api"
 import { RenameInput } from "./Confirm"
 import { DevicesDialog } from "./Devices"
 import { backendShort } from "./format"
 import type { Push } from "./push"
 import { lastActive } from "./useLobby"
 
+/**
+ * The sidebar's rows top to bottom: each project (most recently used first)
+ * with its sessions, then the sessions outside any project.
+ */
+export function sidebarGroups(sessions: AgentInfo[], projects: Project[]) {
+  const known = new Set(projects.map((p) => p.id))
+  const inside = new Map<string, AgentInfo[]>(projects.map((p) => [p.id, []]))
+  const loose: AgentInfo[] = []
+  // `sessions` is already most recent first, and keeps that order in a group.
+  for (const s of sessions) {
+    if (s.project_id && known.has(s.project_id)) inside.get(s.project_id)!.push(s)
+    else loose.push(s)
+  }
+  const used = (p: Project) => {
+    const first = inside.get(p.id)![0]
+    return first ? lastActive(first) : p.created_at
+  }
+  const groups = [...projects]
+    .sort((a, b) => used(b) - used(a))
+    .map((project) => ({ project, sessions: inside.get(project.id)! }))
+  return { groups, loose }
+}
+
+/** The sessions as drawn, folded projects left out: what j/k walks. */
+export function sidebarOrder(sessions: AgentInfo[], projects: Project[], folded: Set<string>): AgentInfo[] {
+  const { groups, loose } = sidebarGroups(sessions, projects)
+  return [...groups.flatMap((g) => (folded.has(g.project.id) ? [] : g.sessions)), ...loose]
+}
+
 type Props = {
   sessions: AgentInfo[]
+  projects: Project[]
+  // Projects whose sessions are hidden, by id; see App.
+  folded: Set<string>
+  onFold: (projectId: string) => void
+  // A project to edit, or null to make one.
+  onEditProject: (project: Project | null) => void
   devices: Device[]
   onUpsertDevice: (device: Device) => void
   push: Push
@@ -21,7 +72,7 @@ type Props = {
   renamingId: string | null
   onRenamed: (id: string, title: string | null) => Promise<void>
   onSelect: (id: string) => void
-  onCreate: (backend: AgentBackend) => void
+  onCreate: (backend: AgentBackend, projectId?: string) => void
   onDelete: (id: string) => void
   onCollapse: () => void
   browserOpen: boolean
@@ -30,6 +81,10 @@ type Props = {
 
 export function Sidebar({
   sessions,
+  projects,
+  folded,
+  onFold,
+  onEditProject,
   devices,
   onUpsertDevice,
   push,
@@ -54,13 +109,59 @@ export function Sidebar({
   }, [])
   const [devicesOpen, setDevicesOpen] = useState(false)
   const online = devices.filter((d) => d.online).length
+  const { groups, loose } = sidebarGroups(sessions, projects)
+
+  const row = (s: AgentInfo, nested: boolean) => (
+    <div
+      key={s.id}
+      ref={s.id === cursorId ? (el) => el?.scrollIntoView({ block: "nearest" }) : undefined}
+      className={
+        "session" +
+        (nested ? " nested" : "") +
+        (s.id === activeId ? " active" : "") +
+        (s.id === cursorId ? " cursor" : "")
+      }
+      onClick={() => onSelect(s.id)}
+    >
+      <span className={"dot " + s.status} title={s.status} />
+      {s.id === renamingId ? (
+        <RenameInput value={s.title ?? s.id} stem={false} onDone={(title) => onRenamed(s.id, title)} />
+      ) : (
+        <span className="session-label">{s.title ?? s.id}</span>
+      )}
+      {s.queued > 0 && (
+        <span className="session-queued" title="queued messages">
+          {s.queued}
+        </span>
+      )}
+      <span className="session-when" title={"last active " + new Date(lastActive(s)).toLocaleString()}>
+        {when(lastActive(s))}
+      </span>
+      {/* Which engine is running it is not a detail: the two behave
+          differently and the binding is permanent. */}
+      <span className={"session-backend " + s.backend}>{backendShort(s.backend)}</span>
+      <button
+        className="session-del"
+        title="Delete session and its history"
+        onClick={(e) => {
+          e.stopPropagation()
+          onDelete(s.id)
+        }}
+      >
+        <X />
+      </button>
+    </div>
+  )
 
   return (
     <aside className="sidebar">
       <div className="sidebar-head">
         <span className="brand">loom</span>
         <span className="sidebar-actions">
-          <NewSessionButton onCreate={onCreate} />
+          <button className="icon-btn" onClick={() => onEditProject(null)} title="New project">
+            <FolderPlus />
+          </button>
+          <NewSessionButton onCreate={(backend) => onCreate(backend)} />
           <button className="icon-btn" onClick={onCollapse} title="Hide sidebar">
             <PanelLeftClose />
           </button>
@@ -68,53 +169,52 @@ export function Sidebar({
       </div>
 
       <div className="session-list">
-        {sessions.length === 0 && (
+        {sessions.length === 0 && projects.length === 0 && (
           <div className="session-empty">No sessions yet.</div>
         )}
 
-        {sessions.map((s) => (
-          <div
-            key={s.id}
-            ref={s.id === cursorId ? (el) => el?.scrollIntoView({ block: "nearest" }) : undefined}
-            className={
-              "session" + (s.id === activeId ? " active" : "") + (s.id === cursorId ? " cursor" : "")
-            }
-            onClick={() => onSelect(s.id)}
-          >
-            <span className={"dot " + s.status} title={s.status} />
-            {s.id === renamingId ? (
-              <RenameInput value={s.title ?? s.id} stem={false} onDone={(title) => onRenamed(s.id, title)} />
-            ) : (
-              <span className="session-label">{s.title ?? s.id}</span>
-            )}
-            {s.queued > 0 && (
-              <span className="session-queued" title="queued messages">
-                {s.queued}
-              </span>
-            )}
-            <span
-              className="session-when"
-              title={"last active " + new Date(lastActive(s)).toLocaleString()}
-            >
-              {when(lastActive(s))}
-            </span>
-            {/* Which engine is running it is not a detail: the two behave
-                differently and the binding is permanent. */}
-            <span className={"session-backend " + s.backend}>
-              {backendShort(s.backend)}
-            </span>
-            <button
-              className="session-del"
-              title="Delete session and its history"
-              onClick={(e) => {
-                e.stopPropagation()
-                onDelete(s.id)
-              }}
-            >
-              <X />
-            </button>
-          </div>
-        ))}
+        {groups.length > 0 && <div className="sidebar-section">Projects</div>}
+        {groups.map(({ project, sessions: inside }) => {
+          const open = !folded.has(project.id)
+          const holdsActive = inside.some((s) => s.id === activeId)
+          return (
+            <div key={project.id} className="project-group">
+              <div
+                className={"project-row" + (!open && holdsActive ? " active" : "")}
+                onClick={() => onFold(project.id)}
+                title={project.workspace}
+              >
+                <span className="project-fold">{open ? <ChevronDown /> : <ChevronRight />}</span>
+                {open ? <FolderOpen className="project-icon" /> : <Folder className="project-icon" />}
+                <span className="session-label">{project.name}</span>
+                {!open && inside.length > 0 && <span className="session-when">{inside.length}</span>}
+                <span className="project-actions" onClick={(e) => e.stopPropagation()}>
+                  <NewSessionButton
+                    small
+                    title={`New session in ${project.name}`}
+                    onCreate={(backend) => onCreate(backend, project.id)}
+                  />
+                  <button
+                    className="session-del project-edit"
+                    title="Project settings"
+                    onClick={() => onEditProject(project)}
+                  >
+                    <Settings />
+                  </button>
+                </span>
+              </div>
+              {open &&
+                (inside.length ? (
+                  inside.map((s) => row(s, true))
+                ) : (
+                  <div className="project-empty">No sessions yet.</div>
+                ))}
+            </div>
+          )
+        })}
+
+        {groups.length > 0 && loose.length > 0 && <div className="sidebar-section">Sessions</div>}
+        {loose.map((s) => row(s, false))}
       </div>
 
       <div className="sidebar-foot">
@@ -204,8 +304,13 @@ function PushButton({ push }: { push: Push }) {
  */
 function NewSessionButton({
   onCreate,
+  small = false,
+  title = "New session",
 }: {
   onCreate: (backend: AgentBackend) => void
+  // The one on a project's row, the size of the row's other buttons.
+  small?: boolean
+  title?: string
 }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLSpanElement>(null)
@@ -227,9 +332,9 @@ function NewSessionButton({
   return (
     <span className="new-session" ref={ref}>
       <button
-        className="icon-btn"
+        className={small ? "session-del project-new" : "icon-btn"}
         onClick={() => setOpen((v) => !v)}
-        title="New session"
+        title={title}
       >
         <Plus />
       </button>
