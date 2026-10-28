@@ -44,7 +44,8 @@ defmodule LoomWeb.ProjectControllerTest do
     %{"id" => id, "workspace" => ws} = create_project(conn, %{name: "Blog"})
     assert File.dir?(ws)
 
-    assert %{"projects" => [%{"id" => ^id}]} = conn |> get(~p"/api/projects") |> json_response(200)
+    assert %{"projects" => [%{"id" => ^id}]} =
+             conn |> get(~p"/api/projects") |> json_response(200)
 
     assert %{"name" => "Blog 2", "instructions" => "Short."} =
              conn
@@ -60,7 +61,9 @@ defmodule LoomWeb.ProjectControllerTest do
       create_project(conn, %{name: "Novel", instructions: "Use British spelling."})
 
     %{"id" => id, "project_id" => ^pid} =
-      conn |> post(~p"/api/agents", %{backend: "claude_code", project_id: pid}) |> json_response(201)
+      conn
+      |> post(~p"/api/agents", %{backend: "claude_code", project_id: pid})
+      |> json_response(201)
 
     meta = BackendStub.last_meta()
     assert meta.cc_cwd == ws
@@ -71,7 +74,11 @@ defmodule LoomWeb.ProjectControllerTest do
 
   test "editing a project hands its sessions the new instructions", %{conn: conn} do
     %{"id" => pid, "workspace" => ws} = create_project(conn, %{name: "Live"})
-    conn |> post(~p"/api/agents", %{backend: "claude_code", project_id: pid}) |> json_response(201)
+
+    conn
+    |> post(~p"/api/agents", %{backend: "claude_code", project_id: pid})
+    |> json_response(201)
+
     conn |> post(~p"/api/agents", %{backend: "claude_code"}) |> json_response(201)
 
     conn |> patch(~p"/api/projects/#{pid}", %{instructions: "New rules."}) |> json_response(200)
@@ -82,7 +89,9 @@ defmodule LoomWeb.ProjectControllerTest do
   end
 
   test "a loose session moves into a project, carrying on in its workspace", %{conn: conn} do
-    %{"id" => pid, "workspace" => ws} = create_project(conn, %{name: "Home", instructions: "Be brief."})
+    %{"id" => pid, "workspace" => ws} =
+      create_project(conn, %{name: "Home", instructions: "Be brief."})
+
     %{"id" => id} = conn |> post(~p"/api/agents", %{backend: "claude_code"}) |> json_response(201)
 
     assert %{"project_id" => ^pid} =
@@ -99,6 +108,29 @@ defmodule LoomWeb.ProjectControllerTest do
 
     assert_receive {:stub_relocated, nil, instructions}
     refute instructions =~ "Home"
+  end
+
+  test "the next turn after a move tells the backend, once, and the transcript nothing", %{
+    conn: conn
+  } do
+    %{"id" => pid} = create_project(conn, %{name: "Notes", instructions: "Use bullet points."})
+    %{"id" => id} = conn |> post(~p"/api/agents", %{backend: "claude_code"}) |> json_response(201)
+    conn |> patch(~p"/api/agents/#{id}", %{project_id: pid}) |> json_response(200)
+
+    {:ok, :started} = Agent.submit(id, "hello")
+    text = BackendStub.await_turn()
+    assert text =~ "Note from Loom"
+    assert text =~ "Use bullet points."
+    assert String.ends_with?(text, "hello")
+
+    {:ok, %{events: events}} = Agent.attach(id)
+    assert [%{payload: %{text: "hello"}}] = Enum.filter(events, &(&1.kind == :user))
+
+    [{session, _}] = Registry.lookup(Loom.Agent.Registry, id)
+    send(session, {:stub, [{:event, :turn_done, %{}}]})
+    _ = Agent.info(id)
+    {:ok, _} = Agent.submit(id, "again")
+    assert BackendStub.await_turn() == "again"
   end
 
   test "a move is refused mid-turn, and to a project that does not exist", %{conn: conn} do
@@ -121,9 +153,13 @@ defmodule LoomWeb.ProjectControllerTest do
     %{"id" => id, "pinned" => false} =
       conn |> post(~p"/api/agents", %{backend: "claude_code"}) |> json_response(201)
 
-    assert %{"pinned" => true} = conn |> patch(~p"/api/agents/#{id}", %{pinned: true}) |> json_response(200)
+    assert %{"pinned" => true} =
+             conn |> patch(~p"/api/agents/#{id}", %{pinned: true}) |> json_response(200)
+
     assert {:ok, %{pinned: true}} = Loom.Agent.Store.read_meta(id)
-    assert %{"pinned" => false} = conn |> patch(~p"/api/agents/#{id}", %{pinned: false}) |> json_response(200)
+
+    assert %{"pinned" => false} =
+             conn |> patch(~p"/api/agents/#{id}", %{pinned: false}) |> json_response(200)
   end
 
   test "a session outside any project has no project and no cwd", %{conn: conn} do
@@ -147,7 +183,9 @@ defmodule LoomWeb.ProjectControllerTest do
     File.write!(Path.join(ws, "data.csv"), "a,b\n")
 
     %{"id" => id} =
-      conn |> post(~p"/api/agents", %{backend: "claude_code", project_id: pid}) |> json_response(201)
+      conn
+      |> post(~p"/api/agents", %{backend: "claude_code", project_id: pid})
+      |> json_response(201)
 
     assert %{"workspace" => [%{"path" => "data.csv"}], "workspace_truncated" => false} =
              conn |> get(~p"/api/agents/#{id}/tree") |> json_response(200)
@@ -158,14 +196,20 @@ defmodule LoomWeb.ProjectControllerTest do
 
   test "a session outside a project has no workspace in its tree", %{conn: conn} do
     %{"id" => id} = conn |> post(~p"/api/agents", %{backend: "claude_code"}) |> json_response(201)
-    refute Map.has_key?(conn |> get(~p"/api/agents/#{id}/tree") |> json_response(200), "workspace")
+
+    refute Map.has_key?(
+             conn |> get(~p"/api/agents/#{id}/tree") |> json_response(200),
+             "workspace"
+           )
   end
 
   test "deleting a project deletes its sessions, not others", %{conn: conn} do
     %{"id" => pid, "workspace" => ws} = create_project(conn, %{name: "Gone"})
 
     %{"id" => inside} =
-      conn |> post(~p"/api/agents", %{backend: "claude_code", project_id: pid}) |> json_response(201)
+      conn
+      |> post(~p"/api/agents", %{backend: "claude_code", project_id: pid})
+      |> json_response(201)
 
     %{"id" => outside} =
       conn |> post(~p"/api/agents", %{backend: "claude_code"}) |> json_response(201)

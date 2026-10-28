@@ -30,13 +30,16 @@ defmodule LoomWeb.ProjectController do
     end
   end
 
-  # DELETE /api/projects/:id — the project, every session made in it, and the
-  # workspace if Loom made it. Sessions first: one left behind would point at
-  # a cwd that is about to go.
+  # DELETE /api/projects/:id — the project, every session in it, and its
+  # workspace. Sessions first: one left behind would point at a cwd that is
+  # about to go.
   def delete(conn, %{"id" => id}) do
     case Projects.get(id) do
       {:ok, _project} ->
-        for meta <- Agent.list_persisted(), meta[:project_id] == id, do: Agent.delete_session(meta.id)
+        for meta <- Agent.list_persisted(),
+            meta[:project_id] == id,
+            do: Agent.delete_session(meta.id)
+
         :ok = Projects.delete(id)
         send_resp(conn, :no_content, "")
 

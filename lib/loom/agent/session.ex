@@ -273,7 +273,9 @@ defmodule Loom.Agent.Session do
   # restore, so a renamed project or edited instructions are what the backend
   # is told next.
   defp instructions(id, nil), do: Output.instructions(id)
-  defp instructions(id, project), do: Output.instructions(id) <> "\n" <> Loom.Projects.instructions(project)
+
+  defp instructions(id, project),
+    do: Output.instructions(id) <> "\n" <> Loom.Projects.instructions(project)
 
   defp project_of(nil), do: nil
 
@@ -306,6 +308,7 @@ defmodule Loom.Agent.Session do
           handle: handle,
           project_id: meta[:project_id],
           pinned: meta[:pinned] == true,
+          notice: if(is_binary(meta[:notice]), do: meta[:notice]),
           title: meta[:title],
           created_at: meta[:created_at],
           last_active_at: last_active(transcript) || meta[:created_at],
@@ -373,6 +376,9 @@ defmodule Loom.Agent.Session do
       project_id: nil,
       # Shown above everything else in the sidebar.
       pinned: false,
+      # Told to the backend ahead of the next turn's message, once: what changed
+      # about its project since the conversation began. See `moved_notice/2`.
+      notice: nil,
       title: nil,
       created_at: nil,
       # When the last message went either way; orders the sidebar. Derived from
@@ -491,7 +497,13 @@ defmodule Loom.Agent.Session do
       {:ok, handle} =
         Backend.impl(state.backend).relocate(state.handle, cwd, instructions(state.id, project))
 
-      state = %{state | handle: handle, project_id: project && project.id}
+      state = %{
+        state
+        | handle: handle,
+          project_id: project && project.id,
+          notice: moved_notice(project, Map.get(handle, :cwd))
+      }
+
       persist_meta(state)
       {:reply, :ok, state}
     else
@@ -545,8 +557,16 @@ defmodule Loom.Agent.Session do
   # `/reload` would; Codex reads it at its next resume.
   def handle_info(:refresh_instructions, %{handle: handle, status: status} = state)
       when is_map(handle) and status in [:starting, :running] do
-    text = instructions(state.id, project_of(state.project_id))
-    state = %{state | handle: Map.replace(handle, :instructions, text)}
+    project = project_of(state.project_id)
+    text = instructions(state.id, project)
+
+    state = %{
+      state
+      | handle: Map.replace(handle, :instructions, text),
+        notice: edited_notice(project)
+    }
+
+    write_meta(state)
     handle_info(:reload_backend, state)
   end
 
@@ -555,8 +575,13 @@ defmodule Loom.Agent.Session do
     project = project_of(state.project_id)
     cwd = project && Loom.Projects.workspace(project)
     state = cancel_release(state)
-    {:ok, handle} = Backend.impl(state.backend).relocate(handle, cwd, instructions(state.id, project))
-    {:noreply, %{state | handle: handle}}
+
+    {:ok, handle} =
+      Backend.impl(state.backend).relocate(handle, cwd, instructions(state.id, project))
+
+    state = %{state | handle: handle, notice: edited_notice(project)}
+    write_meta(state)
+    {:noreply, state}
   end
 
   def handle_info(:refresh_instructions, state), do: {:noreply, state}
@@ -741,7 +766,7 @@ defmodule Loom.Agent.Session do
   defp drain(state) do
     # The whole queue becomes one message. See the moduledoc.
     queue = state.queue
-    text = Enum.join(queue, "\n\n")
+    text = with_notice(state.notice, Enum.join(queue, "\n\n"))
 
     state = cancel_release(state)
 
@@ -750,7 +775,7 @@ defmodule Loom.Agent.Session do
         # `:starting` rather than `:running`: Claude Code takes seconds to boot
         # before it says anything, and a UI with no state for that gap looks
         # hung. The backend's own status event moves us to `:running`.
-        set_status(%{state | handle: handle, queue: []}, :starting)
+        set_status(%{state | handle: handle, queue: [], notice: nil}, :starting)
 
       {:error, reason} ->
         # The queue is cleared only on success. Dropping the user's message
@@ -933,6 +958,7 @@ defmodule Loom.Agent.Session do
       backend: state.backend,
       project_id: state.project_id,
       pinned: state.pinned,
+      notice: state.notice,
       title: state.title,
       created_at: state.created_at,
       status: state.status,
@@ -953,6 +979,34 @@ defmodule Loom.Agent.Session do
   end
 
   # ── Helpers ─────────────────────────────────────────────────────────────
+
+  # What a conversation already under way is told when its project changes.
+  # A system prompt cannot carry it: Claude Code keeps the one a conversation
+  # started with across `--resume` and ignores a new `--append-system-prompt`
+  # (measured, 2.1.312). So it goes ahead of the next message the backend
+  # gets, marked as Loom's, and is not shown in the transcript.
+  defp moved_notice(nil, cwd) do
+    "[Note from Loom, not written by the user: this conversation is no longer in a " <>
+      "Loom project. Your working directory is now #{cwd}. Earlier project " <>
+      "instructions no longer apply.]"
+  end
+
+  defp moved_notice(project, _cwd) do
+    "[Note from Loom, not written by the user: this conversation has been moved " <>
+      "into a Loom project, and your working directory is now its workspace.]\n\n" <>
+      Loom.Projects.instructions(project)
+  end
+
+  defp edited_notice(nil), do: nil
+
+  defp edited_notice(project) do
+    "[Note from Loom, not written by the user: the project's details have changed. " <>
+      "They now read as follows, and replace what you were told before.]\n\n" <>
+      Loom.Projects.instructions(project)
+  end
+
+  defp with_notice(nil, text), do: text
+  defp with_notice(notice, text), do: notice <> "\n\n---\n\n" <> text
 
   # Name the session after its first message. Without this a session list shows
   # nothing but opaque ids, and the alternative — joining every session to read

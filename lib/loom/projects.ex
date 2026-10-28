@@ -231,7 +231,11 @@ defmodule Loom.Projects do
 
   def handle_call({:update, id, attrs}, _from, state) do
     with {:ok, project} <- fetch(state, id),
-         {:ok, name} <- if(Map.has_key?(attrs, "name"), do: valid_name(attrs["name"]), else: {:ok, project.name}),
+         {:ok, name} <-
+           if(Map.has_key?(attrs, "name"),
+             do: valid_name(attrs["name"]),
+             else: {:ok, project.name}
+           ),
          {:ok, instructions} <-
            if(Map.has_key?(attrs, "instructions"),
              do: valid_instructions(attrs["instructions"]),
@@ -266,7 +270,8 @@ defmodule Loom.Projects do
     end
   end
 
-  defp broadcast(message), do: Phoenix.PubSub.broadcast(Loom.PubSub, Loom.Agent.lobby_topic(), message)
+  defp broadcast(message),
+    do: Phoenix.PubSub.broadcast(Loom.PubSub, Loom.Agent.lobby_topic(), message)
 
   # ── Validation ────────────────────────────────────────────────────────────
 
