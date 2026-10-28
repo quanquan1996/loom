@@ -32,6 +32,8 @@ import {
 } from "./api"
 import { dropSocket } from "./socket"
 import "./App.css"
+// Last, so it decides the look over every other stylesheet.
+import "./theme.css"
 
 const SIDEBAR_KEY = "loom_sidebar_open"
 const CANVAS_KEY = "loom_canvas"

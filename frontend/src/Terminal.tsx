@@ -6,13 +6,14 @@ import "@xterm/xterm/css/xterm.css"
 import { getSocket } from "./socket"
 
 // Mirrors the local iTerm2 "Default" profile palette so index-colored output
-// (prompts, ls, TUIs) renders identically in the browser.
+// (prompts, ls, TUIs) renders identically in the browser. The background,
+// cursor and selection follow the app's theme (theme.css) instead.
 const THEME = {
-  background: "#010c18",
-  foreground: "#ecdef4",
-  cursor: "#38ff9d",
-  cursorAccent: "#010c18",
-  selectionBackground: "#38ff9c",
+  background: "#181818",
+  foreground: "#ececec",
+  cursor: "#ececec",
+  cursorAccent: "#181818",
+  selectionBackground: "#ffffff40",
   black: "#0b3b61",
   red: "#ff3a3a",
   green: "#52ffd0",

@@ -1,0 +1,607 @@
+/* ── Theme: ChatGPT's look ───────────────────────────────────────────────
+   Loaded last (see App.tsx), over App.css, Chat.css and Login.css, which keep
+   the layout. This file decides how it looks: ChatGPT's dark greys, its
+   near-white text, a neutral accent instead of neon, the system's sans for
+   the interface, and the mono kept for what is code — code blocks, tool
+   output, terminals.
+
+   Most of it is the variables: every colour the other files use is one of
+   them. The rest is the few places whose shape is part of the look — the
+   message bubble, the composer, the send button, menus and dialogs. */
+
+:root {
+  --bg: #212121;
+  --bg-raised: #181818;
+  --bg-card: #303030;
+  --line: #ffffff1a;
+  --fg: #ececec;
+  --fg-dim: #9b9b9b;
+  /* What was neon green is ChatGPT's white: selection, the active row, the
+     caret. Colour is kept for meaning only — green for working, red for
+     stopped or failed, blue for links. */
+  --accent: #ececec;
+  --green: #10a37f;
+  --blue: #66b5ff;
+  --red: #f87171;
+  --ui: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", Roboto, "Helvetica Neue", Arial, sans-serif;
+  /* ChatGPT's column. In rem now: the old 100ch assumed a monospace UI. */
+  --measure: 48rem;
+}
+
+html,
+body,
+#root {
+  background: var(--bg);
+}
+
+/* The interface in sans… */
+.app,
+.loading,
+.placeholder,
+.login,
+.icon-btn,
+.text-btn,
+.modal,
+.chip.button,
+.option,
+.command-menu li,
+.composer-input,
+.composer-btn,
+.file-card,
+.file-drop,
+.session-menu,
+.sidebar .session-list,
+button,
+input,
+textarea,
+select {
+  font-family: var(--ui);
+}
+
+/* …and what is code in mono. */
+pre,
+code,
+kbd,
+samp,
+.code-block,
+.tool-summary,
+.tool-input,
+.tool-output,
+.command-menu .name,
+.cron-id,
+.install-command,
+.project-path,
+.xterm {
+  font-family: var(--mono);
+}
+
+::selection {
+  background: #ffffff33;
+}
+
+/* ── Status colours ─────────────────────────────────────────────────────── */
+
+.dot.running,
+.dot.online {
+  background: var(--green);
+}
+
+.chip.status.running {
+  color: var(--green);
+}
+
+.session-backend.claude_code,
+.session-backend.codex {
+  color: var(--fg-dim);
+}
+
+/* ── Sidebar ────────────────────────────────────────────────────────────── */
+
+.sidebar {
+  background: var(--bg-raised);
+  border-right: 0;
+}
+
+.sidebar-head {
+  border-bottom-color: transparent;
+}
+
+.brand {
+  color: var(--fg);
+  font-family: var(--ui);
+  font-size: 1.15rem;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.sidebar-head .icon-btn,
+.chat-header .icon-btn {
+  background: transparent;
+  color: var(--fg-dim);
+  border-radius: 8px;
+}
+
+.sidebar-head .icon-btn:hover,
+.chat-header .icon-btn:hover {
+  background: #ffffff12;
+  color: var(--fg);
+}
+
+.sidebar .session:hover,
+.nav-item:hover,
+.project-row:hover {
+  background: #ffffff0d;
+}
+
+.sidebar .session.active {
+  background: #ffffff17;
+}
+
+.sidebar-foot {
+  border-top-color: transparent;
+}
+
+/* ── Chat ───────────────────────────────────────────────────────────────── */
+
+.chat-header {
+  background: var(--bg);
+  border-bottom-color: transparent;
+}
+
+.chat-name {
+  font-size: 1.05rem;
+  font-weight: 500;
+}
+
+/* The header's chips: quiet text, a button only when hovered or on. */
+.chip {
+  background: transparent;
+}
+
+.chip.button.terminal-toggle,
+.chip.button.canvas-toggle {
+  color: var(--fg-dim);
+  background: transparent;
+  border-radius: 8px;
+}
+
+.chip.button.terminal-toggle:hover,
+.chip.button.canvas-toggle:hover {
+  color: var(--fg);
+  background: #ffffff12;
+}
+
+.chip.button.terminal-toggle.on,
+.chip.button.canvas-toggle.on {
+  color: var(--fg);
+  background: #ffffff1f;
+}
+
+.timeline {
+  padding: 20px 16px 32px;
+}
+
+.timeline-inner {
+  gap: 14px;
+}
+
+.bubble {
+  line-height: 1.7;
+}
+
+.bubble.user {
+  max-width: min(70%, 36rem);
+  padding: 0.6rem 1.1rem;
+  border: 0;
+  border-radius: 1.5rem;
+  background: var(--bg-card);
+}
+
+.bubble.assistant {
+  font-size: 1.02rem;
+}
+
+.bubble.assistant.live::after {
+  content: "●";
+  color: var(--fg);
+  font-size: 0.8em;
+}
+
+code {
+  background: #ffffff1a;
+  font-size: 0.9em;
+}
+
+pre.code {
+  border: 0;
+  border-radius: 12px;
+  background: #171717;
+}
+
+.tool {
+  border-color: #ffffff14;
+  border-radius: 12px;
+  background: transparent;
+}
+
+.tool-head:hover {
+  background: #ffffff0a;
+}
+
+.tool-name {
+  color: var(--fg);
+  font-weight: 500;
+}
+
+.notice,
+.thinking {
+  font-style: normal;
+}
+
+.error {
+  border-left: 0;
+  border-radius: 12px;
+  background: #f871711a;
+}
+
+.md a {
+  color: var(--blue);
+}
+
+/* ── Composer: ChatGPT's pill, and its white send button ──────────────── */
+
+.composer {
+  padding: 4px 16px 16px;
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+}
+
+.composer-box {
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 1.75rem;
+  background: var(--bg-card);
+  box-shadow:
+    0 0 0 1px #ffffff0d,
+    0 4px 20px rgb(0 0 0 / 25%);
+}
+
+.composer-box:focus-within {
+  border-color: transparent;
+}
+
+.composer-input {
+  font-size: 1.02rem;
+}
+
+.composer-btn {
+  color: var(--fg);
+}
+
+.composer-btn:hover:not(:disabled) {
+  background: #ffffff12;
+}
+
+.composer-btn.send,
+.composer-btn.stop {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.composer-btn.send:hover:not(:disabled),
+.composer-btn.stop:hover {
+  background: #ffffffcc;
+  color: var(--bg);
+}
+
+.composer-btn.send:disabled {
+  background: #676767;
+  color: #2f2f2f;
+  opacity: 1;
+}
+
+.command-menu {
+  border: 0;
+  border-radius: 1rem;
+  background: #353535;
+  box-shadow: 0 8px 28px rgb(0 0 0 / 40%);
+}
+
+.command-menu li.on {
+  background: #ffffff12;
+}
+
+/* ── Menus, dialogs, buttons ────────────────────────────────────────────── */
+
+.session-menu,
+.backend-menu {
+  border: 0;
+  border-radius: 16px;
+  background: #353535;
+  box-shadow: 0 10px 32px rgb(0 0 0 / 45%);
+}
+
+.session-menu {
+  padding: 6px;
+}
+
+.session-menu button {
+  border-radius: 10px;
+  font-size: 0.95rem;
+}
+
+.session-menu button:hover:not(:disabled),
+.backend-menu button:hover {
+  background: #ffffff12;
+}
+
+.session-menu-sep {
+  background: #ffffff14;
+}
+
+.modal-scrim {
+  background: rgb(0 0 0 / 60%);
+}
+
+.modal {
+  border: 0;
+  border-radius: 16px;
+  background: #2f2f2f;
+  box-shadow: 0 16px 48px rgb(0 0 0 / 50%);
+}
+
+.modal-head {
+  border-bottom-color: #ffffff14;
+  font-weight: 600;
+}
+
+.text-btn {
+  border-radius: 999px;
+  background: #ffffff12;
+  color: var(--fg);
+}
+
+.text-btn:hover {
+  background: #ffffff21;
+  color: var(--fg);
+}
+
+.text-btn.primary,
+.project-form .text-btn.primary {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.text-btn.primary:hover {
+  background: #ffffffcc;
+  color: var(--bg);
+}
+
+.text-btn.danger {
+  color: var(--red);
+}
+
+.text-btn.danger:hover {
+  background: #f8717126;
+  color: var(--red);
+}
+
+.project-form input,
+.project-form textarea,
+.device-add input,
+.device-name-input {
+  border-color: #ffffff1a;
+  border-radius: 10px;
+  background: #212121;
+}
+
+.project-form input:focus,
+.project-form textarea:focus {
+  outline: none;
+  border-color: #ffffff40;
+}
+
+/* ── Login ──────────────────────────────────────────────────────────────── */
+
+.login {
+  background: var(--bg);
+}
+
+.login-box {
+  background: transparent;
+}
+
+.login-title {
+  color: var(--fg);
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.login-input {
+  border-color: #ffffff26;
+  border-radius: 999px;
+  background: var(--bg-card);
+  color: var(--fg);
+  padding: 12px 18px;
+}
+
+.login-input:focus {
+  border-color: #ffffff59;
+}
+
+.login-error {
+  color: var(--red);
+}
+
+.login-btn {
+  border-radius: 999px;
+  background: var(--fg);
+  color: var(--bg);
+  font-weight: 600;
+}
+
+/* ── Sizes: ChatGPT's proportions ───────────────────────────────────────
+   16px body text with a 1.75 line, 14px in the sidebar, a 260px sidebar
+   and a 52px header on a desktop; the phone app's larger sidebar type, its
+   bold list headings, on a phone. */
+
+html {
+  font-size: 100%;
+}
+
+:root {
+  --head-h: 3.25rem;
+}
+
+.sidebar {
+  flex-basis: min(16.25rem, 80vw);
+}
+
+.sidebar .session-list {
+  padding: 4px 6px 12px;
+}
+
+.nav-item,
+.project-row,
+.sidebar .session {
+  min-height: 2.25rem;
+  border-radius: 8px;
+}
+
+.nav-item {
+  gap: 10px;
+  padding: 0 8px;
+  font-size: 0.875rem;
+}
+
+.nav-icon {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+.project-row {
+  gap: 10px;
+  padding: 0 8px 0 16px;
+  font-size: 0.875rem;
+}
+
+.project-icon {
+  width: 1rem;
+  height: 1rem;
+}
+
+.project-sessions {
+  margin-left: 24px;
+}
+
+.sidebar .session {
+  padding: 0 6px 0 8px;
+}
+
+.sidebar .session .session-label,
+.project-sessions .session .session-label {
+  font-size: 0.875rem;
+}
+
+.sidebar .session.active .session-label {
+  font-weight: 400;
+}
+
+.list-heading {
+  margin-top: 16px;
+  padding: 6px 8px;
+  color: var(--fg-dim);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.devices-btn {
+  font-family: var(--ui);
+  font-size: 0.875rem;
+}
+
+.chat-name {
+  font-size: 1.125rem;
+  font-weight: 400;
+}
+
+.bubble,
+.bubble.assistant {
+  font-size: 1rem;
+  line-height: 1.75;
+}
+
+.bubble.user {
+  padding: 0.625rem 1.25rem;
+}
+
+.md-h {
+  line-height: 1.4;
+}
+
+pre.code,
+.tool-input,
+.tool-output {
+  font-size: 0.875rem;
+}
+
+.tool-head {
+  padding: 8px 12px;
+  font-size: 0.875rem;
+}
+
+.composer-box {
+  min-height: 3.25rem;
+  box-sizing: border-box;
+  padding: 7px 10px;
+}
+
+.composer-input {
+  font-size: 1rem;
+  line-height: 1.5rem;
+}
+
+.composer-btn {
+  width: 2.25rem;
+  height: 2.25rem;
+  font-size: 1.125rem;
+}
+
+.modal {
+  font-size: 0.9375rem;
+}
+
+/* The phone app: bigger type in the drawer, bold headings over its lists. */
+@media (max-width: 640px) {
+  .nav-item,
+  .project-row,
+  .sidebar .session {
+    min-height: 2.75rem;
+  }
+
+  .nav-item {
+    gap: 14px;
+    font-size: 1.0625rem;
+  }
+
+  .nav-icon {
+    width: 1.375rem;
+    height: 1.375rem;
+  }
+
+  .project-row,
+  .sidebar .session .session-label,
+  .project-sessions .session .session-label {
+    font-size: 1.0625rem;
+  }
+
+  .list-heading {
+    color: var(--fg);
+    font-size: 1.0625rem;
+    font-weight: 600;
+  }
+
+  .brand {
+    font-size: 1.375rem;
+  }
+}
