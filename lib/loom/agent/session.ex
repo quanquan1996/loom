@@ -171,6 +171,13 @@ defmodule Loom.Agent.Session do
   def seen(id, seq), do: GenServer.call(via(id), {:seen, seq})
 
   @doc """
+  How hard the model thinks from the next turn on: one of
+  `Backend.efforts/1` for the session's backend, or nil for the model's own
+  default. Local to loom, and given to the backend as each turn starts.
+  """
+  def set_effort(id, effort), do: GenServer.call(via(id), {:effort, effort})
+
+  @doc """
   Move the session into a project (by id), or out of any with nil.
 
   The conversation carries on where it is, from the project's workspace: the
@@ -358,6 +365,7 @@ defmodule Loom.Agent.Session do
           employee_id: if(is_binary(meta[:employee_id]), do: meta[:employee_id]),
           seen_seq: if(is_integer(meta[:seen_seq]), do: meta[:seen_seq], else: 0),
           reply_seq: reply_seq(meta, transcript),
+          effort: if(meta[:effort] in Backend.efforts(backend), do: meta[:effort]),
           notice: if(is_binary(meta[:notice]), do: meta[:notice]),
           title: meta[:title],
           created_at: meta[:created_at],
@@ -484,6 +492,8 @@ defmodule Loom.Agent.Session do
       # this past `seen_seq`. Not `seq`, which also counts status and queue
       # events nobody reads.
       reply_seq: 0,
+      # The thinking level, or nil for the model's default. See `set_effort/2`.
+      effort: nil,
       # Told to the backend ahead of the next turn's message, once: what changed
       # about its project since the conversation began. See `moved_notice/2`.
       notice: nil,
@@ -596,6 +606,16 @@ defmodule Loom.Agent.Session do
   end
 
   def handle_call({:seen, _seq}, _from, state), do: {:reply, {:error, :not_a_seq}, state}
+
+  def handle_call({:effort, effort}, _from, state) do
+    if effort == nil or effort in Backend.efforts(state.backend) do
+      state = %{state | effort: effort}
+      persist_meta(state)
+      {:reply, :ok, state}
+    else
+      {:reply, {:error, "not a thinking level for this agent"}, state}
+    end
+  end
 
   def handle_call({:move, _project_id}, _from, %{status: status} = state)
       when status in [:starting, :running] do
@@ -1011,8 +1031,9 @@ defmodule Loom.Agent.Session do
     text = with_notice(state.notice, Enum.join(queue, "\n\n"))
 
     state = cancel_release(state)
+    handle = Backend.set_effort(state.backend, state.handle, state.effort)
 
-    case Backend.impl(state.backend).run_turn(state.handle, text) do
+    case Backend.impl(state.backend).run_turn(handle, text) do
       {:ok, handle} ->
         # `:starting` rather than `:running`: Claude Code takes seconds to boot
         # before it says anything, and a UI with no state for that gap looks
@@ -1219,6 +1240,7 @@ defmodule Loom.Agent.Session do
       employee_id: state.employee_id,
       seen_seq: state.seen_seq,
       reply_seq: state.reply_seq,
+      effort: state.effort,
       notice: state.notice,
       title: state.title,
       created_at: state.created_at,
@@ -1296,6 +1318,7 @@ defmodule Loom.Agent.Session do
       employee_id: state.employee_id,
       seen_seq: state.seen_seq,
       reply_seq: state.reply_seq,
+      effort: state.effort,
       title: state.title,
       created_at: state.created_at,
       last_active_at: state.last_active_at,

@@ -163,6 +163,9 @@ defmodule Loom.Agent.Backend.ClaudeCode do
       instructions: Backend.meta_get(meta, :instructions),
       # `--model`, when the session pins one; Claude Code's default otherwise.
       model: Backend.meta_get(meta, :cc_model),
+      # `--effort`, which a running process cannot change: nil for the model's
+      # default. See set_effort/2.
+      effort: Backend.meta_get(meta, :cc_effort),
       # `total_cost_usd` as the running process last reported it: a running
       # total since that process started, so a turn's cost is the difference.
       cost_seen: 0.0,
@@ -238,7 +241,9 @@ defmodule Loom.Agent.Backend.ClaudeCode do
   defp spawn_process(handle) do
     args =
       @base_args ++
-        model_args(handle) ++ fallback_args() ++ session_args(handle) ++ instruction_args(handle)
+        model_args(handle) ++
+        effort_args(handle) ++
+        fallback_args() ++ session_args(handle) ++ instruction_args(handle)
 
     with {:ok, exe} <- executable(),
          {:ok, proc} <- Proc.spawn(handle.loom_id, exe, args, handle.cwd) do
@@ -300,6 +305,9 @@ defmodule Loom.Agent.Backend.ClaudeCode do
   defp model_args(%{model: model}) when is_binary(model) and model != "", do: ["--model", model]
   defp model_args(_handle), do: []
 
+  defp effort_args(%{effort: effort}) when is_binary(effort), do: ["--effort", effort]
+  defp effort_args(_handle), do: []
+
   defp instruction_args(%{instructions: text}) when is_binary(text) and text != "",
     do: ["--append-system-prompt", text]
 
@@ -329,6 +337,15 @@ defmodule Loom.Agent.Backend.ClaudeCode do
     {:ok, %{handle | interrupted?: true, next_control_id: handle.next_control_id + 1}}
   end
 
+  # A flag, so a warm process spawned with another level is let go of; the
+  # turn about to start spawns its successor, which resumes the conversation.
+  @impl Backend
+  def set_effort(handle, effort) do
+    if Map.get(handle, :effort) == effort,
+      do: handle,
+      else: %{teardown(handle) | effort: effort}
+  end
+
   @impl Backend
   def release(%{proc: nil} = handle), do: {:ok, handle}
   def release(handle), do: {:ok, teardown(handle)}
@@ -344,7 +361,8 @@ defmodule Loom.Agent.Backend.ClaudeCode do
       cc_session_id: handle.session_id,
       cc_cwd: handle.cwd,
       cc_started: handle.started?,
-      cc_model: Map.get(handle, :model)
+      cc_model: Map.get(handle, :model),
+      cc_effort: Map.get(handle, :effort)
     }
   end
 

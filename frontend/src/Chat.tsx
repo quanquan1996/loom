@@ -26,6 +26,7 @@ import {
   type ReactNode,
 } from "react"
 import { createPortal } from "react-dom"
+import { EffortButton } from "./Effort"
 import { buildTimeline, foldFinished, isBusy, type CronJob, type TimelineItem } from "./agent"
 import { itemForAttachment, itemForOutput, itemForPath, type CanvasItem } from "./canvasItems"
 import { backendShort, formatBytes } from "./format"
@@ -269,6 +270,7 @@ export function Chat({
           attachments={attachments}
           onSubmit={send}
           onInterrupt={interrupt}
+          tools={<EffortButton session={session} />}
         />
       </OpenCanvas.Provider>
     </div>
@@ -1187,12 +1189,15 @@ function Composer({
   attachments,
   onSubmit,
   onInterrupt,
+  tools,
 }: {
   busy: boolean
   interrupted: boolean
   attachments: Attachments
   onSubmit: (text: string) => void
   onInterrupt: () => void
+  // Beside +: the thinking level.
+  tools?: ReactNode
 }) {
   const [text, setText] = useState("")
   const ref = useRef<HTMLTextAreaElement>(null)
@@ -1309,13 +1314,16 @@ function Composer({
             e.target.value = ""
           }}
         />
-        <button
-          className="composer-btn attach"
-          title="Attach files — or drop them anywhere in the conversation"
-          onClick={() => picker.current?.click()}
-        >
-          <Plus />
-        </button>
+        <div className="composer-tools">
+          <button
+            className="composer-btn attach"
+            title="Attach files — or drop them anywhere in the conversation"
+            onClick={() => picker.current?.click()}
+          >
+            <Plus />
+          </button>
+          {tools}
+        </div>
 
         <textarea
           ref={ref}

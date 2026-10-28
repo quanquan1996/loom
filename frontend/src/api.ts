@@ -156,6 +156,9 @@ export type AgentInfo = {
   // Where the agent last said something; past `seen_seq`, a conversation is
   // unread. Older servers do not send it.
   reply_seq?: number
+  // The thinking level from the next turn on; null for the model's default.
+  // See `EFFORTS` for what each agent takes. Older servers do not send it.
+  effort?: string | null
   created_at: number
   // The last message either way, as ms since the epoch: what orders the
   // sidebar and what its age shows. Older servers do not send it.
@@ -213,12 +216,23 @@ export async function renameAgent(
 }
 
 /**
+ * The thinking levels each agent takes, lowest first: Claude Code's
+ * `--effort`, Codex's per-turn `effort`. Mirrors `Loom.Agent.Backend.efforts/1`;
+ * Kiro has none.
+ */
+export const EFFORTS: Record<AgentBackend, string[]> = {
+  claude_code: ["low", "medium", "high", "xhigh", "max"],
+  codex: ["low", "medium", "high", "xhigh"],
+  kiro: [],
+}
+
+/**
  * Pin or unpin a session, or move it into a project (null: out of any). A
  * move is refused mid-turn; the server says so.
  */
 export function updateAgent(
   id: string,
-  attrs: { pinned?: boolean; project_id?: string | null; seen_seq?: number },
+  attrs: { pinned?: boolean; project_id?: string | null; seen_seq?: number; effort?: string | null },
 ): Promise<AgentInfo> {
   return apiCall(`/api/agents/${id}`, { method: "PATCH", body: JSON.stringify(attrs) })
 }

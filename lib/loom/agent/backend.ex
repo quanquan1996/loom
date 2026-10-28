@@ -250,7 +250,32 @@ defmodule Loom.Agent.Backend do
   """
   @callback checkpoint(handle) :: handle
 
-  @optional_callbacks detach: 1, adopt: 1, checkpoint: 1
+  @doc """
+  How hard the model thinks from the next turn on: one of `efforts/1` for the
+  backend, or nil for the model's own default. Given before every turn, so a
+  backend that has nothing to change returns the handle as it is.
+  """
+  @callback set_effort(handle, effort :: String.t() | nil) :: handle
+
+  @optional_callbacks detach: 1, adopt: 1, checkpoint: 1, set_effort: 2
+
+  @doc """
+  The thinking levels a backend takes, lowest first; empty for one that has
+  none to set. Claude Code's `--effort`, Codex's per-turn `effort`.
+  """
+  @spec efforts(kind) :: [String.t()]
+  def efforts(:claude_code), do: ~w(low medium high xhigh max)
+  def efforts(:codex), do: ~w(low medium high xhigh)
+  def efforts(_kind), do: []
+
+  @doc "`set_effort/2`, for a backend that has it."
+  def set_effort(kind, handle, effort) do
+    module = impl(kind)
+
+    if Code.ensure_loaded?(module) and function_exported?(module, :set_effort, 2),
+      do: module.set_effort(handle, effort),
+      else: handle
+  end
 
   @doc "Whether a session on `kind` keeps its turn running through a restart."
   @spec detachable?(kind) :: boolean()

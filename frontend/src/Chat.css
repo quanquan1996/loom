@@ -1262,3 +1262,274 @@ h3.md-h {
   color: var(--fg-dim);
   font-size: 0.769rem;
 }
+
+/* ── Sliders (Slider.tsx) ────────────────────────────────────────────────
+   Quiet until touched: a hairline track, the part up to the thumb filled in
+   the text colour, a white thumb with a soft shadow. Named stops are dots on
+   the track. */
+.slider {
+  --thumb: 18px;
+  --slider-h: 26px;
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: var(--slider-h);
+}
+
+/* The line, and the part of it filled up to the thumb. */
+.slider::before,
+.slider::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: calc(var(--thumb) / 2);
+  height: 3px;
+  margin-top: -1.5px;
+  border-radius: 2px;
+  pointer-events: none;
+}
+
+.slider::before {
+  right: calc(var(--thumb) / 2);
+  background: color-mix(in srgb, var(--fg) 14%, transparent);
+}
+
+.slider::after {
+  width: calc((100% - var(--thumb)) * var(--fill));
+  background: color-mix(in srgb, var(--fg) 72%, transparent);
+}
+
+.slider-ticks {
+  position: absolute;
+  inset: 0 calc(var(--thumb) / 2 - 2.5px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.slider-ticks span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--fg) 24%, var(--bg));
+}
+
+.slider-ticks span.on {
+  background: color-mix(in srgb, var(--fg) 72%, var(--bg));
+}
+
+.slider input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  background: transparent;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  z-index: 2;
+  /* A sideways drag is the slider's; an up-and-down one still scrolls. */
+  touch-action: pan-y;
+}
+
+.slider input::-webkit-slider-runnable-track {
+  height: 100%;
+  background: transparent;
+}
+
+.slider input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: var(--thumb);
+  height: var(--thumb);
+  margin-top: calc((var(--slider-h) - var(--thumb)) / 2);
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow:
+    0 0 0 0.5px rgb(0 0 0 / 14%),
+    0 1px 4px rgb(0 0 0 / 30%);
+  transition: transform 0.15s ease;
+}
+
+.slider input:active::-webkit-slider-thumb {
+  transform: scale(1.12);
+}
+
+.slider input::-moz-range-track {
+  background: transparent;
+}
+
+.slider input::-moz-range-thumb {
+  width: var(--thumb);
+  height: var(--thumb);
+  border: 0;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow:
+    0 0 0 0.5px rgb(0 0 0 / 14%),
+    0 1px 4px rgb(0 0 0 / 30%);
+}
+
+.slider input:focus-visible {
+  outline: none;
+}
+
+.slider input:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue) 45%, transparent);
+}
+
+/* A thumb drawn by hand, for the thinking track, which moves it itself. */
+.slider-thumb {
+  position: absolute;
+  top: 50%;
+  left: calc(var(--thumb) / 2 + (100% - var(--thumb)) * var(--fill));
+  width: var(--thumb);
+  height: var(--thumb);
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow:
+    0 0 0 0.5px rgb(0 0 0 / 14%),
+    0 1px 4px rgb(0 0 0 / 30%);
+  transform: translate(-50%, -50%);
+  transition:
+    left 0.12s ease,
+    transform 0.15s ease;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Held: the thumb lifts, and says the track is listening. */
+.slider.armed .slider-thumb {
+  transform: translate(-50%, -50%) scale(1.25);
+  box-shadow:
+    0 0 0 0.5px rgb(0 0 0 / 14%),
+    0 3px 10px rgb(0 0 0 / 35%);
+}
+
+/* ── Thinking level, beside + (Effort.tsx) ─────────────────────────────── */
+
+/* + and the brain share the box's left cell. */
+.composer-tools {
+  grid-area: attach;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* The panel opens from the box's left edge, over the box's width. */
+.effort {
+  position: static;
+}
+
+.composer-btn.effort-btn {
+  width: auto;
+  min-width: 2.25rem;
+  gap: 4px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-family: var(--ui);
+  font-size: 1.05rem;
+}
+
+.composer-btn.effort-btn.set,
+.composer-btn.effort-btn.open {
+  color: var(--fg);
+  background: color-mix(in srgb, var(--fg) 8%, transparent);
+}
+
+.effort-btn-label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+/* A phone keeps the composer's width for the text: the lit brain says a
+   level is set, the panel says which. */
+@media (max-width: 640px) {
+  .effort-btn-label {
+    display: none;
+  }
+
+  .composer-btn.effort-btn {
+    padding: 0;
+  }
+}
+
+.effort-pop {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 12px);
+  z-index: 5;
+  width: min(21rem, 100%);
+  box-sizing: border-box;
+  padding: 14px 16px 12px;
+  border-radius: 18px;
+  background: var(--surface-menu);
+  box-shadow:
+    0 0 0 0.5px color-mix(in srgb, var(--fg) 10%, transparent),
+    0 12px 32px var(--shadow);
+  font-family: var(--ui);
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.effort-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 6px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.effort-value {
+  color: var(--fg-dim);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.effort-track {
+  --thumb: 22px;
+  --slider-h: 36px;
+  cursor: pointer;
+  outline: none;
+}
+
+.effort-track:focus-visible .slider-thumb {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue) 45%, transparent);
+}
+
+/* The levels by name, each centred under its dot, and a tap target too. */
+.effort-stops {
+  position: relative;
+  height: 1.9rem;
+}
+
+.effort-stops button {
+  position: absolute;
+  top: 0;
+  left: calc(11px + (100% - 22px) * var(--at));
+  transform: translateX(-50%);
+  padding: 6px 4px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--fg-dim);
+  font: inherit;
+  font-size: 0.75rem;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.effort-stops button.on {
+  color: var(--fg);
+  font-weight: 600;
+}
+
+.effort-hint {
+  margin-top: 6px;
+  color: var(--fg-dim);
+  font-size: 0.75rem;
+}

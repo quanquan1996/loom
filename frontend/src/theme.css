@@ -152,25 +152,8 @@ samp,
   background: color-mix(in srgb, var(--fg) 9%, transparent);
 }
 
-/* The foot a shade off the lists above it, so the two read as two parts:
-   what you open, and the switches under it. Mixed from --fg, so it is a
-   step lighter on dark and a step darker on light. */
 .sidebar-foot {
-  border-top-color: color-mix(in srgb, var(--fg) 6%, transparent);
-  background: color-mix(in srgb, var(--fg) 5%, var(--bg-raised));
-}
-
-.sidebar-foot .devices-btn:hover {
-  background: color-mix(in srgb, var(--fg) 6%, transparent);
-}
-
-/* In the drawer the shade runs on under the home indicator. */
-.drawer .sidebar {
-  padding-bottom: 0;
-}
-
-.drawer .sidebar-foot {
-  padding-bottom: max(4px, env(safe-area-inset-bottom));
+  border-top-color: transparent;
 }
 
 /* Unread: a blue dot by the time, which turns blue too, and the title a
@@ -602,7 +585,7 @@ html {
 pre.code,
 .tool-input,
 .tool-output {
-  font-size: 0.875rem;
+  font-size: calc(0.875rem * var(--code-scale, 1));
 }
 
 .tool-head {
@@ -881,15 +864,53 @@ pre.code,
   height: 0.95rem;
 }
 
-/* Text size's "A"s: one box for all, so the buttons match whatever the
-   glyph's size. */
-.text-size-a {
-  display: inline-block;
-  width: 1.25rem;
-  height: 1.25rem;
-  line-height: 1.25rem;
-  text-align: center;
-  font-weight: 500;
+/* Text size: a row per area, its name, the slider and the size, in columns
+   that line up down the group. */
+.settings-row.text-sizes {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.text-sizes .settings-text {
+  flex-direction: row;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.settings-reset {
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--blue);
+  font: inherit;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.size-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.size-row {
+  display: grid;
+  grid-template-columns: 5.5rem 1fr 3rem;
+  align-items: center;
+  gap: 12px;
+}
+
+.size-name {
+  color: var(--fg-dim);
+  font-size: 0.875rem;
+}
+
+.size-value {
+  text-align: right;
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
 }
 
 @media (max-width: 640px) {
@@ -903,5 +924,74 @@ pre.code,
     justify-content: center;
     padding: 9px 12px;
     font-size: 1rem;
+  }
+}
+
+/* ── Each area's text size (settings.ts) ──────────────────────────────────
+   On top of the interface's rem: a zoom, so an area's rows and padding grow
+   with its text, as the whole page does with the rem. The sidebar keeps its
+   width and the conversation its column, so only the text changes size. */
+.sidebar {
+  zoom: var(--sidebar-scale, 1);
+  flex-basis: calc(min(16.25rem, 80vw) / var(--sidebar-scale, 1));
+}
+
+.drawer .sidebar {
+  width: calc(78vw / var(--sidebar-scale, 1));
+  max-width: calc(22rem / var(--sidebar-scale, 1));
+}
+
+.timeline-inner {
+  zoom: var(--chat-scale, 1);
+  max-width: calc(var(--measure) / var(--chat-scale, 1));
+}
+
+/* ── The sidebar's foot ───────────────────────────────────────────────────
+   No line, shadow or colour of its own: the type sets it apart (see the
+   weights below). */
+
+.sidebar-foot .devices-btn:hover {
+  background: color-mix(in srgb, var(--fg) 6%, transparent);
+}
+
+/* In the drawer the foot runs on under the home indicator. */
+.drawer .sidebar {
+  padding-bottom: 0;
+}
+
+.drawer .sidebar-foot {
+  padding-bottom: max(4px, env(safe-area-inset-bottom));
+}
+
+/* ── The sidebar's type, by weight ────────────────────────────────────────
+   Three steps: the brand largest and heaviest, then the top-level entries
+   (Projects, Employees, Tasks) and the list headings in semibold, then the
+   rows. The foot's switches semibold too, set apart by their dim colour. */
+.sidebar .brand {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.sidebar .nav-item,
+.sidebar .list-heading {
+  font-weight: 600;
+}
+
+.sidebar .nav-item .nav-count {
+  font-weight: 400;
+}
+
+.sidebar-foot .devices-btn {
+  font-weight: 600;
+}
+
+.sidebar-foot .devices-count {
+  font-weight: 400;
+}
+
+@media (max-width: 640px) {
+  .sidebar .brand {
+    font-size: 1.875rem;
   }
 }

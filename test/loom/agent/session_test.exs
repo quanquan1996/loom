@@ -405,6 +405,19 @@ defmodule Loom.Agent.SessionTest do
     end
   end
 
+  describe "thinking level" do
+    test "is kept in the header, and only a level the agent has is taken" do
+      id = new_session()
+      assert :ok = Agent.set_effort(id, "xhigh")
+      assert Agent.info(id).effort == "xhigh"
+      assert {:ok, %{effort: "xhigh"}} = Store.read_meta(id)
+
+      assert {:error, _} = Agent.set_effort(id, "ludicrous")
+      assert :ok = Agent.set_effort(id, nil)
+      assert Agent.info(id).effort == nil
+    end
+  end
+
   describe "the transcript" do
     test "events are numbered, persisted and replayable" do
       id = new_session()

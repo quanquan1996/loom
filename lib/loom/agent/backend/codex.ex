@@ -136,9 +136,14 @@ defmodule Loom.Agent.Backend.Codex do
       tools: %{},
       usage: nil,
       context_tokens: 0,
-      context_window: nil
+      context_window: nil,
+      # Sent with each turn; nil leaves the thread's own. See set_effort/2.
+      effort: nil
     }
   end
+
+  @impl Backend
+  def set_effort(handle, effort), do: Map.put(handle, :effort, effort)
 
   @impl Backend
   def run_turn(%{thread_id: nil}, _text), do: {:error, "no codex thread"}
@@ -167,7 +172,7 @@ defmodule Loom.Agent.Backend.Codex do
   end
 
   defp start_turn(handle, text) do
-    case Server.start_turn(handle.thread_id, text) do
+    case Server.start_turn(handle.thread_id, text, effort: Map.get(handle, :effort)) do
       {:ok, turn_id} ->
         {:ok, %{handle | turn_id: turn_id, aborted?: false, tools: %{}}}
 
