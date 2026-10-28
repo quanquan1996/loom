@@ -1206,8 +1206,9 @@ h3.md-h {
   height: 0.9rem;
 }
 
+/* A phone's header has no room for the name: the folder alone, still a button. */
 @media (max-width: 640px) {
-  .chip.button.chat-project {
-    max-width: 7rem;
+  .chip.button.chat-project span {
+    display: none;
   }
 }
