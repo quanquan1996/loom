@@ -227,6 +227,39 @@ defmodule Loom.Agent.Backend do
   @callback stop(handle) :: :ok
 
   @doc """
+  Let go of the backend's process and leave it running: the node is stopping,
+  and the next one will `adopt/1` it. Saves what `adopt/1` needs first.
+
+  Claude Code and Kiro run on a `Loom.Agent.Proc`, which nothing about the
+  node's exit can stop, so a turn under way carries on through a restart.
+  Codex's app-server is a port shared by every session and cannot; it does
+  not implement these, and a restart waits for its turns (`Loom.Restarter`).
+  """
+  @callback detach(handle) :: :ok
+
+  @doc """
+  Take back the process an earlier node let go of — or was killed away from —
+  continuing from the last `checkpoint/1`. `handle` is what `resume/2` just
+  built. `:error` when there is nothing to take back.
+  """
+  @callback adopt(handle) :: {:ok, handle} | :error
+
+  @doc """
+  Save the decoding state for `adopt/1`, once the session has recorded every
+  event the output so far produced. Cheap when nothing changed.
+  """
+  @callback checkpoint(handle) :: handle
+
+  @optional_callbacks detach: 1, adopt: 1, checkpoint: 1
+
+  @doc "Whether a session on `kind` keeps its turn running through a restart."
+  @spec detachable?(kind) :: boolean()
+  def detachable?(kind) do
+    module = impl(kind)
+    Code.ensure_loaded?(module) and function_exported?(module, :adopt, 1)
+  end
+
+  @doc """
   The module implementing `kind`.
 
   Configurable so tests can substitute a stub without spawning anything:

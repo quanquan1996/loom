@@ -62,11 +62,28 @@ to disk.
 ### 2.3 Crash recovery
 
 When the supervisor restarts a session with its original spec, `init/1` finds
-`meta.json` on disk and reattaches; the disk always wins over the spec. A
-crash mid-turn is treated as an involuntary interrupt. The turn died with the
-node, and resending it would show the model the message twice. So the session
-comes back `:interrupted`, with its queue kept and a status event explaining
-why.
+`meta.json` on disk and reattaches; the disk always wins over the spec.
+
+A Claude Code or Kiro turn survives a restart of the node. Their CLIs run
+outside it (`Loom.Agent.Proc`): stdin is a FIFO the CLI opens read-write, so it
+never sees EOF; stdout is appended to a file; `setsid` gives it a session of
+its own; and systemd kills only the node (`KillMode=process`). A stopping node
+lets the process go (`Backend.detach/1`). After every batch of output, once its
+events are on disk, the backend saves its decoding state beside the file
+(`Backend.checkpoint/1`), so the next node takes the process back from exactly
+there (`Backend.adopt/1`). That works even after `kill -9`: the session stays
+`:running`, reads what was written while nobody was reading, and the turn ends
+as it would have. A warm idle process is taken back too. Measured with a
+two-step shell task: Claude Code across a SIGTERM, Kiro across a SIGKILL. Both
+finished while Loom was down, and every event arrived once, in order. The
+header's `seq` can lag the log after a hard kill, so restore numbers on from
+whichever is ahead.
+
+Everything else is treated as an involuntary interrupt: a Codex turn, whose
+app-server dies with the node, or a process that has gone. Resending would show
+the model the message twice, so the session comes back `:interrupted`, with its
+queue kept and a status event explaining why. A session being *deleted* still
+kills its process.
 
 ### 2.4 `/reload`
 
@@ -496,7 +513,7 @@ Loom.Supervisor
 ├─ Loom.Nodes                     the user's devices (loom-node)
 ├─ Loom.Push                      notifications when a turn ends
 ├─ Loom.Employees                 virtual employees' heartbeat and budget
-├─ Loom.Restarter                 restart-when-idle, for deploys
+├─ Loom.Restarter                 restart once no Codex turn runs, for deploys
 └─ LoomWeb.Endpoint
 ```
 
@@ -564,7 +581,8 @@ it's CSS".
 
 - `:question` events (CC `AskUserQuestion`, Codex `requestUserInput`). Today a
   question arrives as plain text.
-- Turns that survive a Loom restart (a Codex daemon mode).
+- Codex turns that survive a Loom restart (a Codex daemon mode). Claude Code
+  and Kiro turns do; see §2.3.
 - Cleanup of uploads that were removed from the tray.
 - Range requests on the canvas, so a long video can seek, and a proper video
   player. Markdown in the canvas shows as plain text, the way a browser shows

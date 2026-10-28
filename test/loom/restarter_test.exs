@@ -1,7 +1,8 @@
 defmodule Loom.RestarterTest do
   @moduledoc """
-  The restart waits for every turn, and never forces one: it stops the node
-  only once nothing is running, and gives up rather than cut a turn short.
+  The restart waits for every turn that would die with the node, and never
+  forces one: it stops the node only once nothing such is running, and gives
+  up rather than cut a turn short.
   """
   use ExUnit.Case, async: false
 
@@ -18,7 +19,11 @@ defmodule Loom.RestarterTest do
       Loom.Agent,
       previous
       |> Keyword.put(:data_dir, data_dir)
-      |> Keyword.put(:backends, %{claude_code: BackendStub, codex: BackendStub})
+      |> Keyword.put(:backends, %{
+        claude_code: BackendStub,
+        codex: BackendStub,
+        kiro: Loom.CarryingStub
+      })
     )
 
     start_supervised!({BackendStub, notify: self()})
@@ -69,6 +74,16 @@ defmodule Loom.RestarterTest do
     refute_receive :stopped, 100
 
     finish_turn(id)
+    assert_receive :stopped, 500
+  end
+
+  test "a turn that carries on through the restart does not hold it up", %{server: server} do
+    id = "a_restart_#{System.unique_integer([:positive])}"
+    {:ok, _pid} = Agent.start_session(id, backend: :kiro)
+    start_turn(id)
+
+    assert {:ok, :pending, busy} = Restarter.request(server: server)
+    refute id in busy
     assert_receive :stopped, 500
   end
 

@@ -816,4 +816,68 @@ defmodule Loom.Agent.SessionTest do
       assert output_events(id) == []
     end
   end
+
+  describe "a turn that outlives the node" do
+    setup do
+      config = Application.get_env(:loom, Loom.Agent, [])
+      backends = Map.put(config[:backends], :kiro, Loom.CarryingStub)
+      Application.put_env(:loom, Loom.Agent, Keyword.put(config, :backends, backends))
+      on_exit(fn -> Application.delete_env(:loom, :carrying_adopts) end)
+      :ok
+    end
+
+    defp crash_and_restore(id) do
+      [{pid, _}] = Registry.lookup(Loom.Agent.Registry, id)
+      ref = Process.monitor(pid)
+      Process.exit(pid, :kill)
+      assert_receive {:DOWN, ^ref, :process, ^pid, :killed}, 1_000
+
+      assert_eventually(fn ->
+        match?([{new, _}] when new != pid, Registry.lookup(Loom.Agent.Registry, id))
+      end)
+    end
+
+    test "is still running when its process is taken back, and ends as it would have" do
+      id = new_session(backend: :kiro)
+      Agent.submit(id, "long job")
+      BackendStub.await_turn()
+      backend_sends(id, [{:event, :status, %{status: :running}}])
+
+      crash_and_restore(id)
+      assert Agent.info(id).status == :running
+
+      finish_turn(id)
+      assert Agent.info(id).status == :idle
+      {:ok, %{events: events}} = Agent.attach(id)
+      refute Enum.any?(events, &match?(%{payload: %{status: :interrupted}}, &1))
+    end
+
+    test "numbers on from the log, which a node killed outright had left ahead of the header" do
+      id = new_session(backend: :kiro)
+      Agent.submit(id, "long job")
+      BackendStub.await_turn()
+      backend_sends(id, [{:event, :status, %{status: :running}}])
+      # Not a status change, so the header is not written again.
+      backend_sends(id, [{:event, :assistant_text, %{block_id: "b1", text: "halfway"}}])
+      last = Agent.info(id).seq
+
+      crash_and_restore(id)
+      finish_turn(id)
+      {:ok, %{events: events}} = Agent.attach(id)
+      seqs = Enum.map(events, & &1.seq)
+      assert seqs == Enum.uniq(seqs)
+      assert List.last(seqs) > last
+    end
+
+    test "is interrupted, as before, when there is no process to take back" do
+      Application.put_env(:loom, :carrying_adopts, false)
+      id = new_session(backend: :kiro)
+      Agent.submit(id, "long job")
+      BackendStub.await_turn()
+      backend_sends(id, [{:event, :status, %{status: :running}}])
+
+      crash_and_restore(id)
+      assert Agent.info(id).status == :interrupted
+    end
+  end
 end

@@ -46,6 +46,14 @@ defmodule Loom.Agent.Backend.ClaudeCode do
 
   stdin is never closed. The process is reclaimed by killing it, not by EOF.
 
+  ## Not on a port, so a restart does not stop it
+
+  The process is a `Loom.Agent.Proc`: stdin a FIFO, stdout a file, polled. A
+  node that stops lets go of it (`detach/1`) instead of killing it, and the
+  next one takes it back (`adopt/1`) with the decoding state saved beside the
+  output (`checkpoint/1`) — so a turn under way when loom restarts carries on
+  and is seen to the end, and an idle one is still warm.
+
   Slash commands ride the same pipe. `/compact` typed as a message is run by
   Claude Code itself (measured: 15.7K → 1.3K tokens, earlier context still
   recalled), and reports back only as a `compact_boundary` — see `translate/2`.
@@ -104,6 +112,7 @@ defmodule Loom.Agent.Backend.ClaudeCode do
 
   alias Loom.Agent.Backend
   alias Loom.Agent.Jsonl
+  alias Loom.Agent.Proc
 
   @base_args [
     "-p",
@@ -125,26 +134,28 @@ defmodule Loom.Agent.Backend.ClaudeCode do
   @reap_grace_ms 2_000
 
   @impl Backend
-  def start(_session_id, meta) do
-    {:ok, new(uuid4(), meta)}
+  def start(loom_id, meta) do
+    {:ok, new(loom_id, uuid4(), meta)}
   end
 
   @impl Backend
-  def resume(_session_id, meta) do
+  def resume(loom_id, meta) do
     case Backend.meta_get(meta, :cc_session_id) do
       id when is_binary(id) ->
         # `--resume <uuid>` locates a conversation across working directories
         # (measured), so there is nothing else to restore — provided there is a
         # conversation. A session restored before its first turn has only an id.
-        {:ok, %{new(id, meta) | started?: started?(meta, id)}}
+        {:ok, %{new(loom_id, id, meta) | started?: started?(meta, id)}}
 
       _ ->
         {:error, "no cc_session_id recorded for this session"}
     end
   end
 
-  defp new(session_id, meta) do
+  defp new(loom_id, session_id, meta) do
     %{
+      # Loom's own session id, which names the process's directory.
+      loom_id: loom_id,
       session_id: session_id,
       cwd: Backend.meta_get(meta, :cc_cwd) || default_cwd(),
       # Appended to Claude Code's own system prompt on every spawn — it is a
@@ -165,8 +176,10 @@ defmodule Loom.Agent.Backend.ClaudeCode do
       # what has been written to it since, newest first. Enough to start over
       # once if `--resume` turns out to have nothing to resume. See decode/2.
       booting: nil,
-      port: nil,
-      os_pid: nil,
+      # The running process, a `Loom.Agent.Proc`; nil when there is none.
+      proc: nil,
+      # What the last checkpoint saved, so an unchanged handle is not saved again.
+      saved: nil,
       # Identity of the API call currently streaming. One turn makes several, and
       # the SSE `index` restarts at 0 in each — see `block_id/2`.
       message_id: nil,
@@ -197,7 +210,7 @@ defmodule Loom.Agent.Backend.ClaudeCode do
   end
 
   @impl Backend
-  def steer(%{port: nil}, _text) do
+  def steer(%{proc: nil}, _text) do
     # Nothing is running, so there is nothing to join. The session falls back to
     # starting a turn.
     {:error, "no live claude process to steer"}
@@ -209,39 +222,30 @@ defmodule Loom.Agent.Backend.ClaudeCode do
     {:ok, write(handle, message_line(text))}
   end
 
-  defp ensure_process(%{port: port} = handle) when is_port(port) do
-    if Port.info(port) == nil do
-      # The process died without us noticing. Start a new one rather than
-      # writing into a closed pipe.
-      spawn_process(%{handle | port: nil, os_pid: nil, buffer: ""})
-    else
+  defp ensure_process(%{proc: %Proc{} = proc} = handle) do
+    if Proc.alive?(proc) do
       {:ok, handle}
+    else
+      # The process died without us noticing. Start a new one rather than
+      # writing into a pipe nobody reads.
+      Proc.close(proc)
+      spawn_process(%{handle | proc: nil, buffer: ""})
     end
   end
 
   defp ensure_process(handle), do: spawn_process(handle)
 
   defp spawn_process(handle) do
-    with {:ok, exe} <- executable() do
-      port =
-        Port.open({:spawn_executable, exe}, [
-          :binary,
-          :exit_status,
-          :use_stdio,
-          :hide,
-          args:
-            @base_args ++
-              model_args(handle) ++
-              fallback_args() ++ session_args(handle) ++ instruction_args(handle),
-          cd: handle.cwd,
-          env: Loom.ChildEnv.port_env()
-        ])
+    args =
+      @base_args ++
+        model_args(handle) ++ fallback_args() ++ session_args(handle) ++ instruction_args(handle)
 
+    with {:ok, exe} <- executable(),
+         {:ok, proc} <- Proc.spawn(handle.loom_id, exe, args, handle.cwd) do
       {:ok,
        %{
          handle
-         | port: port,
-           os_pid: os_pid(port),
+         | proc: proc,
            cost_seen: 0.0,
            buffer: "",
            tools: %{},
@@ -253,14 +257,9 @@ defmodule Loom.Agent.Backend.ClaudeCode do
   end
 
   defp write(handle, line) do
-    # A CLI that exits at once (a bad `--resume`, a missing login) can close the
-    # port before the first write. The `exit_status` already on its way says
-    # what happened, so a write into it is not worth crashing the session for.
-    try do
-      Port.command(handle.port, line)
-    rescue
-      ArgumentError -> :closed
-    end
+    # A CLI that exits at once (a bad `--resume`, a missing login) is reported
+    # by the poll that finds it gone; the write into its FIFO goes nowhere.
+    if handle.proc, do: Proc.write(handle.proc, line)
 
     case handle.booting do
       nil -> handle
@@ -311,7 +310,7 @@ defmodule Loom.Agent.Backend.ClaudeCode do
   end
 
   @impl Backend
-  def interrupt(%{port: nil} = handle), do: {:ok, handle}
+  def interrupt(%{proc: nil} = handle), do: {:ok, handle}
 
   def interrupt(handle) do
     # Asking beats killing: the process survives, so the next turn is still
@@ -331,7 +330,7 @@ defmodule Loom.Agent.Backend.ClaudeCode do
   end
 
   @impl Backend
-  def release(%{port: nil} = handle), do: {:ok, handle}
+  def release(%{proc: nil} = handle), do: {:ok, handle}
   def release(handle), do: {:ok, teardown(handle)}
 
   @impl Backend
@@ -355,32 +354,83 @@ defmodule Loom.Agent.Backend.ClaudeCode do
     :ok
   end
 
-  defp teardown(%{port: nil} = handle), do: handle
+  defp teardown(%{proc: nil} = handle), do: handle
 
   defp teardown(handle) do
-    kill_tree(handle.os_pid)
+    Proc.kill(handle.proc)
+    %{handle | proc: nil, buffer: "", saved: nil}
+  end
 
-    # Close after killing: closing first can make the child exit on a broken
-    # pipe before we have snapshotted its children.
-    if is_port(handle.port) and Port.info(handle.port) != nil do
-      Port.close(handle.port)
+  # ── Outliving the node ───────────────────────────────────────────────────
+
+  @impl Backend
+  def detach(%{proc: nil}), do: :ok
+
+  def detach(handle) do
+    checkpoint(handle)
+    Proc.close(handle.proc)
+  end
+
+  @impl Backend
+  def adopt(handle) do
+    case Proc.adopt(handle.loom_id) do
+      # The fresh handle's instructions win: only a spawn reads them.
+      {:ok, proc, saved} ->
+        {:ok, %{Map.merge(handle, saved) | proc: proc, instructions: handle.instructions}}
+
+      :error ->
+        :error
     end
+  end
 
-    %{handle | port: nil, os_pid: nil, buffer: ""}
+  @impl Backend
+  def checkpoint(%{proc: nil} = handle), do: handle
+
+  def checkpoint(handle) do
+    saved = Map.drop(handle, [:proc, :saved, :instructions])
+    mark = :erlang.phash2({handle.proc.offset, saved})
+
+    if mark == handle.saved do
+      handle
+    else
+      Proc.checkpoint(handle.proc, saved)
+      %{handle | saved: mark}
+    end
   end
 
   # ── Decoding ──────────────────────────────────────────────────────────────
 
   @impl Backend
-  def decode(%{port: port} = handle, {port, {:data, chunk}}) do
+  def decode(%{proc: %Proc{ref: ref} = proc} = handle, {:loom_proc, ref}) do
+    case Proc.poll(proc) do
+      {"", proc, :alive} ->
+        {:ok, %{handle | proc: proc}, []}
+
+      {data, proc, :alive} ->
+        {handle, out} = feed(%{handle | proc: proc}, data)
+        {:ok, handle, out}
+
+      {"", _proc, {:exited, status}} ->
+        died(handle, status)
+    end
+  end
+
+  # A poll for a process we have let go of.
+  def decode(handle, {:loom_proc, _ref}), do: {:ok, handle, []}
+
+  def decode(_handle, _message), do: :ignore
+
+  @doc false
+  # Output as read: lines may be split anywhere. Public for the tests.
+  def feed(handle, chunk) do
     {lines, buffer} = Jsonl.split(handle.buffer <> chunk)
     {handle, out} = Enum.reduce(lines, {%{handle | buffer: buffer}, []}, &reduce_line/2)
-    {:ok, handle, Enum.reverse(out)}
+    {handle, Enum.reverse(out)}
   end
 
   # Only reachable when the process died on its own: the one we kill ourselves
-  # (`release/1`, `stop/1`) is forgotten first, so its exit status falls to the
-  # clause below. So this always means the process went away with nothing to
+  # (`release/1`, `stop/1`) is forgotten first, so its polls no longer match
+  # it. So this always means the process went away with nothing to
   # explain it — and a session left sitting in `:running` with no reason is the
   # failure mode that makes a background agent look hung.
   #
@@ -394,10 +444,9 @@ defmodule Loom.Agent.Backend.ClaudeCode do
   # store cleaned by hand. The conversation is then named afresh and the turn's
   # messages written again, so the user sees nothing but a slower start. Only
   # once per spawn: the retry is a `--session-id` spawn, which never lands here.
-  def decode(
-        %{port: port, booting: %{resumed?: true} = booting} = handle,
-        {port, {:exit_status, status}}
-      ) do
+  @doc false
+  # Public for the tests.
+  def died(%{booting: %{resumed?: true} = booting} = handle, status) do
     if stored?(handle.session_id) do
       exited(handle, status)
     else
@@ -405,7 +454,7 @@ defmodule Loom.Agent.Backend.ClaudeCode do
         "ClaudeCode: no conversation #{handle.session_id} to resume; starting it afresh"
       )
 
-      restart = %{handle | port: nil, os_pid: nil, buffer: "", started?: false}
+      restart = %{handle | proc: nil, buffer: "", started?: false}
 
       case spawn_process(restart) do
         {:ok, fresh} ->
@@ -417,22 +466,13 @@ defmodule Loom.Agent.Backend.ClaudeCode do
     end
   end
 
-  def decode(%{port: port} = handle, {port, {:exit_status, status}}), do: exited(handle, status)
-
-  # The process we killed, confirming it died. Erlang delivers this even after
-  # `Port.close/1`, so it has to be swallowed here — falling through to
-  # `:ignore` makes the session log a line about it on every single turn.
-  def decode(handle, {port, {:exit_status, _status}}) when is_port(port) do
-    {:ok, handle, []}
-  end
-
-  def decode(_handle, _message), do: :ignore
+  def died(handle, status), do: exited(handle, status)
 
   defp exited(handle, status) do
-    {:ok, %{handle | port: nil, os_pid: nil, booting: nil},
+    {:ok, %{handle | proc: nil, booting: nil, saved: nil},
      [
        {:event, :turn_failed,
-        %{reason: "claude exited with status #{status} before finishing the turn"}}
+        %{reason: "claude exited with status #{status || "?"} before finishing the turn"}}
      ]}
   end
 
@@ -826,13 +866,6 @@ defmodule Loom.Agent.Backend.ClaudeCode do
   defp describe(other), do: inspect(other)
 
   # ── Processes ─────────────────────────────────────────────────────────────
-
-  defp os_pid(port) do
-    case Port.info(port, :os_pid) do
-      {:os_pid, pid} -> pid
-      nil -> nil
-    end
-  end
 
   @doc false
   # Public only so a test can assert the orphan behaviour this exists to prevent.

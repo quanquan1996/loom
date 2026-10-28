@@ -31,8 +31,12 @@ ExecStart=/home/ubuntu/loom/_build/prod/rel/loom/bin/loom start
 # Any exit — crash or a deliberate System.stop() — is restarted.
 Restart=always
 RestartSec=3
-# agents spawn claude/codex and their children; stop the whole tree.
-KillMode=control-group
+# Only loom itself. Claude Code and Kiro run outside the node on purpose
+# (Loom.Agent.Proc), so that a turn under way carries on through a restart and
+# the next node takes it back; killing the whole cgroup would end it. Loom kills
+# what it means to (a deleted session, an idle release) itself. Terminal shells
+# go with their pty, and codex's app-server with its stdin.
+KillMode=process
 TimeoutStopSec=20
 
 [Install]

@@ -2,7 +2,7 @@ defmodule Loom.Agent.Backend.ClaudeCodeTest do
   @moduledoc """
   The translation layer against real recorded `claude -p --output-format
   stream-json` output, plus the two things that have actually gone wrong in
-  practice: a JSON line split across port reads, and a process tree that
+  practice: a JSON line split across reads, and a process tree that
   survives being killed.
 
   Fixtures are verbatim lines captured from the CLI (Claude Code 2.1.296), not
@@ -15,17 +15,18 @@ defmodule Loom.Agent.Backend.ClaudeCodeTest do
 
   @session_id "f9c5596e-333d-4e1f-b434-aa044ae76532"
 
-  # A handle in the state it would be in mid-turn. `port` is matched
-  # structurally, not with is_port/1, so an atom stands in for a real one and
-  # the whole decode path stays a pure function.
+  # A handle in the state it would be in mid-turn. Output goes straight to
+  # `feed/2`, so an atom stands in for the process and the whole decode path
+  # stays a pure function.
   defp handle(overrides \\ %{}) do
     base = %{
       session_id: @session_id,
       cwd: "/tmp",
       started?: true,
       booting: nil,
-      port: :fake_port,
-      os_pid: nil,
+      loom_id: "a_test",
+      proc: :fake_proc,
+      saved: nil,
       message_id: "msg_one",
       pending_blocks: [],
       buffer: "",
@@ -44,11 +45,10 @@ defmodule Loom.Agent.Backend.ClaudeCodeTest do
   end
 
   defp feed(handle, chunk) when is_binary(chunk) do
-    {:ok, handle, out} = ClaudeCode.decode(handle, {:fake_port, {:data, chunk}})
-    {handle, out}
+    ClaudeCode.feed(handle, chunk)
   end
 
-  # Feed real port messages to decode/2 until `done?` holds, failing on any
+  # Feed real process polls to decode/2 until `done?` holds, failing on any
   # turn failure along the way.
   defp pump(handle, done?, deadline \\ System.monotonic_time(:millisecond) + 5_000) do
     if done?.(handle) do
@@ -440,7 +440,7 @@ defmodule Loom.Agent.Backend.ClaudeCodeTest do
       {handle, _} =
         feed(handle(), [%{"type" => "result", "subtype" => "success", "usage" => %{}}])
 
-      assert handle.port == :fake_port
+      assert handle.proc == :fake_proc
     end
 
     test "the result of an interrupt we asked for is not reported as a failure" do
@@ -605,7 +605,7 @@ defmodule Loom.Agent.Backend.ClaudeCodeTest do
       # Cost is deliberately not reported: Codex has no USD figure at all, and a
       # number that exists on one backend and not the other is worse than none.
       refute Map.has_key?(payload, :cost_usd)
-      assert handle.port == :fake_port
+      assert handle.proc == :fake_proc
     end
 
     test "a non-success result is a failure, with its terminal reason" do
@@ -624,27 +624,22 @@ defmodule Loom.Agent.Backend.ClaudeCodeTest do
   end
 
   describe "process exit" do
-    test "a reaped process confirming it died is swallowed, not logged" do
-      # Erlang delivers the exit status even after `Port.close/1`, and release
-      # or teardown kills with SIGKILL — so `exit_status 137` for a port we
-      # already let go is entirely expected and must not be logged as a
-      # surprise on every release.
-      port = Port.open({:spawn, "cat"}, [:binary])
-      assert {:ok, _handle, []} = ClaudeCode.decode(handle(), {port, {:exit_status, 137}})
-      Port.close(port)
+    test "a poll for a process we let go of is swallowed, not logged" do
+      # Release and teardown forget the process, but a poll may already be on
+      # its way; it must not be logged as a surprise on every release.
+      assert {:ok, _handle, []} = ClaudeCode.decode(handle(), {:loom_proc, make_ref()})
     end
 
     test "exiting with no result at all is reported" do
       # Otherwise the session sits in :running forever with nothing to explain
       # it — the failure mode that makes a background agent look hung.
-      assert {:ok, _handle, out} = ClaudeCode.decode(handle(), {:fake_port, {:exit_status, 1}})
+      assert {:ok, _handle, out} = ClaudeCode.died(handle(), 1)
       assert [{:event, :turn_failed, %{reason: reason}}] = out
       assert reason =~ "status 1"
     end
 
-    test "messages from another port are not ours" do
-      # One session must not consume another's output, and the session's own
-      # unrelated messages have to fall through.
+    test "messages that are not ours fall through" do
+      # The session's own unrelated messages have to reach it.
       assert ClaudeCode.decode(handle(), {:other_port, {:data, "{}\n"}}) == :ignore
       assert ClaudeCode.decode(handle(), :timeout) == :ignore
     end
@@ -780,7 +775,11 @@ defmodule Loom.Agent.Backend.ClaudeCodeTest do
       previous_env = System.get_env("CLAUDE_CONFIG_DIR")
       System.put_env("CLAUDE_CONFIG_DIR", Path.join(dir, "empty"))
       previous = Application.get_env(:loom, Loom.Agent, [])
-      Application.put_env(:loom, Loom.Agent, Keyword.put(previous, :claude_cli, cli))
+      Application.put_env(
+        :loom,
+        Loom.Agent,
+        previous |> Keyword.put(:claude_cli, cli) |> Keyword.put(:data_dir, dir)
+      )
 
       on_exit(fn ->
         Application.put_env(:loom, Loom.Agent, previous)
@@ -789,10 +788,6 @@ defmodule Loom.Agent.Backend.ClaudeCodeTest do
           do: System.put_env("CLAUDE_CONFIG_DIR", previous_env),
           else: System.delete_env("CLAUDE_CONFIG_DIR")
       end)
-
-      # As in `Loom.Agent.Session`: the CLI may exit before the message is
-      # written, and the pipe breaking must not take the owner down.
-      Process.flag(:trap_exit, true)
 
       # The record claims a conversation the store does not have.
       {:ok, handle} = ClaudeCode.resume("a_1", %{cc_session_id: @session_id, cc_started: true})

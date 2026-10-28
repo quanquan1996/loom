@@ -31,6 +31,13 @@ defmodule Loom.Agent.Backend.Kiro do
   process"), so the next `session/load` fails. The child is spawned directly,
   and killed with its descendants (`ClaudeCode.kill_tree/1`).
 
+  ## It outlives the node
+
+  As for Claude Code, the process is a `Loom.Agent.Proc`, not a port. That
+  matters more here: on a pipe, Kiro takes EOF on stdin as "quit" and drops
+  the turn half done (measured), so a restart would always cut it off. On a
+  FIFO it carries on, and the next node takes it back with `adopt/1`.
+
   ## No steering, no cost
 
   ACP has one prompt at a time per session, so `steer/2` refuses and the
@@ -43,8 +50,8 @@ defmodule Loom.Agent.Backend.Kiro do
   require Logger
 
   alias Loom.Agent.Backend
-  alias Loom.Agent.Backend.ClaudeCode
   alias Loom.Agent.Jsonl
+  alias Loom.Agent.Proc
 
   # Every model Kiro lists has a window this size (`--list-models`).
   @window 1_000_000
@@ -68,8 +75,9 @@ defmodule Loom.Agent.Backend.Kiro do
       cwd: Backend.meta_get(meta, :kiro_cwd) || Backend.meta_get(meta, :cc_cwd) || default_cwd(),
       instructions: Backend.meta_get(meta, :instructions),
       model: Backend.meta_get(meta, :kiro_model),
-      port: nil,
-      os_pid: nil,
+      # The running process, a `Loom.Agent.Proc`; nil when there is none.
+      proc: nil,
+      saved: nil,
       buffer: "",
       next_id: 1,
       # Request id => what it was, for matching replies.
@@ -92,10 +100,12 @@ defmodule Loom.Agent.Backend.Kiro do
   def run_turn(handle, text) when is_binary(text) do
     handle = %{handle | prompt: text, interrupted?: false, tools: %{}, block: nil}
 
+    live? = handle.proc != nil and Proc.alive?(handle.proc)
+
     cond do
-      handle.port && Port.info(handle.port) && handle.phase == :idle -> {:ok, prompt(handle)}
-      handle.port && Port.info(handle.port) -> {:ok, handle}
-      true -> spawn_process(handle)
+      live? and handle.phase == :idle -> {:ok, prompt(handle)}
+      live? -> {:ok, handle}
+      true -> spawn_process(teardown(handle))
     end
   end
 
@@ -103,7 +113,7 @@ defmodule Loom.Agent.Backend.Kiro do
   def steer(_handle, _text), do: {:error, "kiro takes one prompt at a time"}
 
   @impl Backend
-  def interrupt(%{port: nil} = handle), do: {:ok, handle}
+  def interrupt(%{proc: nil} = handle), do: {:ok, handle}
 
   def interrupt(%{phase: :running} = handle) do
     # A notification, not a request: the prompt's own reply says `cancelled`.
@@ -123,7 +133,7 @@ defmodule Loom.Agent.Backend.Kiro do
   end
 
   @impl Backend
-  def release(%{port: nil} = handle), do: {:ok, handle}
+  def release(%{proc: nil} = handle), do: {:ok, handle}
   def release(handle), do: {:ok, teardown(handle)}
 
   @impl Backend
@@ -137,12 +147,47 @@ defmodule Loom.Agent.Backend.Kiro do
     :ok
   end
 
-  defp teardown(%{port: nil} = handle), do: handle
+  defp teardown(%{proc: nil} = handle), do: handle
 
   defp teardown(handle) do
-    ClaudeCode.kill_tree(handle.os_pid)
-    if Port.info(handle.port), do: Port.close(handle.port)
-    %{handle | port: nil, os_pid: nil, buffer: "", phase: :idle, pending: %{}, block: nil}
+    Proc.kill(handle.proc)
+    %{handle | proc: nil, saved: nil, buffer: "", phase: :idle, pending: %{}, block: nil}
+  end
+
+  @impl Backend
+  def detach(%{proc: nil}), do: :ok
+
+  def detach(handle) do
+    checkpoint(handle)
+    Proc.close(handle.proc)
+  end
+
+  @impl Backend
+  def adopt(handle) do
+    case Proc.adopt(handle.loom_id) do
+      # The fresh handle's instructions win: they are written to the agent
+      # file before the next spawn.
+      {:ok, proc, saved} ->
+        {:ok, %{Map.merge(handle, saved) | proc: proc, instructions: handle.instructions}}
+
+      :error ->
+        :error
+    end
+  end
+
+  @impl Backend
+  def checkpoint(%{proc: nil} = handle), do: handle
+
+  def checkpoint(handle) do
+    saved = Map.drop(handle, [:proc, :saved, :instructions])
+    mark = :erlang.phash2({handle.proc.offset, saved})
+
+    if mark == handle.saved do
+      handle
+    else
+      Proc.checkpoint(handle.proc, saved)
+      %{handle | saved: mark}
+    end
   end
 
   # ── Spawning ────────────────────────────────────────────────────────────
@@ -151,34 +196,23 @@ defmodule Loom.Agent.Backend.Kiro do
     with {:ok, exe} <- executable(),
          :ok <- write_agent(handle) do
       File.mkdir_p!(handle.cwd)
+      args = ["acp", "--trust-all-tools", "--agent", agent_name(handle)]
 
-      port =
-        Port.open({:spawn_executable, exe}, [
-          :binary,
-          :exit_status,
-          :use_stdio,
-          :hide,
-          args: ["acp", "--trust-all-tools", "--agent", agent_name(handle)],
-          cd: handle.cwd,
-          env: Loom.ChildEnv.port_env()
-        ])
-
-      os_pid =
-        case Port.info(port, :os_pid) do
-          {:os_pid, pid} -> pid
-          nil -> nil
-        end
-
-      handle = %{handle | port: port, os_pid: os_pid, buffer: "", pending: %{}, phase: :init}
-
-      params = %{
-        protocolVersion: 1,
-        clientCapabilities: %{fs: %{readTextFile: false, writeTextFile: false}, terminal: false},
-        clientInfo: %{name: "loom", version: "1"}
-      }
-
-      {:ok, send_rpc(handle, "initialize", params, :initialize)}
+      with {:ok, proc} <- Proc.spawn(handle.loom_id, exe, args, handle.cwd) do
+        handle = %{handle | proc: proc, buffer: "", pending: %{}, phase: :init}
+        init(handle)
+      end
     end
+  end
+
+  defp init(handle) do
+    params = %{
+      protocolVersion: 1,
+      clientCapabilities: %{fs: %{readTextFile: false, writeTextFile: false}, terminal: false},
+      clientInfo: %{name: "loom", version: "1"}
+    }
+
+    {:ok, send_rpc(handle, "initialize", params, :initialize)}
   end
 
   @doc false
@@ -214,12 +248,7 @@ defmodule Loom.Agent.Backend.Kiro do
   end
 
   defp write(handle, message) do
-    try do
-      Port.command(handle.port, Jsonl.line(message))
-    rescue
-      ArgumentError -> :closed
-    end
-
+    if handle.proc, do: Proc.write(handle.proc, Jsonl.line(message))
     handle
   end
 
@@ -237,7 +266,28 @@ defmodule Loom.Agent.Backend.Kiro do
   # ── Decoding ────────────────────────────────────────────────────────────
 
   @impl Backend
-  def decode(%{port: port} = handle, {port, {:data, chunk}}) do
+  def decode(%{proc: %Proc{ref: ref} = proc} = handle, {:loom_proc, ref}) do
+    case Proc.poll(proc) do
+      {"", proc, :alive} ->
+        {:ok, %{handle | proc: proc}, []}
+
+      {data, proc, :alive} ->
+        {handle, out} = feed(%{handle | proc: proc}, data)
+        {:ok, handle, out}
+
+      {"", _proc, {:exited, status}} ->
+        died(handle, status)
+    end
+  end
+
+  # A poll for a process we have let go of.
+  def decode(handle, {:loom_proc, _ref}), do: {:ok, handle, []}
+
+  def decode(_handle, _message), do: :ignore
+
+  @doc false
+  # Output as read: lines may be split anywhere. Public for the tests.
+  def feed(handle, chunk) do
     {lines, buffer} = Jsonl.split(handle.buffer <> chunk)
 
     {handle, out} =
@@ -253,22 +303,19 @@ defmodule Loom.Agent.Backend.Kiro do
         end
       end)
 
-    {:ok, handle, out}
+    {handle, out}
   end
 
-  def decode(%{port: port} = handle, {port, {:exit_status, status}}) do
-    {:ok, %{handle | port: nil, os_pid: nil, phase: :idle, pending: %{}},
+  @doc false
+  # It went away on its own. Public for the tests.
+  def died(handle, status) do
+    {:ok, %{handle | proc: nil, saved: nil, phase: :idle, pending: %{}},
      close_block(handle) ++
        [
          {:event, :turn_failed,
-          %{reason: "kiro exited with status #{status} before finishing the turn"}}
+          %{reason: "kiro exited with status #{status || "?"} before finishing the turn"}}
        ]}
   end
-
-  # One we killed, confirming it died.
-  def decode(handle, {port, {:exit_status, _}}) when is_port(port), do: {:ok, handle, []}
-
-  def decode(_handle, _message), do: :ignore
 
   # Replies.
   defp translate(handle, %{"id" => id} = message) when is_integer(id) do

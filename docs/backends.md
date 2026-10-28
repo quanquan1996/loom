@@ -294,6 +294,11 @@ kept warm, released when idle.
   read as tokens of a 1M window. A virtual employee on Kiro (or Codex) has a
   budget in turns a day instead of dollars.
 - **Login** is Kiro's own (`kiro-cli login`); Loom adds nothing.
+- **EOF on stdin means quit.** On a pipe, a node restart closes stdin and Kiro
+  exits mid-turn: measured on a two-step task, it did step one and dropped step
+  two. Claude Code, with both pipes closed, finished the turn and exited 0. So
+  both run on a FIFO and a file instead of a port (`Loom.Agent.Proc`), and their
+  turns carry on through a restart ([architecture.md §2.3](architecture.md)).
 
 ## 7. Not done: permission prompts
 

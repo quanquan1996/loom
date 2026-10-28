@@ -51,6 +51,16 @@ defmodule Loom.ChildEnv do
     unset ++ set
   end
 
+  @doc """
+  The same environment as a `System.cmd/3` `:env` option: dropped variables
+  unset (`nil`), as for a port.
+  """
+  def cmd_env(env \\ System.get_env()) do
+    kept = map(env)
+    unset = for {name, _} <- env, not Map.has_key?(kept, name), do: {name, nil}
+    unset ++ Map.to_list(kept)
+  end
+
   defp loom_var?(name), do: name in @loom_vars or String.starts_with?(name, "RELEASE_")
 
   defp clean_path(env, nil), do: env

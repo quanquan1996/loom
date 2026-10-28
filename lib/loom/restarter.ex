@@ -10,6 +10,11 @@ defmodule Loom.Restarter do
 
       bin/loom rpc 'IO.inspect(Loom.Restarter.request())'
 
+  Only turns that would die with the node count. Claude Code and Kiro sessions
+  carry on through a restart — their processes outlive the node and the next
+  one adopts them (`Loom.Agent.Backend.detach/1`) — so their turns do not hold
+  it up; Codex ones do.
+
   Idleness comes from the lobby (`Loom.Agent.lobby_topic/0`), not from polling
   the sessions.
 
@@ -67,7 +72,8 @@ defmodule Loom.Restarter do
        stop: Keyword.get(opts, :stop, &System.stop/0),
        settle_ms: Keyword.get(opts, :settle_ms, @settle_ms),
        pending: false,
-       # id => {seq, status}, for every live session while a request is pending.
+       # id => {seq, status}, for every live session while a request is pending;
+      # status is `:carries_on` for one whose turn survives the restart.
        sessions: %{},
        timeout: nil,
        settle: nil
@@ -84,7 +90,7 @@ defmodule Loom.Restarter do
     # `seq` sorts out any summary that turns out older than the list.
     :ok = Phoenix.PubSub.subscribe(Loom.PubSub, Agent.lobby_topic())
 
-    sessions = Map.new(Agent.list_sessions(), &{&1.id, {&1.seq, &1.status}})
+    sessions = Map.new(Agent.list_sessions(), &{&1.id, {&1.seq, waiting_on(&1)}})
 
     state = %{
       state
@@ -106,7 +112,9 @@ defmodule Loom.Restarter do
   def handle_call(:status, _from, state), do: {:reply, {:pending, busy(state)}, state}
 
   @impl true
-  def handle_info({:agent_summary, %{id: id, seq: seq, status: status}}, %{pending: true} = state) do
+  def handle_info({:agent_summary, %{id: id, seq: seq} = summary}, %{pending: true} = state) do
+    status = waiting_on(summary)
+
     sessions =
       Map.update(state.sessions, id, {seq, status}, fn {known, _} = old ->
         if seq >= known, do: {seq, status}, else: old
@@ -143,6 +151,12 @@ defmodule Loom.Restarter do
   def handle_info(_message, state), do: {:noreply, state}
 
   # ── Helpers ─────────────────────────────────────────────────────────────
+
+  defp waiting_on(%{backend: backend, status: status}) when is_atom(backend) do
+    if Loom.Agent.Backend.detachable?(backend), do: :carries_on, else: status
+  end
+
+  defp waiting_on(%{status: status}), do: status
 
   defp busy(state) do
     for {id, {_seq, status}} <- state.sessions, status in @busy, do: id

@@ -1,19 +1,18 @@
 defmodule Loom.Agent.Backend.KiroTest do
-  # The ACP translation, as a pure function: an atom stands in for the port,
-  # and writes to it go nowhere. Messages are as kiro-cli 1.28.1 sent them.
+  # The ACP translation, as a pure function: no process, so writes go
+  # nowhere. Messages are as kiro-cli 1.28.1 sent them.
   use ExUnit.Case, async: true
 
   alias Loom.Agent.Backend.Kiro
 
   defp handle(overrides \\ %{}) do
     {:ok, h} = Kiro.start("a_test", %{cc_cwd: "/tmp", instructions: "be good"})
-    Map.merge(h, Map.merge(%{port: :fake_port, phase: :running, session_id: "sid"}, overrides))
+    Map.merge(h, Map.merge(%{phase: :running, session_id: "sid"}, overrides))
   end
 
   defp feed(handle, messages) do
     chunk = Enum.map_join(messages, "", &(Jason.encode!(&1) <> "\n"))
-    {:ok, handle, out} = Kiro.decode(handle, {:fake_port, {:data, chunk}})
-    {handle, out}
+    Kiro.feed(handle, chunk)
   end
 
   defp update(u),

@@ -48,17 +48,22 @@ defmodule Loom.Agent.Session do
   so there is no resume button, no "continue or discard" prompt, and no second
   code path — recovery *is* an ordinary submit.
 
-  ## A restart mid-turn is an interrupt, not a resume
+  ## A restart mid-turn carries on, where the backend allows
 
-  The old loop could pick a turn back up after a crash because it owned the loop.
-  A backend turn is a child process of this node, so it dies with the node and
-  cannot be rejoined. Re-submitting is worse than it looks: the user's message is
-  already in the backend's own history, so the model would see it twice.
+  Claude Code and Kiro run outside the node (`Loom.Agent.Proc`): a stopping
+  node lets their process go (`Backend.detach/1`) and the next one takes it
+  back (`Backend.adopt/1`), reading what it wrote meanwhile from where the last
+  one stopped. So a session found `:running` on disk with its process adopted
+  is still running, and the turn ends as it would have. So does one whose node
+  was killed outright: the decoding state is saved after every batch of output
+  (`Backend.checkpoint/1`), once its events are on disk.
 
-  So a session found mid-turn on disk comes back `:interrupted` with its queue
-  intact, and says so. The user supplies the next message and continues, exactly
-  as after a deliberate interrupt. Codex daemon mode would restore the old
-  behaviour and is noted as future work.
+  Otherwise — Codex, whose app-server dies with the node, or a process that is
+  gone — the turn went with the node and cannot be rejoined. Re-submitting is
+  worse than it looks: the user's message is already in the backend's own
+  history, so the model would see it twice. So that session comes back
+  `:interrupted` with its queue intact, and says so; the user continues as
+  after a deliberate interrupt.
 
   ## Fan-out to several devices
 
@@ -354,7 +359,9 @@ defmodule Loom.Agent.Session do
           created_at: meta[:created_at],
           last_active_at: last_active(transcript) || meta[:created_at],
           transcript: transcript,
-          seq: meta[:seq] || 0,
+          # The log, when it is ahead: a node killed outright had appended
+          # events since it last wrote the header.
+          seq: max(meta[:seq] || 0, last_seq(transcript)),
           queue: restore_queue(meta[:queue]),
           usage: meta[:usage],
           context_tokens: meta[:context_tokens] || 0,
@@ -364,15 +371,36 @@ defmodule Loom.Agent.Session do
           outputs: outputs(id)
       }
 
-      if meta[:status] in ["running", "starting"] do
-        # It was mid-turn when the node stopped. The turn went with it and
-        # cannot be rejoined, so say so and wait for the user rather than
-        # re-sending a message the backend has already recorded.
-        {:ok, interrupted(state, "the session was interrupted by a restart")}
-      else
-        state = %{state | status: restore_status(meta[:status])}
-        announce(state)
-        {:ok, state}
+      {adopted?, state} = adopt(state)
+
+      cond do
+        # Its process carried on while the node was down, and is ours again:
+        # the turn is still this one, and the output it wrote meanwhile is
+        # read from where the last node stopped. See `Loom.Agent.Proc`.
+        adopted? and meta[:status] == "running" ->
+          state = %{state | status: :running}
+          announce(state)
+          {:ok, state}
+
+        # `:starting` with a queue was still waiting for its project, so no
+        # turn was ever started.
+        adopted? and meta[:status] == "starting" and state.queue == [] ->
+          state = %{state | status: :starting}
+          announce(state)
+          {:ok, state}
+
+        meta[:status] in ["running", "starting"] ->
+          # It was mid-turn when the node stopped, and the turn went with it
+          # (a Codex one, or a process that is gone). Say so and wait for the
+          # user rather than re-sending a message the backend has already
+          # recorded.
+          {:ok, interrupted(state, "the session was interrupted by a restart")}
+
+        true ->
+          state = %{state | status: restore_status(meta[:status])}
+          state = if adopted?, do: schedule_release(state), else: state
+          announce(state)
+          {:ok, state}
       end
     else
       {:error, reason} -> {:stop, {:restore_failed, reason}}
@@ -400,6 +428,29 @@ defmodule Loom.Agent.Session do
         {:error, reason}
     end
   end
+
+  defp last_seq([%{seq: seq} | _]), do: seq
+  defp last_seq([]), do: 0
+
+  defp adopt(state) do
+    if Backend.detachable?(state.backend) do
+      case Backend.impl(state.backend).adopt(state.handle) do
+        {:ok, handle} -> {true, %{state | handle: handle}}
+        :error -> {false, state}
+      end
+    else
+      {false, state}
+    end
+  end
+
+  # After anything that changed the handle: what `adopt/1` would resume from.
+  defp checkpoint(%{handle: handle} = state) when handle != nil do
+    if Backend.detachable?(state.backend),
+      do: %{state | handle: Backend.impl(state.backend).checkpoint(handle)},
+      else: state
+  end
+
+  defp checkpoint(state), do: state
 
   defp restore_status("interrupted"), do: :interrupted
   defp restore_status(_other), do: :idle
@@ -497,7 +548,7 @@ defmodule Loom.Agent.Session do
     case Backend.impl(state.backend).interrupt(state.handle) do
       {:ok, handle} ->
         # Whatever the turn wrote before it was stopped is still the user's.
-        state = collect_outputs(%{state | handle: handle})
+        state = collect_outputs(checkpoint(%{state | handle: handle}))
         {:reply, :ok, interrupted(state, "interrupted")}
 
       {:error, reason} ->
@@ -657,7 +708,9 @@ defmodule Loom.Agent.Session do
   def handle_info(message, state) do
     case Backend.impl(state.backend).decode(state.handle, message) do
       {:ok, handle, out} ->
-        {:noreply, consume(%{state | handle: handle}, out)}
+        # Saved only once every event it produced is on disk: a node killed
+        # in between then reads that output again rather than losing it.
+        {:noreply, checkpoint(consume(%{state | handle: handle}, out))}
 
       :ignore ->
         Logger.debug("Loom.Agent.Session #{state.id} ignoring #{inspect(message)}")
@@ -667,19 +720,34 @@ defmodule Loom.Agent.Session do
 
   @impl true
   def terminate(_reason, state) do
-    # Take the backend down with us: a `claude` process left running would keep
-    # editing files for a conversation nobody is watching, and a codex thread
-    # left claimed cannot be reopened.
-    if state.handle, do: Backend.impl(state.backend).stop(state.handle)
+    if detach?(state) do
+      # The node is stopping, not the session: the process carries on — a
+      # turn under way included — and the next node adopts it. So the status
+      # stays what it is; `restore/2` reads it.
+      Backend.impl(state.backend).detach(state.handle)
+      write_meta(state)
+    else
+      # Take the backend down with us: a `claude` process left running would
+      # keep editing files for a conversation nobody is watching, and a codex
+      # thread left claimed cannot be reopened.
+      if state.handle, do: Backend.impl(state.backend).stop(state.handle)
 
-    # Record that we are not mid-turn, so a restart does not report a
-    # deliberately stopped session as interrupted. A hard crash skips this and
-    # leaves `status` as it was — which is what makes the restart notice.
-    write_meta(%{state | status: settled_status(state)})
+      # Record that we are not mid-turn, so a restart does not report a
+      # deliberately stopped session as interrupted. A hard crash skips this
+      # and leaves `status` as it was — which is what makes the restart notice.
+      write_meta(%{state | status: settled_status(state)})
+    end
     Store.close_logs(state.logs)
     :ok
   catch
     _, _ -> :ok
+  end
+
+  # A session being deleted is stopped while the node runs on; one the node
+  # takes down with it is not.
+  defp detach?(state) do
+    state.handle != nil and match?({:stopping, _}, :init.get_status()) and
+      Backend.detachable?(state.backend)
   end
 
   # An interrupted session stays interrupted across a restart: its queue is
@@ -920,7 +988,7 @@ defmodule Loom.Agent.Session do
         # `:starting` rather than `:running`: Claude Code takes seconds to boot
         # before it says anything, and a UI with no state for that gap looks
         # hung. The backend's own status event moves us to `:running`.
-        set_status(%{state | handle: handle, queue: [], notice: nil}, :starting)
+        set_status(checkpoint(%{state | handle: handle, queue: [], notice: nil}), :starting)
 
       {:error, reason} ->
         # The queue is cleared only on success. Dropping the user's message

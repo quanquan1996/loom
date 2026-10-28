@@ -64,7 +64,10 @@ If the build step is skipped, `/` returns a 404 saying "run mix assets.deploy".
 ## 5. systemd
 
 The unit is [`rel/systemd/loom.service`](../rel/systemd/loom.service). It runs as
-`ubuntu` in `~/loom`, with `Restart=always` and `KillMode=control-group`.
+`ubuntu` in `~/loom`, with `Restart=always` and `KillMode=process`: only the
+node is stopped, so Claude Code and Kiro turns carry on and the next node takes
+them back ([architecture.md §2.3](architecture.md)). Loom kills the agent
+processes it means to stop itself.
 After editing it:
 
 ```sh
@@ -77,14 +80,15 @@ sudo systemctl daemon-reload
 
 ## 6. Deploying Loom from inside Loom
 
-An agent inside Loom is part of the service's process tree. Restarting the
-service kills that agent, so it can't simply restart it. Use `rel/deploy.sh`
-instead:
+An agent inside Loom is part of the service's process tree. A Claude Code or
+Kiro agent survives the node's restart and is taken back by the next node, but
+a Codex one does not. Use `rel/deploy.sh` instead of restarting by hand:
 
 1. It builds into `_build/prod/rel/loom.next` and leaves the running release
    alone.
-2. It calls `Loom.Restarter.request()`. Once every session is idle, including
-   the one that asked, the node stops.
+2. It calls `Loom.Restarter.request()`. Once no Codex turn is running, the
+   node stops. Claude Code and Kiro turns don't hold it up, including the one
+   that asked; they carry on through the restart.
 3. systemd restarts it, and `promote-next.sh` in `ExecStartPre` swaps in
    `loom.next`. The old release is kept as `loom.prev`.
 
