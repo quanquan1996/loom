@@ -89,6 +89,7 @@ defmodule LoomWeb.Router do
   # and the binary it downloads. See `LoomWeb.NodeInstallController`.
   scope "/node", LoomWeb do
     get "/install/:code", NodeInstallController, :script
+    get "/install/:code/ps1", NodeInstallController, :powershell
     get "/download/:target", NodeInstallController, :download
   end
 

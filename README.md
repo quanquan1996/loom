@@ -64,17 +64,20 @@ back later on another device, and the turn has kept running.
 ### Your own devices (loom-node)
 
 The server is not your computer, but your computers can join it. Install
-`loom-node` on a Mac, a Linux box or WSL, and agents in any session can work on
+`loom-node` on a Mac, a Windows PC, a Linux box or WSL, and agents in any
+session can work on
 that machine as you:
 
-- **Run commands** in your login shell, with output streamed back and the real
-  exit code.
+- **Run commands** in your login shell (PowerShell on Windows), with output
+  streamed back and the real exit code.
 - **Read and write files**, binary-safe, so an agent can fetch a document from
   your laptop, work on it on the server, and put the result back.
 - **One-line install.** Add a device in the Devices dialog (foot of the
   sidebar), then paste the `curl … | sh` command it gives you into that
-  machine's terminal. It installs a per-user service (launchd on macOS,
-  systemd on Linux) that reconnects by itself after sleep and reboot.
+  machine's terminal, or the `irm … | iex` one into PowerShell on Windows. It
+  installs a per-user service (launchd on macOS, systemd on Linux, a Run-key
+  entry on Windows, no administrator needed) that reconnects by itself after
+  sleep and reboot.
 - **Outbound only.** The device dials Loom; nothing on it listens on a port,
   so it works behind NAT and home routers.
 - **Safe defaults.** Each device has its own token, stored only as a hash;

@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -9,11 +11,11 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"syscall"
 )
 
 // Installing makes the daemon a per-user login service — launchd on macOS, a
-// systemd user unit on Linux (WSL included, when systemd is on) — so it runs
+// systemd user unit on Linux (WSL included, when systemd is on), the Run key on
+// Windows (see install_windows.go) — so it runs
 // as the user, with their files and their shell, and comes back after a
 // reboot. Not a system service: it would run as root, which is more reach than
 // anything the agent asked for.
@@ -27,7 +29,13 @@ func runInstall(args []string) int {
 	fs := flag.NewFlagSet("install", flag.ContinueOnError)
 	origin := fs.String("url", "", "loom's address, e.g. https://loom.example.com")
 	token := fs.String("token", "", "this device's token, from the install script")
-	shell := fs.String("shell", os.Getenv("SHELL"), "the shell commands run in")
+	// Not $SHELL on Windows: Git Bash's is an MSYS path. The daemon picks
+	// PowerShell when it starts.
+	shellDefault := os.Getenv("SHELL")
+	if runtime.GOOS == "windows" {
+		shellDefault = ""
+	}
+	shell := fs.String("shell", shellDefault, "the shell commands run in")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -56,6 +64,8 @@ func runInstall(args []string) int {
 		err = installLaunchd(exe)
 	case "linux":
 		err = installSystemd(exe)
+	case "windows":
+		err = installWindows(exe)
 	default:
 		err = fmt.Errorf("%s is not supported", runtime.GOOS)
 	}
@@ -198,7 +208,7 @@ func installDetached(exe string) error {
 	exec.Command("pkill", "-x", "loom-node").Run()
 	cmd := exec.Command(exe, "daemon")
 	cmd.Stdout, cmd.Stderr = logFile, logFile
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	detach(cmd)
 	if err := cmd.Start(); err != nil {
 		return err
 	}
@@ -220,8 +230,27 @@ func runUninstall(args []string) int {
 		exec.Command("systemctl", "--user", "disable", "--now", systemdUnit).Run()
 		os.Remove(unitPath())
 		exec.Command("systemctl", "--user", "daemon-reload").Run()
+	case "windows":
+		uninstallWindows()
 	}
 	os.Remove(configPath())
 	fmt.Println("loom-node stopped and its service and token removed; remove the device in loom too")
 	return 0
+}
+
+// ── Windows ─────────────────────────────────────────────────────────────
+
+// guiCopy marks a PE image as a Windows GUI program: the subsystem field, two
+// bytes at offset 68 of the optional header in both PE32 and PE32+.
+func guiCopy(b []byte) error {
+	if len(b) < 0x40 {
+		return errors.New("this binary is not a PE image")
+	}
+	pe := int(binary.LittleEndian.Uint32(b[0x3c:]))
+	at := pe + 4 + 20 + 68
+	if pe < 0 || at+2 > len(b) || string(b[pe:pe+4]) != "PE\x00\x00" {
+		return errors.New("this binary is not a PE image")
+	}
+	binary.LittleEndian.PutUint16(b[at:], 2) // IMAGE_SUBSYSTEM_WINDOWS_GUI
+	return nil
 }

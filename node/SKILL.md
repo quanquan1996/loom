@@ -1,6 +1,6 @@
 ---
 name: loom-nodes
-description: Run commands and read or write files on the user's own machines (their Mac, WSL, home PC) rather than on this server. Use when the user refers to "my computer", "my Mac", "local", "本地", "我电脑上", "我的 Mac", "WSL", or a device by name, or asks for something that only exists on their machine.
+description: Run commands and read or write files on the user's own machines (their Mac, Windows PC, WSL, home PC) rather than on this server. Use when the user refers to "my computer", "my Mac", "my PC", "local", "本地", "我电脑上", "我的 Mac", "Windows", "WSL", or a device by name, or asks for something that only exists on their machine.
 ---
 
 # loom-nodes: the user's own devices
@@ -33,6 +33,11 @@ loom-node exec <device> [--cwd DIR] [--timeout SECONDS] -- '<command>'
 - No stdin and no terminal: anything interactive (prompts, `sudo` asking for a
   password, editors, pagers) cannot be answered. Pass flags like `-y`, or use
   `git --no-pager`, `| cat`.
+- **Windows devices** (OS `windows` in the list) run the command in
+  PowerShell — `pwsh` if installed, else Windows PowerShell 5.1, which has no
+  `&&` (use `;` and `if ($?) {…}`). Write PowerShell, not sh: `Get-ChildItem`
+  or `ls`, `$env:USERPROFILE`, `Select-String` for grep. Output is UTF-8.
+  `C:\Users\…` and `~\…` paths both work for read/write.
 - Default timeout 120s, at most 1800s. A command that runs past it is killed
   and exits 124 — raise `--timeout` for builds and long tests.
 - Output beyond 10 MB is dropped (a note says so); narrow it with `head`,

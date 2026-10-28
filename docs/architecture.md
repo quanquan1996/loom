@@ -323,7 +323,8 @@ The page is model output, so it is treated as hostile:
 
 ### 4.4 Devices (loom-node)
 
-Agents can reach the user's own machines, such as a Mac or a WSL box. Each
+Agents can reach the user's own machines, such as a Mac, a Windows PC or a
+WSL box. Each
 device runs `loom-node daemon`, which is the Go program in `node/`. One binary
 serves both ends of the link:
 
@@ -339,12 +340,17 @@ agent ──zsh──> loom-node exec mac -- '…'      CLI, on this host
 
 - **Registering a device.** The Devices dialog at the foot of the sidebar
   registers a name and returns a one-time install code, valid for an hour. The
-  user runs `curl …/node/install/<code> | sh` on the device. Fetching that
+  user runs `curl …/node/install/<code> | sh` on the device, or
+  `irm …/node/install/<code>/ps1 | iex` in PowerShell on Windows. Fetching
+  either
   script redeems the code: it mints the device's token, which loom keeps only
   as a SHA-256 hash, and kills the previous token. The script then downloads
   the binary for the device's OS and arch from `/node/download/…`, writes
   `~/.config/loom-node/config.json`, and installs a per-user service (launchd
-  or a systemd user unit). Reinstalling is how a token is replaced, and
+  or a systemd user unit). On Windows it is a value under the user's
+  `HKCU\…\Run` key, which starts `loom-noded.exe` at logon. That file is the
+  same binary with its PE subsystem set to GUI, so no console window ever
+  opens for it. Reinstalling is how a token is replaced, and
   removing the device revokes its token.
 - **How the CLI gets in.** The CLI's routes, `/api/node/*`, share a port with
   everything Cloudflare forwards. They require the key from
@@ -368,6 +374,10 @@ agent ──zsh──> loom-node exec mac -- '…'      CLI, on this host
     unanswered for 15s.
   - The server lets a silent socket go after 45s.
 - **Running a command.** It runs as `$SHELL -lc` in its own process group:
+  - on Windows it runs in PowerShell (`pwsh` if installed, else Windows
+    PowerShell) with `-NoProfile -EncodedCommand`. Output is forced to UTF-8
+    and the command runs in a hidden console. A job object stands in for the
+    process group;
   - stdin is closed;
   - the timeout defaults to 120s and is capped at 1800s, with exit 124 on
     expiry;

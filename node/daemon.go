@@ -14,7 +14,6 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -60,10 +59,7 @@ func loadConfig() (*config, error) {
 		return nil, fmt.Errorf("%s has no url or token; reinstall from loom's Devices", configPath())
 	}
 	if c.Shell == "" {
-		c.Shell = os.Getenv("SHELL")
-	}
-	if c.Shell == "" {
-		c.Shell = "/bin/sh"
+		c.Shell = defaultShell()
 	}
 	return &c, nil
 }
@@ -74,6 +70,7 @@ func runDaemon(args []string) int {
 		return 2
 	}
 	log.SetFlags(log.LstdFlags)
+	daemonLog()
 	log.Printf("loom-node %s starting", version)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -215,23 +212,18 @@ func (s *session) fail(id string, err error) {
 // ── exec ────────────────────────────────────────────────────────────────
 
 type job struct {
-	cmd      *exec.Cmd
+	group    *group
 	once     sync.Once
 	reason   string
 	timedOut atomic.Bool
 }
 
-// kill takes down the whole process group: `$SHELL -lc` forks, and a command
-// may start its own children.
+// kill takes down the whole group: `$SHELL -lc` forks, and a command may
+// start its own children.
 func (j *job) kill(reason string) {
 	j.once.Do(func() {
 		j.reason = reason
-		if j.cmd.Process == nil {
-			return
-		}
-		pgid := -j.cmd.Process.Pid
-		syscall.Kill(pgid, syscall.SIGTERM)
-		time.AfterFunc(killGrace, func() { syscall.Kill(pgid, syscall.SIGKILL) })
+		j.group.kill()
 	})
 }
 
@@ -289,21 +281,20 @@ func (s *session) exec(r request) {
 
 	var mu sync.Mutex
 	var total int64
-	cmd := exec.Command(s.cfg.Shell, "-lc", r.Cmd)
+	cmd := shellCommand(s.cfg.Shell, r.Cmd)
 	cmd.Dir = cwd
 	cmd.Env = append(os.Environ(), "LOOM_NODE=1")
 	cmd.Stdout = &stream{s: s, id: r.ID, name: "stdout", mu: &mu, total: &total}
 	cmd.Stderr = &stream{s: s, id: r.ID, name: "stderr", mu: &mu, total: &total}
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.WaitDelay = pipeLinger
 
-	j := &job{cmd: cmd}
 	audit("exec %s cwd=%s timeout=%s session=%s: %s", r.ID, cwd, timeout, r.Session, r.Cmd)
 
 	if err := cmd.Start(); err != nil {
 		s.fail(r.ID, err)
 		return
 	}
+	j := &job{group: newGroup(cmd)}
 
 	s.mu.Lock()
 	s.execs[r.ID] = j
@@ -316,15 +307,13 @@ func (s *session) exec(r request) {
 		timer := time.AfterFunc(timeout, func() { j.timedOut.Store(true); j.kill("timed out") })
 		err := cmd.Wait()
 		timer.Stop()
+		j.group.close()
 
 		s.mu.Lock()
 		delete(s.execs, r.ID)
 		s.mu.Unlock()
 
-		code := cmd.ProcessState.ExitCode()
-		if ws, ok := cmd.ProcessState.Sys().(syscall.WaitStatus); ok && ws.Signaled() {
-			code = 128 + int(ws.Signal())
-		}
+		code := exitCode(cmd.ProcessState)
 		timedOut := j.timedOut.Load()
 		if timedOut {
 			code = 124
@@ -491,7 +480,8 @@ func (s *session) finish(u *upload) error {
 
 // expand resolves a leading ~ — paths come from the model, which writes them
 // the way a shell would accept them. Relative paths are taken from home, the
-// directory commands run in by default.
+// directory commands run in by default. On Windows `~\` works too, and `\x`
+// is on home's drive.
 func expand(path string) (string, error) {
 	if path == "" {
 		return "", nil
@@ -503,10 +493,12 @@ func expand(path string) (string, error) {
 	switch {
 	case path == "~":
 		return home, nil
-	case strings.HasPrefix(path, "~/"):
+	case path[0] == '~' && len(path) > 1 && os.IsPathSeparator(path[1]):
 		return filepath.Join(home, path[2:]), nil
 	case filepath.IsAbs(path):
 		return path, nil
+	case os.IsPathSeparator(path[0]):
+		return filepath.VolumeName(home) + filepath.Clean(path), nil
 	default:
 		return filepath.Join(home, path), nil
 	}

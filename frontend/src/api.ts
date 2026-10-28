@@ -512,9 +512,16 @@ export function deviceInstallCode(id: string): Promise<{ code: string }> {
   return apiCall(`/api/devices/${id}/install`, { method: "POST" })
 }
 
-/** What to paste into a terminal on the device. */
-export function installCommand(code: string): string {
-  return `curl -fsSL ${window.location.origin}/node/install/${code} | sh`
+/**
+ * What to paste into a terminal on the device, per kind of system. One code:
+ * whichever is run first uses it up.
+ */
+export function installCommands(code: string): { system: string; command: string }[] {
+  const url = `${window.location.origin}/node/install/${code}`
+  return [
+    { system: "macOS, Linux, WSL", command: `curl -fsSL ${url} | sh` },
+    { system: "Windows PowerShell", command: `irm ${url}/ps1 | iex` },
+  ]
 }
 
 // ── Projects (see Loom.Projects) ──────────────────────────────────────────

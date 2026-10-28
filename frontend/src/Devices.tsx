@@ -6,7 +6,7 @@ import {
   createDevice,
   deleteDevice,
   deviceInstallCode,
-  installCommand,
+  installCommands,
   renameDevice,
   type Device,
 } from "./api"
@@ -31,8 +31,8 @@ export function DevicesDialog({
 }) {
   const [name, setName] = useState("")
   const [error, setError] = useState<string | null>(null)
-  // The device whose install command is on screen, and the command.
-  const [install, setInstall] = useState<{ id: string; command: string } | null>(null)
+  // The device whose install commands are on screen, and its code.
+  const [install, setInstall] = useState<{ id: string; code: string } | null>(null)
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose()
@@ -48,7 +48,7 @@ export function DevicesDialog({
       onUpsert(node)
       setName("")
       setError(null)
-      setInstall({ id: node.id, command: installCommand(code) })
+      setInstall({ id: node.id, code })
     } catch (e) {
       setError((e as Error).message)
     }
@@ -58,7 +58,7 @@ export function DevicesDialog({
     try {
       const { code } = await deviceInstallCode(device.id)
       setError(null)
-      setInstall({ id: device.id, command: installCommand(code) })
+      setInstall({ id: device.id, code })
     } catch (e) {
       setError((e as Error).message)
     }
@@ -98,8 +98,8 @@ export function DevicesDialog({
         <div className="device-list">
           {devices.length === 0 && (
             <div className="device-empty">
-              No devices yet. Add your Mac or a WSL box, run the command it gives
-              you there, and agents can run commands on it.
+              No devices yet. Add your Mac, PC or a WSL box, run the command it
+              gives you there, and agents can run commands on it.
             </div>
           )}
           {devices.map((d) => (
@@ -111,7 +111,7 @@ export function DevicesDialog({
                 onRemove={() => remove(d)}
               />
               {install?.id === d.id && (
-                <InstallBox command={install.command} onDone={() => setInstall(null)} />
+                <InstallBox code={install.code} onDone={() => setInstall(null)} />
               )}
             </div>
           ))}
@@ -215,13 +215,13 @@ function DeviceRow({
   )
 }
 
-function InstallBox({ command, onDone }: { command: string; onDone: () => void }) {
-  const [copied, setCopied] = useState(false)
+function InstallBox({ code, onDone }: { code: string; onDone: () => void }) {
+  const [copied, setCopied] = useState<string | null>(null)
 
-  const copy = async () => {
+  const copy = async (command: string) => {
     try {
       await navigator.clipboard.writeText(command)
-      setCopied(true)
+      setCopied(command)
     } catch {
       // No clipboard (an http origin): the text is selectable instead.
     }
@@ -229,14 +229,21 @@ function InstallBox({ command, onDone }: { command: string; onDone: () => void }
 
   return (
     <div className="install-box">
-      <div className="install-hint">Run this in a terminal on the device — it works once, within an hour:</div>
-      <code className="install-command" onClick={(e) => selectAll(e.currentTarget)}>
-        {command}
-      </code>
+      <div className="install-hint">Run one of these in a terminal on the device — it works once, within an hour:</div>
+      {installCommands(code).map(({ system, command }) => (
+        <div key={system} className="install-option">
+          <div className="install-system">
+            <span>{system}</span>
+            <button className="text-btn" onClick={() => copy(command)}>
+              {copied === command ? "Copied" : "Copy"}
+            </button>
+          </div>
+          <code className="install-command" onClick={(e) => selectAll(e.currentTarget)}>
+            {command}
+          </code>
+        </div>
+      ))}
       <div className="install-actions">
-        <button className="text-btn" onClick={copy}>
-          {copied ? "Copied" : "Copy"}
-        </button>
         <button className="text-btn" onClick={onDone}>
           Done
         </button>

@@ -90,6 +90,19 @@ defmodule LoomWeb.NodeTest do
 
       assert get(build_conn(), "/node/install/#{code}").status == 404
     end
+
+    test "the PowerShell install script redeems the same code, once" do
+      {:ok, _node, code} = Nodes.create("pc#{System.unique_integer([:positive])}")
+
+      conn = get(build_conn(), "/node/install/#{code}/ps1")
+      assert conn.status == 200
+      assert conn.resp_body =~ "/node/download/windows-$arch"
+      [_, token] = Regex.run(~r/\$TOKEN = '([^']+)'/, conn.resp_body)
+      assert {:ok, _} = Nodes.authenticate(token)
+
+      assert get(build_conn(), "/node/install/#{code}").status == 404
+      assert get(build_conn(), "/node/install/#{code}/ps1").resp_body =~ "Write-Error"
+    end
   end
 
   describe "presence" do

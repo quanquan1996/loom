@@ -426,6 +426,19 @@
   user-select: all;
 }
 
+.install-option + .install-option {
+  margin-top: 8px;
+}
+
+.install-system {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+  color: var(--fg-dim);
+  font-size: 0.846rem;
+}
+
 .install-actions {
   display: flex;
   justify-content: flex-end;
@@ -434,6 +447,7 @@
 }
 
 .install-actions .text-btn,
+.install-system .text-btn,
 .device-add .text-btn {
   padding: 5px 12px;
   color: var(--fg);
@@ -442,6 +456,7 @@
 }
 
 .install-actions .text-btn:hover,
+.install-system .text-btn:hover,
 .device-add .text-btn:hover:not(:disabled) {
   background: var(--blue);
   color: var(--bg);
