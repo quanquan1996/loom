@@ -94,8 +94,15 @@ defmodule LoomWeb.NodeTest do
     test "the PowerShell install script redeems the same code, once" do
       {:ok, _node, code} = Nodes.create("pc#{System.unique_integer([:positive])}")
 
-      conn = get(build_conn(), "/node/install/#{code}/ps1")
+      conn =
+        build_conn()
+        |> put_req_header("x-forwarded-proto", "http")
+        |> put_req_header("cloudfront-forwarded-proto", "https")
+        |> Map.put(:host, "loom.example")
+        |> get("/node/install/#{code}/ps1")
+
       assert conn.status == 200
+      assert conn.resp_body =~ "$URL = 'https://loom.example'"
       assert conn.resp_body =~ "/node/download/windows-$arch"
       [_, token] = Regex.run(~r/\$TOKEN = '([^']+)'/, conn.resp_body)
       assert {:ok, _} = Nodes.authenticate(token)

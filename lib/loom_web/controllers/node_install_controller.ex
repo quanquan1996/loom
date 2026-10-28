@@ -69,9 +69,12 @@ defmodule LoomWeb.NodeInstallController do
   def download(conn, _params), do: send_resp(conn, 404, "no such target\n")
 
   # The origin the device reached us on, which is the one it should keep
-  # dialling. Cloudflare terminates TLS, so the scheme is in the header.
+  # dialling. Cloudflare or CloudFront terminates TLS, so the scheme is in a
+  # header — CloudFront's own, as it rewrites X-Forwarded-Proto to the scheme
+  # it used to reach us.
   defp origin(conn) do
-    case get_req_header(conn, "x-forwarded-proto") do
+    case get_req_header(conn, "cloudfront-forwarded-proto") ++
+           get_req_header(conn, "x-forwarded-proto") do
       [scheme | _] ->
         "#{scheme}://#{conn.host}"
 
