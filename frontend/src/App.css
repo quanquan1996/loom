@@ -1228,75 +1228,6 @@
 .browser-type input { flex: 1; min-width: 0; font: inherit; font-size: 16px; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); }
 .browser-screen { flex: 1; min-height: 0; background: #1a1a1a; }
 
-/* Projects in the sidebar: a row that folds its sessions away, with its own
-   "new session" and settings, then the sessions indented under it. */
-.sidebar-section {
-  padding: 10px 8px 4px;
-  color: var(--fg-dim);
-  font-size: 0.75rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.project-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 8px 6px 4px;
-  border-radius: 6px;
-  cursor: pointer;
-  user-select: none;
-}
-
-.project-row:hover {
-  background: var(--bg-card);
-}
-
-/* Folded, with the open session inside. */
-.project-row.active {
-  box-shadow: inset 2px 0 0 var(--accent);
-}
-
-.project-fold,
-.project-icon {
-  flex: 0 0 auto;
-  display: inline-flex;
-  color: var(--fg-dim);
-}
-
-.project-fold svg,
-.project-icon {
-  width: 1rem;
-  height: 1rem;
-}
-
-.project-icon {
-  color: var(--accent);
-}
-
-.project-actions {
-  display: inline-flex;
-  gap: 2px;
-}
-
-.project-row:hover .session-del {
-  visibility: visible;
-}
-
-.project-row .session-del:hover {
-  background: var(--blue);
-}
-
-.session.nested {
-  padding-left: 26px;
-}
-
-.project-empty {
-  padding: 4px 8px 6px 30px;
-  color: var(--fg-dim);
-  font-size: 0.846rem;
-}
-
 .modal.project-dialog {
   width: min(34rem, 100%);
 }
@@ -1460,26 +1391,260 @@
   color: var(--red);
 }
 
-/* A section heading that folds its list. */
-.sidebar-section.foldable {
+/* ── The sidebar's modules: projects and sessions ────────────────────────
+   Each is a card with a header of its own (icon, name, count, a "new"
+   button, a fold), so the two read as features rather than as one list
+   with headings in it. See `Module` in Sidebar.tsx. */
+.side-module {
+  --tone: var(--accent);
+  margin: 0 0 8px;
+  border: 1px solid color-mix(in srgb, var(--line) 85%, transparent);
+  border-radius: 10px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--bg-card) 70%, transparent),
+    color-mix(in srgb, var(--bg-card) 30%, transparent)
+  );
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 4%),
+    0 1px 3px rgb(0 0 0 / 35%);
+  overflow: hidden;
+}
+
+.side-module.sessions {
+  --tone: var(--blue);
+}
+
+.module-head {
   display: flex;
   align-items: center;
-  gap: 4px;
-  width: 100%;
+  gap: 8px;
+  min-height: 2.4rem;
+  padding: 0 8px 0 9px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.side-module.open .module-head {
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+}
+
+.module-head:hover {
+  background: color-mix(in srgb, var(--tone) 5%, transparent);
+}
+
+.module-icon {
+  flex: 0 0 auto;
+  width: 1.6rem;
+  height: 1.6rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  color: var(--tone);
+  background: color-mix(in srgb, var(--tone) 14%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone) 25%, transparent);
+}
+
+.module-icon svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.module-label {
+  color: var(--fg);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.module-count {
+  flex: 0 0 auto;
+  min-width: 1.3rem;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--fg-dim) 14%, transparent);
+  color: var(--fg-dim);
+  font-size: 0.75rem;
+  line-height: 1.3rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.module-actions {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* The module's "new": always there, quiet until hovered. */
+.module-btn,
+.module-actions .session-del.project-new {
+  width: 1.6rem;
+  height: 1.6rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
   border: 0;
+  border-radius: 6px;
   background: transparent;
-  font-family: inherit;
-  text-align: left;
+  color: var(--fg-dim);
+  cursor: pointer;
+  visibility: visible;
+}
+
+.module-btn:hover,
+.module-actions .session-del.project-new:hover {
+  background: color-mix(in srgb, var(--tone) 16%, transparent);
+  color: var(--tone);
+}
+
+.module-btn svg,
+.module-actions .session-del svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.module-chevron {
+  flex: 0 0 auto;
+  width: 0.95rem;
+  height: 0.95rem;
+  color: var(--fg-dim);
+  transform: rotate(-90deg);
+  transition: transform 0.15s ease;
+}
+
+.side-module.open .module-chevron {
+  transform: none;
+}
+
+.module-body {
+  padding: 4px;
+}
+
+.module-empty {
+  padding: 8px 8px 10px;
+  color: var(--fg-dim);
+  font-size: 0.846rem;
+  line-height: 1.5;
+}
+
+.module-empty p {
+  margin: 0 0 8px;
+}
+
+.module-empty p:last-child {
+  margin: 0;
+}
+
+.module-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px dashed color-mix(in srgb, var(--tone) 45%, transparent);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--tone) 6%, transparent);
+  color: var(--tone);
+  font: inherit;
+  font-size: 0.846rem;
   cursor: pointer;
 }
 
-.sidebar-section.foldable:hover {
+.module-cta:hover {
+  background: color-mix(in srgb, var(--tone) 14%, transparent);
+}
+
+.module-cta svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+/* A project inside the module: a badge, its name, its count, a chevron; its
+   sessions hang off a guide line underneath. */
+.project-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px;
+  border-radius: 7px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.project-row:hover {
+  background: var(--bg-card);
+}
+
+.project-badge {
+  flex: 0 0 auto;
+  width: 1.45rem;
+  height: 1.45rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.project-badge svg {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+.project-row.holds-active .session-label {
+  color: var(--accent);
+}
+
+.project-actions {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.project-row:hover .session-del {
+  visibility: visible;
+}
+
+.project-row .session-del:hover {
+  background: var(--line);
   color: var(--fg);
 }
 
-.sidebar-section.foldable svg {
+.project-chevron {
+  flex: 0 0 auto;
   width: 0.85rem;
   height: 0.85rem;
+  color: var(--fg-dim);
+  transition: transform 0.15s ease;
+}
+
+.project-group.open .project-chevron {
+  transform: rotate(90deg);
+}
+
+.project-sessions {
+  margin: 1px 0 4px 17px;
+  padding-left: 7px;
+  border-left: 1px solid color-mix(in srgb, var(--accent) 22%, var(--line));
+}
+
+.project-empty {
+  padding: 5px 8px;
+  color: var(--fg-dim);
+  font-size: 0.846rem;
+}
+
+/* Rows inside a module sit on the card, so the hover and the selection are
+   a shade lighter than on the bare sidebar. */
+.module-body .session {
+  border-radius: 7px;
+}
+
+.module-body .session:hover,
+.module-body .session.active {
+  background: color-mix(in srgb, var(--bg-card) 80%, var(--line));
 }
 
 /* In the full list, a session that is in a project says so. */
@@ -1493,4 +1658,10 @@
 .session-project svg {
   width: 0.85rem;
   height: 0.85rem;
+}
+
+@media (hover: none) {
+  .project-row .session-del {
+    visibility: visible;
+  }
 }

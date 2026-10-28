@@ -1180,35 +1180,3 @@ h3.md-h {
   color: var(--fg-dim);
   font-size: 0.769rem;
 }
-
-/* The project a session is in, ahead of its name; opens its settings. */
-.chip.button.chat-project {
-  flex: 0 1 auto;
-  min-width: 0;
-  max-width: 14rem;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 9px;
-  color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 10%, var(--bg-card));
-}
-
-.chip.button.chat-project span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.chip.button.chat-project svg {
-  flex: 0 0 auto;
-  width: 0.9rem;
-  height: 0.9rem;
-}
-
-/* A phone's header has no room for the name: the folder alone, still a button. */
-@media (max-width: 640px) {
-  .chip.button.chat-project span {
-    display: none;
-  }
-}

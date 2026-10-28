@@ -517,8 +517,6 @@ function App() {
             <Chat
               key={active.id}
               session={active}
-              project={projects.find((p) => p.id === active.project_id) ?? null}
-              onOpenProject={setProjectDialog}
               sidebarOpen={!narrow && sidebarOpen}
               onToggleSidebar={() =>
                 narrow ? setDrawerOpen(true) : setSidebarOpen((open) => !open)

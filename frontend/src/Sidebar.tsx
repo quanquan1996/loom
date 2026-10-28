@@ -4,11 +4,14 @@ import {
   ChevronDown,
   ChevronRight,
   Folder,
+  FolderKanban,
   FolderOpen,
   FolderPlus,
   Globe,
   Keyboard,
   KeyboardOff,
+  type LucideIcon,
+  MessagesSquare,
   MonitorSmartphone,
   MoreHorizontal,
   PanelLeftClose,
@@ -16,7 +19,7 @@ import {
   Plus,
   Settings,
 } from "lucide-react"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, type ReactNode } from "react"
 import type { AgentBackend, AgentInfo, Device, Project } from "./api"
 import { RenameInput } from "./Confirm"
 import { DevicesDialog } from "./Devices"
@@ -188,9 +191,6 @@ export function Sidebar({
       <div className="sidebar-head">
         <span className="brand">loom</span>
         <span className="sidebar-actions">
-          <button className="icon-btn" onClick={() => onEditProject(null)} title="New project">
-            <FolderPlus />
-          </button>
           <NewSessionButton onCreate={(backend) => onCreate(backend)} />
           <button className="icon-btn" onClick={onCollapse} title="Hide sidebar">
             <PanelLeftClose />
@@ -199,28 +199,39 @@ export function Sidebar({
       </div>
 
       <div className="session-list">
-        {sessions.length === 0 && projects.length === 0 && (
-          <div className="session-empty">No sessions yet.</div>
-        )}
-
-        {groups.length > 0 && (
-          <Section label="Projects" open={!folded.has(PROJECTS_SECTION)} onFold={() => onFold(PROJECTS_SECTION)} />
-        )}
-        {!folded.has(PROJECTS_SECTION) &&
-          groups.map(({ project, sessions: inside }) => {
+        <Module
+          icon={FolderKanban}
+          tone="projects"
+          label="Projects"
+          count={projects.length}
+          open={!folded.has(PROJECTS_SECTION)}
+          onFold={() => onFold(PROJECTS_SECTION)}
+          actions={
+            <button className="module-btn" onClick={() => onEditProject(null)} title="New project">
+              <FolderPlus />
+            </button>
+          }
+        >
+          {groups.length === 0 && (
+            <div className="module-empty">
+              <p>Group sessions that share a workspace and instructions.</p>
+              <button className="module-cta" onClick={() => onEditProject(null)}>
+                <FolderPlus /> New project
+              </button>
+            </div>
+          )}
+          {groups.map(({ project, sessions: inside }) => {
             const open = !folded.has(project.id)
             const holdsActive = inside.some((s) => s.id === activeId)
             return (
-              <div key={project.id} className="project-group">
+              <div key={project.id} className={"project-group" + (open ? " open" : "")}>
                 <div
-                  className={"project-row" + (!open && holdsActive ? " active" : "")}
+                  className={"project-row" + (holdsActive ? " holds-active" : "")}
                   onClick={() => onFold(project.id)}
                   title={project.workspace}
                 >
-                  <span className="project-fold">{open ? <ChevronDown /> : <ChevronRight />}</span>
-                  {open ? <FolderOpen className="project-icon" /> : <Folder className="project-icon" />}
+                  <span className="project-badge">{open ? <FolderOpen /> : <Folder />}</span>
                   <span className="session-label">{project.name}</span>
-                  {!open && inside.length > 0 && <span className="session-when">{inside.length}</span>}
                   <span className="project-actions" onClick={(e) => e.stopPropagation()}>
                     <NewSessionButton
                       small
@@ -235,23 +246,35 @@ export function Sidebar({
                       <Settings />
                     </button>
                   </span>
+                  <span className="module-count">{inside.length}</span>
+                  <ChevronRight className="project-chevron" />
                 </div>
-                {open &&
-                  (inside.length ? (
-                    inside.map((s) => row(s, true))
-                  ) : (
-                    <div className="project-empty">No sessions yet.</div>
-                  ))}
+                {open && (
+                  <div className="project-sessions">
+                    {inside.length ? (
+                      inside.map((s) => row(s, true))
+                    ) : (
+                      <div className="project-empty">No sessions yet.</div>
+                    )}
+                  </div>
+                )}
               </div>
             )
           })}
+        </Module>
 
-        {groups.length > 0 && all.length > 0 && (
-          <Section label="Sessions" open={!folded.has(SESSIONS_SECTION)} onFold={() => onFold(SESSIONS_SECTION)} />
-        )}
-        {(groups.length === 0 || !folded.has(SESSIONS_SECTION)) && (
-          <div className="session-group">{all.map((s) => row(s, false))}</div>
-        )}
+        <Module
+          icon={MessagesSquare}
+          tone="sessions"
+          label="Sessions"
+          count={sessions.length}
+          open={!folded.has(SESSIONS_SECTION)}
+          onFold={() => onFold(SESSIONS_SECTION)}
+          actions={<NewSessionButton small title="New session" onCreate={(backend) => onCreate(backend)} />}
+        >
+          {all.length === 0 && <div className="module-empty"><p>No sessions yet.</p></div>}
+          {all.map((s) => row(s, false))}
+        </Module>
       </div>
 
       {menu && menuFor && (
@@ -319,13 +342,44 @@ export function Sidebar({
   )
 }
 
-/** A heading that folds what is under it. */
-function Section({ label, open, onFold }: { label: string; open: boolean; onFold: () => void }) {
+/**
+ * One of the sidebar's two blocks, projects and sessions: a card whose
+ * header names it, counts it, carries its own "new" button and folds it.
+ */
+function Module({
+  icon: Icon,
+  tone,
+  label,
+  count,
+  open,
+  onFold,
+  actions,
+  children,
+}: {
+  icon: LucideIcon
+  tone: "projects" | "sessions"
+  label: string
+  count: number
+  open: boolean
+  onFold: () => void
+  actions: ReactNode
+  children: ReactNode
+}) {
   return (
-    <button className="sidebar-section foldable" onClick={onFold} aria-expanded={open}>
-      {open ? <ChevronDown /> : <ChevronRight />}
-      {label}
-    </button>
+    <section className={`side-module ${tone}` + (open ? " open" : "")}>
+      <div className="module-head" role="button" aria-expanded={open} onClick={onFold}>
+        <span className="module-icon">
+          <Icon />
+        </span>
+        <span className="module-label">{label}</span>
+        {count > 0 && <span className="module-count">{count}</span>}
+        <span className="module-actions" onClick={(e) => e.stopPropagation()}>
+          {actions}
+        </span>
+        <ChevronDown className="module-chevron" />
+      </div>
+      {open && <div className="module-body">{children}</div>}
+    </section>
   )
 }
 
