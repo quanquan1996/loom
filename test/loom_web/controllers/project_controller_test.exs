@@ -36,6 +36,26 @@ defmodule LoomWeb.ProjectControllerTest do
     {:ok, conn: conn}
   end
 
+  defmodule PickClassifier do
+    @moduledoc false
+    # Answers whatever the test put in the application env, after a moment.
+    def classify(_text, _projects) do
+      Process.sleep(20)
+      Application.get_env(:loom, :test_classifier_answer)
+    end
+  end
+
+  defp with_classifier(answer) do
+    previous = Application.get_env(:loom, Loom.Projects)
+    Application.put_env(:loom, Loom.Projects, Keyword.put(previous, :classifier, PickClassifier))
+    Application.put_env(:loom, :test_classifier_answer, answer)
+
+    on_exit(fn ->
+      Application.put_env(:loom, Loom.Projects, previous)
+      Application.delete_env(:loom, :test_classifier_answer)
+    end)
+  end
+
   defp create_project(conn, attrs) do
     conn |> post(~p"/api/projects", attrs) |> json_response(201)
   end
@@ -131,6 +151,62 @@ defmodule LoomWeb.ProjectControllerTest do
     _ = Agent.info(id)
     {:ok, _} = Agent.submit(id, "again")
     assert BackendStub.await_turn() == "again"
+  end
+
+  describe "filing a new session's first message" do
+    test "into the project it belongs to, before the turn starts", %{conn: conn} do
+      %{"id" => pid, "workspace" => ws} =
+        create_project(conn, %{name: "Blog", instructions: "Casual."})
+
+      with_classifier(pid)
+
+      %{"id" => id} =
+        conn |> post(~p"/api/agents", %{backend: "claude_code"}) |> json_response(201)
+
+      {:ok, :started} = Agent.submit(id, "five titles for a post on hiking")
+      # Typed while it waits: goes out with the first.
+      {:ok, :queued} = Agent.submit(id, "and keep them short")
+
+      assert_receive {:stub_relocated, ^ws, instructions}
+      assert instructions =~ "Casual."
+      text = BackendStub.await_turn()
+      assert text =~ "five titles for a post on hiking"
+      assert text =~ "and keep them short"
+      assert Agent.info(id).project_id == pid
+
+      {:ok, %{events: events}} = Agent.attach(id)
+
+      assert %{payload: %{project_id: ^pid, name: "Blog", auto: true}} =
+               Enum.find(events, &(&1.kind == :project_moved))
+    end
+
+    test "nowhere when no project fits, and only for the first message", %{conn: conn} do
+      create_project(conn, %{name: "Blog"})
+      with_classifier(nil)
+
+      %{"id" => id} =
+        conn |> post(~p"/api/agents", %{backend: "claude_code"}) |> json_response(201)
+
+      {:ok, :started} = Agent.submit(id, "what is 2 + 2")
+      assert BackendStub.await_turn() == "what is 2 + 2"
+      refute_received {:stub_relocated, _, _}
+      assert Agent.info(id).project_id == nil
+    end
+
+    test "not for a session made in a project", %{conn: conn} do
+      %{"id" => pid} = create_project(conn, %{name: "Blog"})
+      %{"id" => other} = create_project(conn, %{name: "Other"})
+      with_classifier(other)
+
+      %{"id" => id} =
+        conn
+        |> post(~p"/api/agents", %{backend: "claude_code", project_id: pid})
+        |> json_response(201)
+
+      {:ok, :started} = Agent.submit(id, "hello")
+      assert BackendStub.await_turn() == "hello"
+      assert Agent.info(id).project_id == pid
+    end
   end
 
   test "a move is refused mid-turn, and to a project that does not exist", %{conn: conn} do

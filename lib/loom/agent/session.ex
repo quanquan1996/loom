@@ -99,6 +99,10 @@ defmodule Loom.Agent.Session do
   # open overnight costs nothing.
   @idle_release_ms :timer.minutes(15)
 
+  # How long a first message waits for `Loom.Projects.Classifier` before the
+  # turn starts where the session already is. It answers in about two seconds.
+  @classify_timeout_ms :timer.seconds(15)
+
   # What counts as the session being used, for `last_active_at`. Not `:status`:
   # a restart restores every session, and must not make them all "just now".
   @activity [:user, :assistant_text, :turn_done]
@@ -379,6 +383,8 @@ defmodule Loom.Agent.Session do
       # Told to the backend ahead of the next turn's message, once: what changed
       # about its project since the conversation began. See `moved_notice/2`.
       notice: nil,
+      # Set while the first message waits to be filed into a project.
+      classifying: nil,
       title: nil,
       created_at: nil,
       # When the last message went either way; orders the sidebar. Derived from
@@ -489,24 +495,8 @@ defmodule Loom.Agent.Session do
   end
 
   def handle_call({:move, project_id}, _from, state) do
-    with {:ok, project} <- requested_project(project: project_id) do
-      cwd = project && Loom.Projects.workspace(project)
-      if cwd, do: File.mkdir_p!(cwd)
-      state = cancel_release(state)
-
-      {:ok, handle} =
-        Backend.impl(state.backend).relocate(state.handle, cwd, instructions(state.id, project))
-
-      state = %{
-        state
-        | handle: handle,
-          project_id: project && project.id,
-          notice: moved_notice(project, Map.get(handle, :cwd))
-      }
-
-      persist_meta(state)
-      {:reply, :ok, state}
-    else
+    case requested_project(project: project_id) do
+      {:ok, project} -> {:reply, :ok, relocate_to(state, project, false)}
       {:error, reason} -> {:reply, {:error, reason}, state}
     end
   end
@@ -587,6 +577,23 @@ defmodule Loom.Agent.Session do
   def handle_info(:refresh_instructions, state), do: {:noreply, state}
 
   def handle_info({:EXIT, _from, _reason}, state), do: {:noreply, state}
+
+  # The first message's project, or the timeout: whichever comes first starts
+  # the turn. The other finds the token gone and is dropped.
+  def handle_info({:classified, token, project_id}, %{classifying: token} = state) do
+    state = %{state | classifying: nil}
+
+    state =
+      case project_of(project_id) do
+        nil -> state
+        project -> relocate_to(state, project, true)
+      end
+
+    # Interrupted while it waited: the message stays parked, like any other.
+    {:noreply, if(state.status == :starting, do: drain(state), else: state)}
+  end
+
+  def handle_info({:classified, _token, _project_id}, state), do: {:noreply, state}
 
   def handle_info(message, state) do
     case Backend.impl(state.backend).decode(state.handle, message) do
@@ -681,20 +688,86 @@ defmodule Loom.Agent.Session do
     # paths, the user does not want to read them.
     message = Files.prompt(text, files)
 
-    case state.status do
-      status when status in [:starting, :running] ->
+    cond do
+      state.classifying != nil ->
+        # No turn yet to steer into: it goes out with the first message.
+        state = Map.update!(state, :queue, &(&1 ++ [message]))
+        {:reply, {:ok, :queued}, persist_and_broadcast_queue(state)}
+
+      state.status in [:starting, :running] ->
         # Hand it straight over: both backends inject it into the turn that is
         # running. Queuing it would waste the one thing that makes typing
         # mid-turn useful. It only joins the queue if steering is refused.
         steer(state, message)
 
-      _ ->
+      true ->
         # Covers `:interrupted` as well as `:idle`: typing is how an
         # interrupted session continues, and anything parked goes out merged
         # with this message.
         state = Map.update!(state, :queue, &(&1 ++ [message]))
-        {:reply, {:ok, :started}, drain(state)}
+
+        if classify?(state, text),
+          do: {:reply, {:ok, :started}, classify(state, text)},
+          else: {:reply, {:ok, :started}, drain(state)}
     end
+  end
+
+  # A session's first message, outside any project, while there are projects
+  # it could belong to: asked which, before the turn starts, so that the
+  # session begins in the right place. See `Loom.Projects.Classifier`.
+  defp classify?(state, text) do
+    state.project_id == nil and state.turns == 0 and String.trim(text) != "" and
+      classifier() != nil and Loom.Projects.list() != []
+  end
+
+  defp classifier,
+    do:
+      Keyword.get(
+        Application.get_env(:loom, Loom.Projects, []),
+        :classifier,
+        Loom.Projects.Classifier
+      )
+
+  defp classify(state, text) do
+    token = make_ref()
+    session = self()
+    module = classifier()
+    projects = Loom.Projects.list()
+
+    Task.Supervisor.start_child(Loom.Agent.TaskSupervisor, fn ->
+      send(session, {:classified, token, module.classify(text, projects)})
+    end)
+
+    Process.send_after(self(), {:classified, token, nil}, @classify_timeout_ms)
+    set_status(%{state | classifying: token}, :starting)
+  end
+
+  # Into `project`, or out of any with nil: the backend carries on from the
+  # new cwd, is told what changed ahead of its next message, and the transcript
+  # says where the session went — and whether it was Loom that put it there.
+  defp relocate_to(state, project, auto?) do
+    cwd = project && Loom.Projects.workspace(project)
+    if cwd, do: File.mkdir_p!(cwd)
+    state = cancel_release(state)
+
+    {:ok, handle} =
+      Backend.impl(state.backend).relocate(state.handle, cwd, instructions(state.id, project))
+
+    state =
+      %{
+        state
+        | handle: handle,
+          project_id: project && project.id,
+          notice: moved_notice(project, Map.get(handle, :cwd))
+      }
+      |> emit(:project_moved, %{
+        project_id: project && project.id,
+        name: project && project.name,
+        auto: auto?
+      })
+
+    persist_meta(state)
+    state
   end
 
   defp consume(state, out), do: Enum.reduce(out, state, &apply_out(&2, &1))
