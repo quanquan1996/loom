@@ -9,7 +9,7 @@ import { KeyHelp, useGlobalKey, useKeys, WhichKey, type Keymap } from "./keys"
 import { Login } from "./Login"
 import { usePush, useVisible } from "./push"
 import { ProjectDialog } from "./Projects"
-import { Sidebar, sidebarOrder } from "./Sidebar"
+import { isOpen, PROJECTS_SECTION, Sidebar, sidebarOrder } from "./Sidebar"
 import { Terminal } from "./Terminal"
 // noVNC is only for the browser pane, so it loads when that is first opened.
 const Browser = lazy(() => import("./Browser").then((m) => ({ default: m.Browser })))
@@ -37,7 +37,7 @@ const SIDEBAR_KEY = "loom_sidebar_open"
 const CANVAS_KEY = "loom_canvas"
 const TREE_KEY = "loom_canvas_tree"
 const VIM_KEY = "loom_vim"
-const FOLDED_KEY = "loom_projects_folded"
+const TOGGLED_KEY = "loom_sidebar_toggled"
 
 // The right-hand side shows one thing at a time: the terminals or the canvas.
 type Side = "terminal" | "canvas" | "browser" | null
@@ -191,22 +191,30 @@ function App() {
     )
   }, [loaded, sessions])
 
-  // Projects whose sessions the sidebar hides. Remembered, like the sidebar.
-  const [folded, setFolded] = useState<Set<string>>(() => {
+  // What the sidebar has folded or unfolded against its defaults (see
+  // `isOpen`). Remembered, like the sidebar.
+  const [toggled, setToggled] = useState<Set<string>>(() => {
     try {
-      return new Set(JSON.parse(localStorage.getItem(FOLDED_KEY) ?? "[]"))
+      return new Set(JSON.parse(localStorage.getItem(TOGGLED_KEY) ?? "[]"))
     } catch {
       return new Set()
     }
   })
   useEffect(() => {
-    localStorage.setItem(FOLDED_KEY, JSON.stringify([...folded]))
-  }, [folded])
-  const fold = (id: string, open?: boolean) =>
-    setFolded((f) => {
-      const next = new Set(f)
-      if (open ?? next.has(id)) next.delete(id)
-      else next.add(id)
+    localStorage.setItem(TOGGLED_KEY, JSON.stringify([...toggled]))
+  }, [toggled])
+  const toggle = (key: string) =>
+    setToggled((t) => {
+      const next = new Set(t)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  // A project something just happened in: unfolded, and Projects with it.
+  const reveal = (projectId: string) =>
+    setToggled((t) => {
+      const next = new Set(t)
+      for (const key of [PROJECTS_SECTION, projectId]) if (!isOpen(next, key)) next.add(key)
       return next
     })
   // The project being made (`"new"`) or edited in its dialog.
@@ -217,7 +225,7 @@ function App() {
   // project too: its workspace is the session's working directory for good.
   const create = async (backend: AgentBackend, projectId?: string) => {
     const session = await createAgent(backend, projectId)
-    if (projectId) fold(projectId, true)
+    if (projectId) reveal(projectId)
     upsert(session)
     setActiveId(session.id)
     setDrawerOpen(false)
@@ -360,7 +368,7 @@ function App() {
     const at = from === null ? -1 : ids.indexOf(from)
     return ids[at === -1 ? 0 : Math.min(ids.length - 1, Math.max(0, at + by))]
   }
-  const ids = sidebarOrder(sessions, projects, folded).map((s) => s.id)
+  const ids = sidebarOrder(sessions, projects, toggled).map((s) => s.id)
 
   // Into the columns either side of the chat, opening them as needed: `h` and
   // `␣b` to the session list, `l` and `␣e` to the file tree.
@@ -463,8 +471,8 @@ function App() {
     <Sidebar
       sessions={sessions}
       projects={projects}
-      folded={folded}
-      onFold={(id) => fold(id)}
+      toggled={toggled}
+      onToggle={toggle}
       onEditProject={(project) => setProjectDialog(project ?? "new")}
       devices={devices}
       onUpsertDevice={upsertDevice}
@@ -481,7 +489,7 @@ function App() {
       onPin={async (id, pinned) => upsert(await updateAgent(id, { pinned }))}
       onMove={async (id, projectId) => {
         upsert(await updateAgent(id, { project_id: projectId }))
-        if (projectId) fold(projectId, true)
+        if (projectId) reveal(projectId)
       }}
       onCollapse={() => (narrow ? setDrawerOpen(false) : setSidebarOpen(false))}
       browserOpen={side === "browser"}
@@ -670,7 +678,7 @@ function App() {
           }
           onSaved={(project) => {
             upsertProject(project)
-            if (projectDialog === "new") fold(project.id, true)
+            if (projectDialog === "new") reveal(project.id)
           }}
           onClose={() => setProjectDialog(null)}
         />

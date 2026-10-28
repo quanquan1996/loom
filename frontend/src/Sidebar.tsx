@@ -1,17 +1,13 @@
 import {
   Bell,
   BellOff,
-  ChevronDown,
   ChevronRight,
   Folder,
-  FolderKanban,
   FolderOpen,
   FolderPlus,
   Globe,
   Keyboard,
   KeyboardOff,
-  type LucideIcon,
-  MessagesSquare,
   MonitorSmartphone,
   MoreHorizontal,
   PanelLeftClose,
@@ -19,7 +15,7 @@ import {
   Plus,
   Settings,
 } from "lucide-react"
-import { useEffect, useRef, useState, type ReactNode } from "react"
+import { useEffect, useRef, useState } from "react"
 import type { AgentBackend, AgentInfo, Device, Project } from "./api"
 import { RenameInput } from "./Confirm"
 import { DevicesDialog } from "./Devices"
@@ -28,18 +24,23 @@ import { backendShort } from "./format"
 import type { Push } from "./push"
 import { lastActive } from "./useLobby"
 
-/** The two sections' keys in `folded`, beside the projects' ids. */
+/**
+ * Which parts of the sidebar are not as they start, by key: `toggled` in App.
+ * Sessions and Pinned start open, Projects and each project start folded, so
+ * a key in the set means the opposite of that.
+ */
 export const PROJECTS_SECTION = "section:projects"
 export const SESSIONS_SECTION = "section:sessions"
+export const PINNED_SECTION = "section:pinned"
 
-// Pinned first, then most recently active: `sessions` arrives in that second
-// order already, and a stable sort keeps it.
-const pinnedFirst = (list: AgentInfo[]) => [...list].sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned))
+export const isOpen = (toggled: Set<string>, key: string) =>
+  key === SESSIONS_SECTION || key === PINNED_SECTION ? !toggled.has(key) : toggled.has(key)
 
 /**
- * The sidebar's two lists, which overlap on purpose: each project (most
- * recently used first) with its sessions, and every session, in a project or
- * not. A session put in a project stays in the list it was found in.
+ * The sidebar's lists, which overlap on purpose: each project (most recently
+ * used first) with all its sessions; then the pinned sessions; then the rest,
+ * most recently active first. A session put in a project stays in the list it
+ * was found in.
  */
 export function sidebarGroups(sessions: AgentInfo[], projects: Project[]) {
   const inside = new Map<string, AgentInfo[]>(projects.map((p) => [p.id, []]))
@@ -50,27 +51,29 @@ export function sidebarGroups(sessions: AgentInfo[], projects: Project[]) {
   }
   const groups = [...projects]
     .sort((a, b) => used(b) - used(a))
-    .map((project) => ({ project, sessions: pinnedFirst(inside.get(project.id)!) }))
-  return { groups, all: pinnedFirst(sessions) }
+    .map((project) => ({ project, sessions: inside.get(project.id)! }))
+  return { groups, pinned: sessions.filter((s) => s.pinned), recent: sessions.filter((s) => !s.pinned) }
 }
 
-/**
- * What j/k walks: the session list, which holds every session, or, with it
- * folded, the sessions of the projects that are open.
- */
-export function sidebarOrder(sessions: AgentInfo[], projects: Project[], folded: Set<string>): AgentInfo[] {
-  const { groups, all } = sidebarGroups(sessions, projects)
-  if (!folded.has(SESSIONS_SECTION)) return all
-  if (folded.has(PROJECTS_SECTION)) return []
-  return groups.flatMap((g) => (folded.has(g.project.id) ? [] : g.sessions))
+/** What j/k walks: every session row that is showing, each once, top to bottom. */
+export function sidebarOrder(sessions: AgentInfo[], projects: Project[], toggled: Set<string>): AgentInfo[] {
+  const { groups, pinned, recent } = sidebarGroups(sessions, projects)
+  const rows = [
+    ...(isOpen(toggled, PROJECTS_SECTION)
+      ? groups.flatMap((g) => (isOpen(toggled, g.project.id) ? g.sessions : []))
+      : []),
+    ...(isOpen(toggled, PINNED_SECTION) ? pinned : []),
+    ...(isOpen(toggled, SESSIONS_SECTION) ? recent : []),
+  ]
+  return rows.filter((s, i) => rows.findIndex((r) => r.id === s.id) === i)
 }
 
 type Props = {
   sessions: AgentInfo[]
   projects: Project[]
-  // Projects whose sessions are hidden, by id; see App.
-  folded: Set<string>
-  onFold: (projectId: string) => void
+  // What is folded or unfolded against its default; see `isOpen`.
+  toggled: Set<string>
+  onToggle: (key: string) => void
   // A project to edit, or null to make one.
   onEditProject: (project: Project | null) => void
   devices: Device[]
@@ -99,8 +102,8 @@ type Props = {
 export function Sidebar({
   sessions,
   projects,
-  folded,
-  onFold,
+  toggled,
+  onToggle,
   onEditProject,
   devices,
   onUpsertDevice,
@@ -129,7 +132,8 @@ export function Sidebar({
   }, [])
   const [devicesOpen, setDevicesOpen] = useState(false)
   const online = devices.filter((d) => d.online).length
-  const { groups, all } = sidebarGroups(sessions, projects)
+  const { groups, pinned, recent } = sidebarGroups(sessions, projects)
+  const open = (key: string) => isOpen(toggled, key)
   // The row whose menu is open, and where its button is.
   const [menu, setMenu] = useState<{ id: string; anchor: DOMRect } | null>(null)
   const menuFor = menu && sessions.find((s) => s.id === menu.id)
@@ -165,13 +169,13 @@ export function Sidebar({
       {/* Which engine is running it is not a detail: the two behave
           differently and the binding is permanent. */}
       <span className={"session-backend " + s.backend}>{backendShort(s.backend)}</span>
-      {/* In the full list, which project it is in; under the project, that goes without saying. */}
+      {/* Outside its project, which one it is in; under it, that goes without saying. */}
       {!nested && projectName(s) && (
         <span className="session-project" title={`in ${projectName(s)}`}>
           <Folder />
         </span>
       )}
-      {s.pinned && <Pin className="session-pin" />}
+      {nested && s.pinned && <Pin className="session-pin" />}
       <button
         className="session-del session-more"
         title="Rename, pin, move to a project, delete"
@@ -199,82 +203,87 @@ export function Sidebar({
       </div>
 
       <div className="session-list">
-        <Module
-          icon={FolderKanban}
-          tone="projects"
-          label="Projects"
-          count={projects.length}
-          open={!folded.has(PROJECTS_SECTION)}
-          onFold={() => onFold(PROJECTS_SECTION)}
-          actions={
-            <button className="module-btn" onClick={() => onEditProject(null)} title="New project">
+        {/* A top-level entry, like the sidebar's others: folded until asked. */}
+        <div
+          className={"nav-item" + (open(PROJECTS_SECTION) ? " open" : "")}
+          role="button"
+          aria-expanded={open(PROJECTS_SECTION)}
+          onClick={() => onToggle(PROJECTS_SECTION)}
+        >
+          <Folder className="nav-icon" />
+          <span className="nav-label">Projects</span>
+          {projects.length > 0 && <span className="nav-count">{projects.length}</span>}
+          <span className="nav-actions" onClick={(e) => e.stopPropagation()}>
+            <button className="session-del nav-btn" onClick={() => onEditProject(null)} title="New project">
               <FolderPlus />
             </button>
-          }
-        >
-          {groups.length === 0 && (
-            <div className="module-empty">
-              <p>Group sessions that share a workspace and instructions.</p>
-              <button className="module-cta" onClick={() => onEditProject(null)}>
-                <FolderPlus /> New project
+          </span>
+          <ChevronRight className="nav-chevron" />
+        </div>
+        {open(PROJECTS_SECTION) && (
+          <div className="nav-children">
+            {groups.length === 0 && (
+              <button className="project-row project-new-row" onClick={() => onEditProject(null)}>
+                <FolderPlus className="project-icon" />
+                <span className="session-label">New project</span>
               </button>
-            </div>
-          )}
-          {groups.map(({ project, sessions: inside }) => {
-            const open = !folded.has(project.id)
-            const holdsActive = inside.some((s) => s.id === activeId)
-            return (
-              <div key={project.id} className={"project-group" + (open ? " open" : "")}>
-                <div
-                  className={"project-row" + (holdsActive ? " holds-active" : "")}
-                  onClick={() => onFold(project.id)}
-                  title={project.workspace}
-                >
-                  <span className="project-badge">{open ? <FolderOpen /> : <Folder />}</span>
-                  <span className="session-label">{project.name}</span>
-                  <span className="project-actions" onClick={(e) => e.stopPropagation()}>
-                    <NewSessionButton
-                      small
-                      title={`New session in ${project.name}`}
-                      onCreate={(backend) => onCreate(backend, project.id)}
-                    />
-                    <button
-                      className="session-del project-edit"
-                      title="Project settings"
-                      onClick={() => onEditProject(project)}
-                    >
-                      <Settings />
-                    </button>
-                  </span>
-                  <span className="module-count">{inside.length}</span>
-                  <ChevronRight className="project-chevron" />
-                </div>
-                {open && (
-                  <div className="project-sessions">
-                    {inside.length ? (
-                      inside.map((s) => row(s, true))
-                    ) : (
-                      <div className="project-empty">No sessions yet.</div>
-                    )}
+            )}
+            {groups.map(({ project, sessions: inside }) => {
+              const unfolded = open(project.id)
+              return (
+                <div key={project.id} className={"project-group" + (unfolded ? " open" : "")}>
+                  <div
+                    className={"project-row" + (inside.some((s) => s.id === activeId) ? " holds-active" : "")}
+                    onClick={() => onToggle(project.id)}
+                    title={project.workspace}
+                  >
+                    {unfolded ? <FolderOpen className="project-icon" /> : <Folder className="project-icon" />}
+                    <span className="session-label">{project.name}</span>
+                    <span className="project-actions" onClick={(e) => e.stopPropagation()}>
+                      <NewSessionButton
+                        small
+                        title={`New session in ${project.name}`}
+                        onCreate={(backend) => onCreate(backend, project.id)}
+                      />
+                      <button
+                        className="session-del project-edit"
+                        title="Project settings"
+                        onClick={() => onEditProject(project)}
+                      >
+                        <Settings />
+                      </button>
+                    </span>
+                    {inside.length > 0 && <span className="nav-count">{inside.length}</span>}
                   </div>
-                )}
-              </div>
-            )
-          })}
-        </Module>
+                  {unfolded && (
+                    <div className="project-sessions">
+                      {inside.length ? (
+                        inside.map((s) => row(s, true))
+                      ) : (
+                        <div className="project-empty">No sessions yet.</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
 
-        <Module
-          icon={MessagesSquare}
-          tone="sessions"
-          label="Sessions"
-          count={sessions.length}
-          open={!folded.has(SESSIONS_SECTION)}
-          onFold={() => onFold(SESSIONS_SECTION)}
-          actions={<NewSessionButton small title="New session" onCreate={(backend) => onCreate(backend)} />}
-        >
-          {all.length === 0 && <div className="module-empty"><p>No sessions yet.</p></div>}
-          {all.map((s) => row(s, false))}
-        </Module>
+        {pinned.length > 0 && (
+          <>
+            <Heading label="Pinned" open={open(PINNED_SECTION)} onToggle={() => onToggle(PINNED_SECTION)} />
+            {open(PINNED_SECTION) && pinned.map((s) => row(s, false))}
+          </>
+        )}
+
+        <Heading label="Sessions" open={open(SESSIONS_SECTION)} onToggle={() => onToggle(SESSIONS_SECTION)} />
+        {open(SESSIONS_SECTION) &&
+          (recent.length ? (
+            recent.map((s) => row(s, false))
+          ) : (
+            <div className="session-empty">{pinned.length ? "Nothing else yet." : "No sessions yet."}</div>
+          ))}
       </div>
 
       {menu && menuFor && (
@@ -342,44 +351,13 @@ export function Sidebar({
   )
 }
 
-/**
- * One of the sidebar's two blocks, projects and sessions: a card whose
- * header names it, counts it, carries its own "new" button and folds it.
- */
-function Module({
-  icon: Icon,
-  tone,
-  label,
-  count,
-  open,
-  onFold,
-  actions,
-  children,
-}: {
-  icon: LucideIcon
-  tone: "projects" | "sessions"
-  label: string
-  count: number
-  open: boolean
-  onFold: () => void
-  actions: ReactNode
-  children: ReactNode
-}) {
+/** A list's heading, ChatGPT's "Pinned" and "Recent": bold, and it folds. */
+function Heading({ label, open, onToggle }: { label: string; open: boolean; onToggle: () => void }) {
   return (
-    <section className={`side-module ${tone}` + (open ? " open" : "")}>
-      <div className="module-head" role="button" aria-expanded={open} onClick={onFold}>
-        <span className="module-icon">
-          <Icon />
-        </span>
-        <span className="module-label">{label}</span>
-        {count > 0 && <span className="module-count">{count}</span>}
-        <span className="module-actions" onClick={(e) => e.stopPropagation()}>
-          {actions}
-        </span>
-        <ChevronDown className="module-chevron" />
-      </div>
-      {open && <div className="module-body">{children}</div>}
-    </section>
+    <button className={"list-heading" + (open ? " open" : "")} onClick={onToggle} aria-expanded={open}>
+      {label}
+      <ChevronRight />
+    </button>
   )
 }
 
