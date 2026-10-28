@@ -1,0 +1,472 @@
+/* ── Tasks page, after ChatGPT's ──────────────────────────────────────────
+   Measured from its iOS app (a 3x screenshot): cards #212121 on black, 20pt
+   in from the edges and padded 20pt, a blue #63a8f8 kind over a white name,
+   the prompt in #cdcdcd cut at three lines, a #424242 rule, the schedule in
+   #afafaf; templates in dashed #333 outlines. The phone gets those sizes; a
+   desktop one size down, as ChatGPT's web page is. */
+
+.tasks-page {
+  /* A card is a shade above the page: #2a2a2a on the desktop's #212121,
+     the app's #212121 on a phone's black (below). */
+  --task-card: #2a2a2a;
+  --task-card-hover: #303030;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--ui);
+}
+
+.tasks-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--head-h);
+  padding: 0 14px;
+  box-sizing: border-box;
+}
+
+.tasks-head h1 {
+  margin: 0;
+  font-size: 1.0625rem;
+  font-weight: 600;
+}
+
+.tasks-round,
+.tasks-round-spacer {
+  flex: 0 0 auto;
+  width: 2.25rem;
+  height: 2.25rem;
+}
+
+.tasks-round {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--fg-dim);
+  cursor: pointer;
+}
+
+.tasks-round:hover {
+  background: #ffffff12;
+  color: var(--fg);
+}
+
+.tasks-round svg {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+.tasks-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  /* Room for the composer floating over the end of the list. */
+  padding: 8px 16px 120px;
+}
+
+.tasks-column {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 44rem;
+  margin: 0 auto;
+}
+
+.tasks-note,
+.tasks-error {
+  padding: 12px 4px;
+  color: var(--fg-dim);
+}
+
+.tasks-error {
+  color: var(--red);
+}
+
+/* A task. */
+.task-card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  padding: 16px 18px;
+  border: 0;
+  border-radius: 22px;
+  background: var(--task-card);
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.task-card:hover {
+  background: var(--task-card-hover);
+}
+
+/* The ring is for the keyboard; a click, or a dialog closing, leaves none. */
+.task-card:focus:not(:focus-visible),
+.task-template:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.task-kind {
+  color: #63a8f8;
+  font-size: 0.875rem;
+}
+
+.task-card.paused .task-kind {
+  color: var(--fg-dim);
+}
+
+.task-name {
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.task-prompt {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  color: #cdcdcd;
+  font-size: 1rem;
+  line-height: 1.4;
+}
+
+.task-card.paused .task-name,
+.task-card.paused .task-prompt {
+  opacity: 0.55;
+}
+
+.task-rule {
+  height: 1px;
+  margin: 12px 0 8px;
+  background: #424242;
+}
+
+.task-when {
+  color: #afafaf;
+  font-size: 0.9375rem;
+}
+
+.task-failed {
+  color: var(--red);
+  font-size: 0.8125rem;
+}
+
+.tasks-section {
+  margin: 20px 4px 4px;
+  color: #afafaf;
+  font-size: 1rem;
+  font-weight: 400;
+}
+
+/* A template: dashed, with its own "+". */
+.task-template {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px 18px;
+  border: 1.5px dashed #333333;
+  border-radius: 22px;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.task-template:hover {
+  background: #ffffff08;
+}
+
+.task-template-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.task-template-emoji {
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.task-template-name {
+  flex: 1 1 auto;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.task-template-plus {
+  flex: 0 0 auto;
+  width: 1.25rem;
+  height: 1.25rem;
+  color: var(--fg);
+}
+
+.task-template-desc {
+  color: #afafaf;
+  font-size: 0.9375rem;
+  line-height: 1.4;
+}
+
+/* The composer, floating over the foot of the list like the chat's. */
+.tasks-composer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 0 16px 16px;
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+  pointer-events: none;
+}
+
+.tasks-composer > * {
+  max-width: 44rem;
+  margin: 0 auto;
+  pointer-events: auto;
+}
+
+.tasks-composer-error {
+  margin-bottom: 8px;
+  padding: 8px 14px;
+  border-radius: 14px;
+  background: #3a1d1d;
+  color: var(--red);
+  font-size: 0.875rem;
+}
+
+.tasks-composer-box {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  min-height: 3.25rem;
+  padding: 7px 8px;
+  box-sizing: border-box;
+  border-radius: 1.75rem;
+  background: #2f2f2f;
+  box-shadow:
+    0 0 0 1px #ffffff0d,
+    0 6px 24px rgb(0 0 0 / 45%);
+}
+
+/* Border-box: the height set from `scrollHeight` already counts the padding. */
+.tasks-composer-box textarea {
+  box-sizing: border-box;
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  padding: 7px 4px;
+  border: 0;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  font-size: 1rem;
+  line-height: 1.5rem;
+  resize: none;
+  outline: none;
+}
+
+.tasks-composer-box textarea::placeholder {
+  color: #8e8e8e;
+}
+
+.tasks-composer-btn {
+  flex: 0 0 auto;
+  width: 2.25rem;
+  height: 2.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.tasks-composer-btn:hover:not(:disabled) {
+  background: #ffffff12;
+}
+
+.tasks-composer-btn svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.tasks-composer-btn.send {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.tasks-composer-btn.send:disabled {
+  background: #676767;
+  color: #2f2f2f;
+  cursor: default;
+}
+
+.spin {
+  animation: tasks-spin 0.9s linear infinite;
+}
+
+@keyframes tasks-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ── The editor ──────────────────────────────────────────────────────── */
+
+.modal.task-editor {
+  width: min(32rem, 100%);
+}
+
+.task-schedule {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.task-schedule label {
+  flex: 1 1 8rem;
+}
+
+.task-schedule .task-schedule-wide {
+  flex: 2 1 14rem;
+}
+
+.task-schedule select,
+.task-schedule input {
+  padding: 6px 8px;
+  border: 1px solid #ffffff1a;
+  border-radius: 10px;
+  background: #212121;
+  color: var(--fg);
+  font: inherit;
+  color-scheme: dark;
+}
+
+.task-days {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.task-day {
+  width: 2.4rem;
+  height: 2.1rem;
+  border: 0;
+  border-radius: 999px;
+  background: #ffffff12;
+  color: var(--fg-dim);
+  font: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.task-day.on {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.task-zone {
+  color: var(--fg-dim);
+  font-size: 0.8125rem;
+}
+
+.task-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.task-actions .text-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+}
+
+.task-actions svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.task-note {
+  color: var(--fg-dim);
+  font-size: 0.875rem;
+}
+
+/* The phone: the app's sizes, as measured. */
+@media (max-width: 640px) {
+  .tasks-page {
+    --task-card: #212121;
+    --task-card-hover: #262626;
+  }
+
+  .tasks-head h1 {
+    font-size: 1.1875rem;
+  }
+
+  .tasks-round {
+    width: 2.7rem;
+    height: 2.7rem;
+    background: #1f1f1f;
+    color: var(--fg);
+  }
+
+  .tasks-round-spacer {
+    width: 2.7rem;
+  }
+
+  .tasks-scroll {
+    padding: 8px 20px 130px;
+  }
+
+  .tasks-column {
+    gap: 16px;
+  }
+
+  .task-card,
+  .task-template {
+    padding: 20px;
+    border-radius: 28px;
+  }
+
+  .task-kind {
+    font-size: 1rem;
+  }
+
+  .task-name,
+  .task-template-name {
+    font-size: 1.1875rem;
+  }
+
+  .task-prompt,
+  .task-template-desc,
+  .tasks-section {
+    font-size: 1.1875rem;
+  }
+
+  .task-when {
+    font-size: 1.0625rem;
+  }
+
+  .tasks-composer {
+    padding-inline: 24px;
+  }
+
+  .tasks-composer-box textarea {
+    font-size: 1.0625rem;
+  }
+}

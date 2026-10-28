@@ -9,6 +9,7 @@ import { KeyHelp, useGlobalKey, useKeys, WhichKey, type Keymap } from "./keys"
 import { Login } from "./Login"
 import { usePush, useVisible } from "./push"
 import { ProjectDialog } from "./Projects"
+import { Tasks } from "./Tasks"
 import { isOpen, PROJECTS_SECTION, Sidebar, sidebarOrder } from "./Sidebar"
 import { Terminal } from "./Terminal"
 // noVNC is only for the browser pane, so it loads when that is first opened.
@@ -230,11 +231,16 @@ function App() {
     if (projectId) reveal(projectId)
     upsert(session)
     setActiveId(session.id)
+    setView("chat")
     setDrawerOpen(false)
   }
 
+  // The main column shows the active session, or the Tasks page instead.
+  const [view, setView] = useState<"chat" | "tasks">("chat")
+
   const select = (id: string) => {
     setActiveId(id)
+    setView("chat")
     setDrawerOpen(false)
   }
 
@@ -476,6 +482,11 @@ function App() {
       toggled={toggled}
       onToggle={toggle}
       onEditProject={(project) => setProjectDialog(project ?? "new")}
+      tasksOpen={view === "tasks"}
+      onOpenTasks={() => {
+        setView("tasks")
+        setDrawerOpen(false)
+      }}
       devices={devices}
       onUpsertDevice={upsertDevice}
       push={push}
@@ -521,7 +532,13 @@ function App() {
 
       <main className="main">
         <div className="main-chat" ref={chatRef}>
-          {active ? (
+          {view === "tasks" ? (
+            <Tasks
+              showSidebarButton={narrow || !sidebarOpen}
+              onToggleSidebar={() => (narrow ? setDrawerOpen(true) : setSidebarOpen(true))}
+              onOpenSession={select}
+            />
+          ) : active ? (
             // Keyed by id so switching sessions rebuilds the channel and the
             // transcript rather than mixing two conversations.
             <Chat

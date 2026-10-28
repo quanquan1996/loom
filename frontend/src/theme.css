@@ -134,7 +134,8 @@ samp,
   background: #ffffff0d;
 }
 
-.sidebar .session.active {
+.sidebar .session.active,
+.nav-item.current {
   background: #ffffff17;
 }
 

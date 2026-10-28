@@ -545,6 +545,55 @@ export function deleteProject(id: string): Promise<void> {
   return apiCall(`/api/projects/${id}`, { method: "DELETE" })
 }
 
+// ── Tasks (see Loom.Cron, LoomWeb.TaskController) ─────────────────────────
+
+/**
+ * A prompt sent to a session on a schedule. `cron` is five fields in the
+ * task's own wall-clock time, `utc_offset` minutes east of UTC (Shanghai,
+ * 480, unless set). `target` is the session its runs land in.
+ */
+export type Task = {
+  id: string
+  name: string
+  prompt: string
+  cron: string
+  utc_offset: number
+  paused: boolean
+  target: string
+  target_title: string | null
+  next_at: string | null
+  last_run_at: string | null
+  last_error: string | null
+}
+
+export function listTasks(): Promise<{ tasks: Task[]; utc_offset: number }> {
+  return apiCall("/api/tasks", { method: "GET" })
+}
+
+/** From fields, or `{text}`: the task said in words, which the server reads. */
+export function createTask(
+  attrs: { name?: string; prompt: string; cron: string } | { text: string },
+): Promise<Task> {
+  return apiCall("/api/tasks", { method: "POST", body: JSON.stringify(attrs) })
+}
+
+export function updateTask(
+  id: string,
+  attrs: Partial<Pick<Task, "name" | "prompt" | "cron" | "paused">>,
+): Promise<Task> {
+  return apiCall(`/api/tasks/${id}`, { method: "PATCH", body: JSON.stringify(attrs) })
+}
+
+/** Now, off its schedule; the reply lands in its session. */
+export function runTask(id: string): Promise<Task> {
+  return apiCall(`/api/tasks/${id}/run`, { method: "POST" })
+}
+
+/** The task only: its session stays. */
+export function deleteTask(id: string): Promise<void> {
+  return apiCall(`/api/tasks/${id}`, { method: "DELETE" })
+}
+
 // ── Notifications (see push.ts) ───────────────────────────────────────────
 
 /** The key the server signs pushes with, base64url, to subscribe against. */

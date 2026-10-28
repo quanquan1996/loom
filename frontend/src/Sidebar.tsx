@@ -2,6 +2,7 @@ import {
   Bell,
   BellOff,
   ChevronRight,
+  Clock,
   Folder,
   FolderOpen,
   FolderPlus,
@@ -76,6 +77,9 @@ type Props = {
   onToggle: (key: string) => void
   // A project to edit, or null to make one.
   onEditProject: (project: Project | null) => void
+  // The Tasks page, and whether it is the one showing.
+  tasksOpen: boolean
+  onOpenTasks: () => void
   devices: Device[]
   onUpsertDevice: (device: Device) => void
   push: Push
@@ -105,6 +109,8 @@ export function Sidebar({
   toggled,
   onToggle,
   onEditProject,
+  tasksOpen,
+  onOpenTasks,
   devices,
   onUpsertDevice,
   push,
@@ -269,6 +275,12 @@ export function Sidebar({
             })}
           </div>
         )}
+
+        {/* Another top-level entry: a page of its own, not a list. */}
+        <div className={"nav-item" + (tasksOpen ? " current" : "")} role="button" onClick={onOpenTasks}>
+          <Clock className="nav-icon" />
+          <span className="nav-label">Tasks</span>
+        </div>
 
         {pinned.length > 0 && (
           <>
