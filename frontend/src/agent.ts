@@ -458,6 +458,18 @@ export function buildTimeline(t: Transcript): TimelineItem[] {
         items.push({ key, kind: "error", text: String(p.message ?? "error") })
         break
 
+      // Where the session went, and who put it there.
+      case "project_moved": {
+        const name = p.name ? String(p.name) : null
+        const text = !name
+          ? "Removed from its project"
+          : p.auto
+            ? `Loom filed this session under ${name}`
+            : `Moved to ${name}`
+        items.push({ key, kind: "notice", text })
+        break
+      }
+
       case "api_retry": {
         // The API refused a request and the backend is about to try again.
         // One line for the whole run of them, showing the latest: ten

@@ -10,46 +10,56 @@ import {
   Keyboard,
   KeyboardOff,
   MonitorSmartphone,
+  MoreHorizontal,
   PanelLeftClose,
+  Pin,
   Plus,
   Settings,
-  X,
 } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 import type { AgentBackend, AgentInfo, Device, Project } from "./api"
 import { RenameInput } from "./Confirm"
 import { DevicesDialog } from "./Devices"
+import { SessionMenu } from "./SessionMenu"
 import { backendShort } from "./format"
 import type { Push } from "./push"
 import { lastActive } from "./useLobby"
 
+/** The two sections' keys in `folded`, beside the projects' ids. */
+export const PROJECTS_SECTION = "section:projects"
+export const SESSIONS_SECTION = "section:sessions"
+
+// Pinned first, then most recently active: `sessions` arrives in that second
+// order already, and a stable sort keeps it.
+const pinnedFirst = (list: AgentInfo[]) => [...list].sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned))
+
 /**
- * The sidebar's rows top to bottom: each project (most recently used first)
- * with its sessions, then the sessions outside any project.
+ * The sidebar's two lists, which overlap on purpose: each project (most
+ * recently used first) with its sessions, and every session, in a project or
+ * not. A session put in a project stays in the list it was found in.
  */
 export function sidebarGroups(sessions: AgentInfo[], projects: Project[]) {
-  const known = new Set(projects.map((p) => p.id))
   const inside = new Map<string, AgentInfo[]>(projects.map((p) => [p.id, []]))
-  const loose: AgentInfo[] = []
-  // `sessions` is already most recent first, and keeps that order in a group.
-  for (const s of sessions) {
-    if (s.project_id && known.has(s.project_id)) inside.get(s.project_id)!.push(s)
-    else loose.push(s)
-  }
+  for (const s of sessions) if (s.project_id) inside.get(s.project_id)?.push(s)
   const used = (p: Project) => {
     const first = inside.get(p.id)![0]
     return first ? lastActive(first) : p.created_at
   }
   const groups = [...projects]
     .sort((a, b) => used(b) - used(a))
-    .map((project) => ({ project, sessions: inside.get(project.id)! }))
-  return { groups, loose }
+    .map((project) => ({ project, sessions: pinnedFirst(inside.get(project.id)!) }))
+  return { groups, all: pinnedFirst(sessions) }
 }
 
-/** The sessions as drawn, folded projects left out: what j/k walks. */
+/**
+ * What j/k walks: the session list, which holds every session, or, with it
+ * folded, the sessions of the projects that are open.
+ */
 export function sidebarOrder(sessions: AgentInfo[], projects: Project[], folded: Set<string>): AgentInfo[] {
-  const { groups, loose } = sidebarGroups(sessions, projects)
-  return [...groups.flatMap((g) => (folded.has(g.project.id) ? [] : g.sessions)), ...loose]
+  const { groups, all } = sidebarGroups(sessions, projects)
+  if (!folded.has(SESSIONS_SECTION)) return all
+  if (folded.has(PROJECTS_SECTION)) return []
+  return groups.flatMap((g) => (folded.has(g.project.id) ? [] : g.sessions))
 }
 
 type Props = {
@@ -74,6 +84,10 @@ type Props = {
   onSelect: (id: string) => void
   onCreate: (backend: AgentBackend, projectId?: string) => void
   onDelete: (id: string) => void
+  // From a row's menu: put its name up for editing, pin it, move it.
+  onRename: (id: string) => void
+  onPin: (id: string, pinned: boolean) => Promise<void>
+  onMove: (id: string, projectId: string | null) => Promise<void>
   onCollapse: () => void
   browserOpen: boolean
   onToggleBrowser: () => void
@@ -96,6 +110,9 @@ export function Sidebar({
   onSelect,
   onCreate,
   onDelete,
+  onRename,
+  onPin,
+  onMove,
   onCollapse,
   browserOpen,
   onToggleBrowser,
@@ -109,7 +126,11 @@ export function Sidebar({
   }, [])
   const [devicesOpen, setDevicesOpen] = useState(false)
   const online = devices.filter((d) => d.online).length
-  const { groups, loose } = sidebarGroups(sessions, projects)
+  const { groups, all } = sidebarGroups(sessions, projects)
+  // The row whose menu is open, and where its button is.
+  const [menu, setMenu] = useState<{ id: string; anchor: DOMRect } | null>(null)
+  const menuFor = menu && sessions.find((s) => s.id === menu.id)
+  const projectName = (s: AgentInfo) => projects.find((p) => p.id === s.project_id)?.name
 
   const row = (s: AgentInfo, nested: boolean) => (
     <div
@@ -118,6 +139,7 @@ export function Sidebar({
       className={
         "session" +
         (nested ? " nested" : "") +
+        (menu?.id === s.id ? " menu-open" : "") +
         (s.id === activeId ? " active" : "") +
         (s.id === cursorId ? " cursor" : "")
       }
@@ -140,15 +162,23 @@ export function Sidebar({
       {/* Which engine is running it is not a detail: the two behave
           differently and the binding is permanent. */}
       <span className={"session-backend " + s.backend}>{backendShort(s.backend)}</span>
+      {/* In the full list, which project it is in; under the project, that goes without saying. */}
+      {!nested && projectName(s) && (
+        <span className="session-project" title={`in ${projectName(s)}`}>
+          <Folder />
+        </span>
+      )}
+      {s.pinned && <Pin className="session-pin" />}
       <button
-        className="session-del"
-        title="Delete session and its history"
+        className="session-del session-more"
+        title="Rename, pin, move to a project, delete"
         onClick={(e) => {
           e.stopPropagation()
-          onDelete(s.id)
+          const anchor = e.currentTarget.getBoundingClientRect()
+          setMenu((m) => (m?.id === s.id ? null : { id: s.id, anchor }))
         }}
       >
-        <X />
+        <MoreHorizontal />
       </button>
     </div>
   )
@@ -173,49 +203,69 @@ export function Sidebar({
           <div className="session-empty">No sessions yet.</div>
         )}
 
-        {groups.length > 0 && <div className="sidebar-section">Projects</div>}
-        {groups.map(({ project, sessions: inside }) => {
-          const open = !folded.has(project.id)
-          const holdsActive = inside.some((s) => s.id === activeId)
-          return (
-            <div key={project.id} className="project-group">
-              <div
-                className={"project-row" + (!open && holdsActive ? " active" : "")}
-                onClick={() => onFold(project.id)}
-                title={project.workspace}
-              >
-                <span className="project-fold">{open ? <ChevronDown /> : <ChevronRight />}</span>
-                {open ? <FolderOpen className="project-icon" /> : <Folder className="project-icon" />}
-                <span className="session-label">{project.name}</span>
-                {!open && inside.length > 0 && <span className="session-when">{inside.length}</span>}
-                <span className="project-actions" onClick={(e) => e.stopPropagation()}>
-                  <NewSessionButton
-                    small
-                    title={`New session in ${project.name}`}
-                    onCreate={(backend) => onCreate(backend, project.id)}
-                  />
-                  <button
-                    className="session-del project-edit"
-                    title="Project settings"
-                    onClick={() => onEditProject(project)}
-                  >
-                    <Settings />
-                  </button>
-                </span>
+        {groups.length > 0 && (
+          <Section label="Projects" open={!folded.has(PROJECTS_SECTION)} onFold={() => onFold(PROJECTS_SECTION)} />
+        )}
+        {!folded.has(PROJECTS_SECTION) &&
+          groups.map(({ project, sessions: inside }) => {
+            const open = !folded.has(project.id)
+            const holdsActive = inside.some((s) => s.id === activeId)
+            return (
+              <div key={project.id} className="project-group">
+                <div
+                  className={"project-row" + (!open && holdsActive ? " active" : "")}
+                  onClick={() => onFold(project.id)}
+                  title={project.workspace}
+                >
+                  <span className="project-fold">{open ? <ChevronDown /> : <ChevronRight />}</span>
+                  {open ? <FolderOpen className="project-icon" /> : <Folder className="project-icon" />}
+                  <span className="session-label">{project.name}</span>
+                  {!open && inside.length > 0 && <span className="session-when">{inside.length}</span>}
+                  <span className="project-actions" onClick={(e) => e.stopPropagation()}>
+                    <NewSessionButton
+                      small
+                      title={`New session in ${project.name}`}
+                      onCreate={(backend) => onCreate(backend, project.id)}
+                    />
+                    <button
+                      className="session-del project-edit"
+                      title="Project settings"
+                      onClick={() => onEditProject(project)}
+                    >
+                      <Settings />
+                    </button>
+                  </span>
+                </div>
+                {open &&
+                  (inside.length ? (
+                    inside.map((s) => row(s, true))
+                  ) : (
+                    <div className="project-empty">No sessions yet.</div>
+                  ))}
               </div>
-              {open &&
-                (inside.length ? (
-                  inside.map((s) => row(s, true))
-                ) : (
-                  <div className="project-empty">No sessions yet.</div>
-                ))}
-            </div>
-          )
-        })}
+            )
+          })}
 
-        {groups.length > 0 && loose.length > 0 && <div className="sidebar-section">Sessions</div>}
-        {loose.map((s) => row(s, false))}
+        {groups.length > 0 && all.length > 0 && (
+          <Section label="Sessions" open={!folded.has(SESSIONS_SECTION)} onFold={() => onFold(SESSIONS_SECTION)} />
+        )}
+        {(groups.length === 0 || !folded.has(SESSIONS_SECTION)) && (
+          <div className="session-group">{all.map((s) => row(s, false))}</div>
+        )}
       </div>
+
+      {menu && menuFor && (
+        <SessionMenu
+          session={menuFor}
+          projects={projects}
+          anchor={menu.anchor}
+          onRename={() => onRename(menuFor.id)}
+          onPin={(on) => onPin(menuFor.id, on)}
+          onMove={(projectId) => onMove(menuFor.id, projectId)}
+          onDelete={() => onDelete(menuFor.id)}
+          onClose={() => setMenu(null)}
+        />
+      )}
 
       <div className="sidebar-foot">
         {vim && (
@@ -266,6 +316,16 @@ export function Sidebar({
         )}
       </div>
     </aside>
+  )
+}
+
+/** A heading that folds what is under it. */
+function Section({ label, open, onFold }: { label: string; open: boolean; onFold: () => void }) {
+  return (
+    <button className="sidebar-section foldable" onClick={onFold} aria-expanded={open}>
+      {open ? <ChevronDown /> : <ChevronRight />}
+      {label}
+    </button>
   )
 }
 

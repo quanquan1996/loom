@@ -6,6 +6,7 @@ import {
   ChevronDown,
   ChevronRight,
   Clock as ClockIcon,
+  FolderOpen,
   PanelLeftOpen,
   Plus,
   Square,
@@ -46,12 +47,17 @@ import {
   outputUrl,
   type AgentFile,
   type AgentInfo,
+  type Project,
   type OutputFile,
 } from "./api"
 import "./Chat.css"
 
 type Props = {
   session: AgentInfo
+  // The project it is in, shown by its name in the header; clicking it opens
+  // the project's settings.
+  project: Project | null
+  onOpenProject: (project: Project) => void
   sidebarOpen: boolean
   onToggleSidebar: () => void
   terminalOpen: boolean
@@ -70,6 +76,8 @@ const OpenCanvas = createContext<(item: CanvasItem) => void>(() => {})
 
 export function Chat({
   session,
+  project,
+  onOpenProject,
   sidebarOpen,
   onToggleSidebar,
   terminalOpen,
@@ -146,6 +154,17 @@ export function Chat({
             title="Show sidebar"
           >
             <PanelLeftOpen />
+          </button>
+        )}
+
+        {project && (
+          <button
+            className="chip button chat-project"
+            onClick={() => onOpenProject(project)}
+            title={`In the project ${project.name}; click for its settings`}
+          >
+            <FolderOpen />
+            <span>{project.name}</span>
           </button>
         )}
 

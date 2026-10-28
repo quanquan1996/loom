@@ -1357,3 +1357,140 @@
 .project-delete {
   margin-right: auto;
 }
+
+/* A row's `…`, and the menu it opens; see SessionMenu.tsx. */
+.session-more:hover {
+  background: var(--line);
+  color: var(--fg);
+}
+
+.session.menu-open .session-del {
+  visibility: visible;
+}
+
+.session-pin {
+  flex: 0 0 auto;
+  width: 0.85rem;
+  height: 0.85rem;
+  color: var(--fg-dim);
+}
+
+.session-menu {
+  position: fixed;
+  z-index: 60;
+  min-width: 13rem;
+  max-width: min(20rem, calc(100vw - 16px));
+  max-height: 70vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-raised);
+  box-shadow: 0 8px 28px rgb(0 0 0 / 50%);
+  font-family: var(--mono);
+}
+
+.session-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  font-size: 0.923rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.session-menu button svg {
+  flex: 0 0 auto;
+  width: 1rem;
+  height: 1rem;
+  color: var(--fg-dim);
+}
+
+.session-menu button:hover:not(:disabled) {
+  background: var(--bg-card);
+}
+
+.session-menu button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.session-menu button.danger,
+.session-menu button.danger svg {
+  color: var(--red);
+}
+
+.session-menu .session-menu-more {
+  margin-left: auto;
+}
+
+.session-menu-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-menu-back {
+  color: var(--fg-dim) !important;
+}
+
+.session-menu-sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--line);
+}
+
+.session-menu-note {
+  padding: 6px 10px;
+  color: var(--fg-dim);
+  font-size: 0.769rem;
+  line-height: 1.4;
+}
+
+.session-menu-note.failed {
+  color: var(--red);
+}
+
+/* A section heading that folds its list. */
+.sidebar-section.foldable {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sidebar-section.foldable:hover {
+  color: var(--fg);
+}
+
+.sidebar-section.foldable svg {
+  width: 0.85rem;
+  height: 0.85rem;
+}
+
+/* In the full list, a session that is in a project says so. */
+.session-project {
+  flex: 0 0 auto;
+  display: inline-flex;
+  color: var(--accent);
+  opacity: 0.7;
+}
+
+.session-project svg {
+  width: 0.85rem;
+  height: 0.85rem;
+}

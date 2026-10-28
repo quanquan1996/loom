@@ -143,6 +143,8 @@ export type AgentInfo = {
   // The project it was made in, for good; null outside any. Older servers do
   // not send it.
   project_id?: string | null
+  // Shown above everything else in the sidebar.
+  pinned?: boolean
   created_at: number
   // The last message either way, as ms since the epoch: what orders the
   // sidebar and what its age shows. Older servers do not send it.
@@ -197,6 +199,17 @@ export async function renameAgent(
   if (res.status === 401) throw unauthorized()
   if (!res.ok) throw new Error(`renameAgent failed: ${res.status}`)
   return res.json()
+}
+
+/**
+ * Pin or unpin a session, or move it into a project (null: out of any). A
+ * move is refused mid-turn; the server says so.
+ */
+export function updateAgent(
+  id: string,
+  attrs: { pinned?: boolean; project_id?: string | null },
+): Promise<AgentInfo> {
+  return apiCall(`/api/agents/${id}`, { method: "PATCH", body: JSON.stringify(attrs) })
 }
 
 // Permanent: the server discards the session's history too, otherwise it would

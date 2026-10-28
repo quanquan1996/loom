@@ -23,6 +23,7 @@ import {
   deleteSession,
   checkAuth,
   renameAgent,
+  updateAgent,
   getToken,
   listSessions,
   onUnauthorized,
@@ -476,6 +477,12 @@ function App() {
       onSelect={select}
       onCreate={create}
       onDelete={remove}
+      onRename={setRenaming}
+      onPin={async (id, pinned) => upsert(await updateAgent(id, { pinned }))}
+      onMove={async (id, projectId) => {
+        upsert(await updateAgent(id, { project_id: projectId }))
+        if (projectId) fold(projectId, true)
+      }}
       onCollapse={() => (narrow ? setDrawerOpen(false) : setSidebarOpen(false))}
       browserOpen={side === "browser"}
       onToggleBrowser={() => {
@@ -510,6 +517,8 @@ function App() {
             <Chat
               key={active.id}
               session={active}
+              project={projects.find((p) => p.id === active.project_id) ?? null}
+              onOpenProject={setProjectDialog}
               sidebarOpen={!narrow && sidebarOpen}
               onToggleSidebar={() =>
                 narrow ? setDrawerOpen(true) : setSidebarOpen((open) => !open)
