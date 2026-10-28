@@ -1397,9 +1397,16 @@
    bold headings over the pinned and the other sessions, whose rows are
    their titles with the details small beside them. See Sidebar.tsx. */
 .sidebar .session-list {
+  overflow-x: hidden;
   padding: 4px 8px 12px;
   font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Segoe UI",
     "Microsoft YaHei", system-ui, sans-serif;
+}
+
+.nav-item,
+.project-row,
+.list-heading {
+  box-sizing: border-box;
 }
 
 .nav-item {
