@@ -229,12 +229,67 @@ defmodule Loom.Agent.Backend.Kiro do
       tools: ["*"],
       allowedTools: ["*"],
       includeMcpJson: true,
+      mcpServers: claude_mcp_servers(),
+      resources: skill_resources(),
       model: handle.model
     }
 
     path = agent_path(handle.loom_id)
     File.mkdir_p!(Path.dirname(path))
-    File.write(path, Jason.encode!(agent, pretty: true))
+    # Owner-only: the MCP servers' env can hold keys, as it may in ~/.claude.json.
+    with :ok <- File.write(path, Jason.encode!(agent, pretty: true)),
+         do: File.chmod(path, 0o600)
+  end
+
+  # What Claude Code has, Kiro gets: the same machine's MCP servers and skills,
+  # so a session does not lose its tools by being on the other agent. Read at
+  # every spawn, like the rest of the agent, so one added to Claude Code
+  # reaches the next Kiro turn.
+  #
+  # The servers are Claude Code's user scope (`claude mcp add --scope user`,
+  # in ~/.claude.json), in Kiro's own shape: a command for stdio, a url for
+  # http and sse.
+  @doc false
+  def claude_mcp_servers(path \\ claude_json()) do
+    with {:ok, body} <- File.read(path),
+         {:ok, %{"mcpServers" => servers}} when is_map(servers) <- Jason.decode(body) do
+      for {name, server} when is_map(server) <- servers,
+          entry = kiro_server(server),
+          into: %{},
+          do: {name, entry}
+    else
+      _ -> %{}
+    end
+  end
+
+  defp kiro_server(%{"command" => command} = server) when is_binary(command) do
+    %{command: command, args: server["args"] || [], env: server["env"] || %{}}
+  end
+
+  defp kiro_server(%{"url" => url} = server) when is_binary(url) do
+    %{url: url, headers: server["headers"] || %{}}
+  end
+
+  defp kiro_server(_server), do: nil
+
+  # Skills load as Kiro reads them: name and description up front, the body
+  # when one is used. Kiro's own folder is kept, as naming any resource
+  # replaces its default.
+  defp skill_resources do
+    [
+      "skill://" <> Path.join([claude_dir(), "skills", "*", "SKILL.md"]),
+      "skill://" <> Path.join([kiro_dir(), "skills", "*", "SKILL.md"])
+    ]
+  end
+
+  defp claude_dir, do: System.get_env("CLAUDE_CONFIG_DIR") || Path.expand("~/.claude")
+
+  # Claude Code keeps it beside its directory, or in it when that is moved.
+  defp claude_json do
+    case System.get_env("CLAUDE_CONFIG_DIR") do
+      nil -> Path.expand("~/.claude.json")
+      dir -> Path.join(dir, ".claude.json")
+    end
   end
 
   defp send_rpc(handle, method, params, nil) do

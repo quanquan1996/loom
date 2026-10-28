@@ -172,4 +172,28 @@ defmodule Loom.Agent.Backend.KiroTest do
   test "steering is refused, so the session queues the message" do
     assert {:error, _} = Kiro.steer(handle(), "more")
   end
+
+  test "Claude Code's MCP servers are carried over in Kiro's shape" do
+    path = Path.join(System.tmp_dir!(), "claude-#{System.unique_integer([:positive])}.json")
+
+    File.write!(
+      path,
+      Jason.encode!(%{
+        "mcpServers" => %{
+          "docs" => %{"type" => "stdio", "command" => "uvx", "args" => ["docs"], "env" => %{"A" => "1"}},
+          "remote" => %{"type" => "http", "url" => "https://x.test/mcp", "headers" => %{"H" => "v"}},
+          "odd" => %{"type" => "stdio"}
+        }
+      })
+    )
+
+    on_exit(fn -> File.rm(path) end)
+
+    assert Kiro.claude_mcp_servers(path) == %{
+             "docs" => %{command: "uvx", args: ["docs"], env: %{"A" => "1"}},
+             "remote" => %{url: "https://x.test/mcp", headers: %{"H" => "v"}}
+           }
+
+    assert Kiro.claude_mcp_servers(path <> ".missing") == %{}
+  end
 end
