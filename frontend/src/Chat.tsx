@@ -1036,22 +1036,24 @@ function ToolGroup({
   const names = [
     ...new Set(item.steps.flatMap((s) => (s.kind === "tool" ? [s.name] : []))),
   ]
+  // Folded from the first call (see `foldFinished`), so a card can still be
+  // working: one of its calls has no result yet.
+  const running = item.steps.some((s) => s.kind === "tool" && s.result === null)
 
   return (
-    <div className={"tool group" + (open ? " open" : "")}>
+    <div className={"tool group" + (open ? " open" : "") + (running ? " running" : "")}>
       <div className="tool-head" onClick={() => setOpen((v) => !v)}>
         <span className="tool-name">
-          used {item.tools} tool{item.tools === 1 ? "" : "s"}
+          {running ? "using" : "used"} {item.tools} tool{item.tools === 1 ? "" : "s"}
         </span>
         <span className="tool-summary">{names.join(", ")}</span>
         <span className={"tool-state" + (item.failed > 0 ? " bad" : "")}>
-          {item.failed > 0 ? (
+          {item.failed > 0 && (
             <>
               {item.failed} <X />
             </>
-          ) : (
-            <Check />
           )}
+          {running ? "…" : item.failed > 0 ? null : <Check />}
           {open ? <ChevronDown /> : <ChevronRight />}
         </span>
       </div>

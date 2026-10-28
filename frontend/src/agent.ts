@@ -631,18 +631,15 @@ export function buildTimeline(t: Transcript): TimelineItem[] {
  * Thinking with no words in it ("thought for a moment") says nothing once the
  * turn is over and is dropped; thinking that has words goes inside the card.
  *
- * "Finished" is everything up to the last turn ending (its context line, an
- * error, a stop notice) while the agent is busy, and everything when it is not.
+ * Folded from the first call, not once the turn is over: the steps open only
+ * when asked, during the turn too. The card a turn is still adding to says
+ * so (see `ToolGroup`), and gains its calls as they come, under the same key,
+ * so one opened by hand stays open.
+ *
+ * While the agent is busy, empty thinking at the very end stays: until the
+ * first call or word, it is the only sign that anything is happening.
  */
 export function foldFinished(items: TimelineItem[], busy: boolean): TimelineItem[] {
-  let live = items.length
-  if (busy) {
-    live = 0
-    items.forEach((item, i) => {
-      if (item.kind === "turn" || item.kind === "error" || item.kind === "notice") live = i + 1
-    })
-  }
-
   const out: TimelineItem[] = []
   let run: TimelineItem[] = []
 
@@ -663,11 +660,15 @@ export function foldFinished(items: TimelineItem[], busy: boolean): TimelineItem
     run = []
   }
 
-  items.slice(0, live).forEach((item) => {
+  items.forEach((item, i) => {
     if (item.kind === "tool") {
       run.push(item)
     } else if (item.kind === "thinking") {
       if (item.text.trim() !== "") run.push(item)
+      else if (busy && i === items.length - 1) {
+        flush()
+        out.push(item)
+      }
     } else {
       flush()
       out.push(item)
@@ -675,7 +676,7 @@ export function foldFinished(items: TimelineItem[], busy: boolean): TimelineItem
   })
   flush()
 
-  return out.concat(items.slice(live))
+  return out
 }
 
 function streamFor(t: Transcript, blockId: string): string {
