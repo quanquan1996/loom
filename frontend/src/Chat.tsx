@@ -25,6 +25,7 @@ import {
   useState,
   type ReactNode,
 } from "react"
+import { createPortal } from "react-dom"
 import { buildTimeline, foldFinished, isBusy, type CronJob, type TimelineItem } from "./agent"
 import { itemForAttachment, itemForOutput, itemForPath, type CanvasItem } from "./canvasItems"
 import { backendShort, formatBytes } from "./format"
@@ -74,6 +75,12 @@ type Props = {
 // How a card or link deep in the transcript opens something in the canvas.
 const OpenCanvas = createContext<(item: CanvasItem) => void>(() => {})
 
+// What a message that did not get through can do: be sent again, or let go.
+const Unsent = createContext<{ resend: (id: string) => void; discard: (id: string) => void }>({
+  resend: () => {},
+  discard: () => {},
+})
+
 export function Chat({
   session,
   sidebarOpen,
@@ -88,7 +95,7 @@ export function Chat({
   tabs,
   subhead,
 }: Props) {
-  const { transcript, joinError, submit, interrupt, dropQueued, rename } = useAgent(
+  const { transcript, joinError, submit, resend, discard, interrupt, dropQueued, rename } = useAgent(
     session.id,
     (event) => {
       if (event.kind === "output_files") {
@@ -136,6 +143,7 @@ export function Chat({
     submit(text, attachments.ready)
     attachments.clear()
   }
+  const unsent = useMemo(() => ({ resend, discard }), [resend, discard])
 
   return (
     <div
@@ -213,6 +221,7 @@ export function Chat({
       {/* `output/…` links in a reply become downloads from this session, and
           attachments, sent or about to be, open in the canvas. */}
       <OpenCanvas.Provider value={onOpenCanvas}>
+        <Unsent.Provider value={unsent}>
         <OutputLink.Provider value={renderOutput}>
           <Timeline
             items={items}
@@ -221,6 +230,7 @@ export function Chat({
             onAnswer={submit}
           />
         </OutputLink.Provider>
+        </Unsent.Provider>
 
         {transcript.queue.length > 0 && (
           <QueuePanel
@@ -429,7 +439,8 @@ function ItemView({ item, sessionId, onAnswer }: ItemProps) {
   switch (item.kind) {
     case "user":
       return (
-        <div className={"bubble user" + (item.pending ? " pending" : "")}>
+        <div className={"bubble user" + (item.pending ? " pending" : "") + (item.failed ? " failed" : "")}>
+          {item.failed && item.clientMsgId && <UnsentMark id={item.clientMsgId} reason={item.failed} />}
           {item.text.trim() !== "" && <Rich text={item.text} />}
           {item.files.length > 0 && <SentFiles sessionId={sessionId} files={item.files} />}
           {item.queued && <span className="tag">queued</span>}
@@ -498,6 +509,74 @@ function ItemView({ item, sessionId, onAnswer }: ItemProps) {
       return <CronJobs jobs={item.jobs} />
   }
 }
+
+/**
+ * The red "!" beside a message that did not get through, as in a chat app.
+ * Pressing it offers to send it again — under the same id, so one that did
+ * arrive after all is not sent twice — or to let it go.
+ */
+function UnsentMark({ id, reason }: { id: string; reason: string }) {
+  const { resend, discard } = useContext(Unsent)
+  // Where the menu goes, in the window: under the mark, or over it when the
+  // mark is near the bottom — where a failed message usually is, the latest
+  // one, just above the composer. Out of the timeline (a portal), so its
+  // scrolling cannot hide the menu.
+  const [at, setAt] = useState<{ left: number; top?: number; bottom?: number } | null>(null)
+  const mark = useRef<HTMLButtonElement>(null)
+  const menu = useRef<HTMLSpanElement>(null)
+
+  const toggle = () => {
+    if (at) return setAt(null)
+    const r = mark.current?.getBoundingClientRect()
+    if (!r) return
+    const left = Math.max(8, Math.min(r.left, window.innerWidth - MENU_WIDTH - 8))
+    const below = window.innerHeight - r.bottom
+    setAt(below > MENU_HEIGHT + 120 ? { left, top: r.bottom + 6 } : { left, bottom: window.innerHeight - r.top + 6 })
+  }
+
+  useEffect(() => {
+    if (!at) return
+    const away = (e: Event) => {
+      const t = e.target as Node
+      if (!menu.current?.contains(t) && !mark.current?.contains(t)) setAt(null)
+    }
+    // Scrolling moves the mark out from under a menu fixed to the window.
+    const scrolled = () => setAt(null)
+    document.addEventListener("pointerdown", away)
+    window.addEventListener("resize", scrolled)
+    document.querySelector(".timeline")?.addEventListener("scroll", scrolled, { passive: true })
+    return () => {
+      document.removeEventListener("pointerdown", away)
+      window.removeEventListener("resize", scrolled)
+      document.querySelector(".timeline")?.removeEventListener("scroll", scrolled)
+    }
+  }, [at])
+
+  return (
+    <span className="unsent">
+      <button ref={mark} className="unsent-mark" title={`Not sent: ${reason}`} aria-label="Not sent" onClick={toggle}>
+        !
+      </button>
+      {at &&
+        createPortal(
+          <span className="unsent-menu" role="menu" ref={menu} style={at}>
+            <span className="unsent-why">Not sent: {reason}</span>
+            <button role="menuitem" onClick={() => (setAt(null), resend(id))}>
+              Resend
+            </button>
+            <button role="menuitem" className="danger" onClick={() => (setAt(null), discard(id))}>
+              Delete
+            </button>
+          </span>,
+          document.body,
+        )}
+    </span>
+  )
+}
+
+// The menu's size, near enough, for placing it inside the window.
+const MENU_WIDTH = 208
+const MENU_HEIGHT = 150
 
 // Shown in local time; the expression itself is UTC, and says so.
 const when = (iso: string | null) =>

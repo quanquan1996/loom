@@ -4,11 +4,14 @@ import { getSocket } from "./socket"
 import type { AgentFile } from "./api"
 import {
   addPending,
+  dropPending,
+  markPending,
   applyDelta,
   applyEvent,
   applySnapshot,
   emptyTranscript,
   newClientMsgId,
+  type PendingMessage,
   type AgentDelta,
   type AgentEvent,
   type Snapshot,
@@ -29,19 +32,60 @@ const cache = new Map<string, Transcript>()
 
 function remember(id: string, t: Transcript) {
   cache.delete(id)
-  // Nothing in flight survives a remount: streaming placeholders are dropped
-  // by the join anyway, and a pending bubble's ack may never come to this mount.
-  cache.set(id, { ...t, streaming: [], toolStreams: [], lastDeltaSeq: 0, pending: [] })
+  // Streaming placeholders do not survive a remount: the join drops them
+  // anyway. Nor does a message's being on its way: its ack may never come to
+  // this mount, so it comes back as not got through, to be sent again.
+  cache.set(id, { ...t, streaming: [], toolStreams: [], lastDeltaSeq: 0, pending: unsentOf(t.pending) })
   for (const old of cache.keys()) {
     if (cache.size <= CACHED_SESSIONS) break
     cache.delete(old)
   }
 }
 
+// How long a message may go unanswered before it is shown as not got through.
+// Longer than phoenix.js's 10 s: on a weak connection a slow ack is common,
+// and a message marked failed that then arrives only looks broken.
+const SUBMIT_TIMEOUT_MS = 20_000
+
+// What did not get through, per session, on this device: a reload, or an app
+// the phone killed in the background, must not lose what the user typed.
+const UNSENT_KEY = (id: string) => `loom_unsent_${id}`
+
+const unsentOf = (pending: PendingMessage[]): PendingMessage[] =>
+  pending.map((p) => (p.failed ? p : { ...p, failed: "the connection dropped before it was confirmed" }))
+
+function loadUnsent(id: string): PendingMessage[] {
+  try {
+    const list = JSON.parse(localStorage.getItem(UNSENT_KEY(id)) ?? "[]")
+    return Array.isArray(list) ? list : []
+  } catch {
+    return []
+  }
+}
+
+function saveUnsent(id: string, pending: PendingMessage[]) {
+  const unsent = pending.filter((p) => p.failed)
+  try {
+    if (unsent.length) localStorage.setItem(UNSENT_KEY(id), JSON.stringify(unsent))
+    else localStorage.removeItem(UNSENT_KEY(id))
+  } catch {
+    // Storage full or off: the bubble still shows for as long as the page does.
+  }
+}
+
+// What the device kept, laid over what the cache kept, without doubles.
+function withUnsent(t: Transcript, id: string): Transcript {
+  const kept = loadUnsent(id).filter((u) => !t.pending.some((p) => p.clientMsgId === u.clientMsgId))
+  return kept.length ? { ...t, pending: [...t.pending, ...kept] } : t
+}
+
 type Agent = {
   transcript: Transcript
   joinError: string | null
   submit: (text: string, files?: AgentFile[]) => void
+  // A message that did not get through: send it again, or let it go.
+  resend: (clientMsgId: string) => void
+  discard: (clientMsgId: string) => void
   interrupt: () => void
   dropQueued: (index: number) => void
   rename: (title: string) => void
@@ -66,8 +110,8 @@ export function useAgent(
   const onLiveRef = useRef(onLiveEvent)
   onLiveRef.current = onLiveEvent
   // Straight from the cache on the first render, so there is no empty frame.
-  const [transcript, setTranscript] = useState<Transcript>(
-    () => (sessionId && cache.get(sessionId)) || emptyTranscript,
+  const [transcript, setTranscript] = useState<Transcript>(() =>
+    sessionId ? withUnsent(cache.get(sessionId) ?? emptyTranscript, sessionId) : emptyTranscript,
   )
   const [joinError, setJoinError] = useState<string | null>(null)
   const channelRef = useRef<Channel | null>(null)
@@ -81,7 +125,7 @@ export function useAgent(
 
   useEffect(() => {
     const cached = sessionId ? cache.get(sessionId) : undefined
-    setTranscript(cached ?? emptyTranscript)
+    setTranscript(sessionId ? withUnsent(cached ?? emptyTranscript, sessionId) : emptyTranscript)
     setJoinError(null)
     lastSeqRef.current = cached?.lastSeq ?? 0
     if (!sessionId) return
@@ -142,7 +186,9 @@ export function useAgent(
           snapshot.truncated_before !== null && lastSeqRef.current < snapshot.truncated_before
         const merge = (wasJoined || !!cached) && !hole
         lastSeqRef.current = snapshot.last_seq
-        setTranscript((t) => applySnapshot(snapshot, merge ? t : undefined))
+        // Not merging still keeps what is waiting to be sent: those bubbles are
+        // ours, not the server's, and its events clear the ones that arrived.
+        setTranscript((t) => applySnapshot(snapshot, merge ? t : { ...emptyTranscript, pending: t.pending }))
         setJoinError(null)
       })
       .receive("error", (resp: { reason?: string }) =>
@@ -171,31 +217,66 @@ export function useAgent(
     }
   }, [sessionId, epoch])
 
-  const submit = useCallback((text: string, files: AgentFile[] = []) => {
-    const channel = channelRef.current
-    if (!channel) return
+  // Kept on the device as they change: one marked failed, one sent again,
+  // one whose `:user` event finally came back and took it off the list.
+  useEffect(() => {
+    if (sessionId) saveUnsent(sessionId, transcript.pending)
+  }, [sessionId, transcript.pending])
 
-    const clientMsgId = newClientMsgId()
-    // Optimistic: the bubble appears now and is replaced by the authoritative
-    // `:user` event, matched on `client_msg_id`. Without that id the sender
-    // would see its own message twice.
-    setTranscript((t) => addPending(t, { clientMsgId, text, files }))
+  // One push of a pending message. Its bubble is already on screen; this only
+  // decides whether it ends up marked. Sent again under the same id, so the
+  // server can tell a resend of something that did arrive (`:duplicate`).
+  const send = useCallback((p: PendingMessage) => {
+    const channel = channelRef.current
+    const fail = (reason: string) => setTranscript((t) => markPending(t, p.clientMsgId, reason))
+    if (!channel) return fail("not connected")
 
     channel
-      .push("submit", {
-        text,
-        client_msg_id: clientMsgId,
-        // Already uploaded; only the path travels. The server checks it is one
-        // of this session's own attachments before the model is told about it.
-        files: files.map((f) => ({ path: f.path, name: f.name })),
+      .push(
+        "submit",
+        {
+          text: p.text,
+          client_msg_id: p.clientMsgId,
+          // Already uploaded; only the path travels. The server checks it is
+          // one of this session's own attachments before the model is told.
+          files: p.files.map((f) => ({ path: f.path, name: f.name })),
+        },
+        SUBMIT_TIMEOUT_MS,
+      )
+      .receive("ok", (reply: { status?: string }) => {
+        // It had already arrived; the `:user` event we have is the bubble.
+        if (reply?.status === "duplicate") setTranscript((t) => dropPending(t, p.clientMsgId))
       })
-      .receive("error", (resp: { reason?: string }) => {
-        setTranscript((t) => ({
-          ...t,
-          pending: t.pending.filter((p) => p.clientMsgId !== clientMsgId),
-        }))
-        setJoinError(resp?.reason ?? "submit failed")
-      })
+      .receive("error", (resp: { reason?: string }) => fail(resp?.reason ?? "the server refused it"))
+      // phoenix.js still sends a push that timed out once the channel is back,
+      // so a message marked here can arrive after all; its event clears it.
+      .receive("timeout", () => fail("no answer — the connection may be weak"))
+  }, [])
+
+  const submit = useCallback(
+    (text: string, files: AgentFile[] = []) => {
+      // Optimistic: the bubble appears now and is replaced by the
+      // authoritative `:user` event, matched on `client_msg_id`. Without that
+      // id the sender would see its own message twice.
+      const p: PendingMessage = { clientMsgId: newClientMsgId(), text, files }
+      setTranscript((t) => addPending(t, p))
+      send(p)
+    },
+    [send],
+  )
+
+  const resend = useCallback(
+    (clientMsgId: string) => {
+      const p = transcriptRef.current.pending.find((m) => m.clientMsgId === clientMsgId)
+      if (!p) return
+      setTranscript((t) => markPending(t, clientMsgId, null))
+      send({ ...p, failed: undefined })
+    },
+    [send],
+  )
+
+  const discard = useCallback((clientMsgId: string) => {
+    setTranscript((t) => dropPending(t, clientMsgId))
   }, [])
 
   // Stopping parks the queue rather than draining it, so nothing is optimistic
@@ -212,5 +293,5 @@ export function useAgent(
     channelRef.current?.push("rename", { title })
   }, [])
 
-  return { transcript, joinError, submit, interrupt, dropQueued, rename }
+  return { transcript, joinError, submit, resend, discard, interrupt, dropQueued, rename }
 }

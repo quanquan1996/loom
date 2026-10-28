@@ -70,11 +70,16 @@ type StreamingBlock = {
  */
 type ToolStream = { blockId: string; text: string }
 
-/** A message we have sent but whose `:user` event has not come back yet. */
-type PendingMessage = {
+/**
+ * A message we have sent but whose `:user` event has not come back yet. Or one
+ * that did not get through (`failed`, with why): it stays, marked, until it is
+ * sent again or let go, like a chat app's red "!".
+ */
+export type PendingMessage = {
   clientMsgId: string
   text: string
   files: AgentFile[]
+  failed?: string
 }
 
 export type Transcript = {
@@ -287,7 +292,21 @@ function newBlock(delta: AgentDelta): StreamingBlock | null {
 }
 
 export function addPending(t: Transcript, pending: PendingMessage): Transcript {
-  return { ...t, pending: [...t.pending, pending] }
+  return { ...t, pending: [...t.pending.filter((p) => p.clientMsgId !== pending.clientMsgId), pending] }
+}
+
+/** Mark one as not got through (`reason`), or as on its way again (null). */
+export function markPending(t: Transcript, clientMsgId: string, reason: string | null): Transcript {
+  return {
+    ...t,
+    pending: t.pending.map((p) =>
+      p.clientMsgId === clientMsgId ? { ...p, failed: reason ?? undefined } : p,
+    ),
+  }
+}
+
+export function dropPending(t: Transcript, clientMsgId: string): Transcript {
+  return { ...t, pending: t.pending.filter((p) => p.clientMsgId !== clientMsgId) }
 }
 
 /** Whether a turn is in flight — which is not the same as "not idle". */
@@ -327,6 +346,9 @@ export type TimelineItem =
       at?: number
       queued: boolean
       pending: boolean
+      // Not got through, and why; with the id to send it again by.
+      failed?: string
+      clientMsgId?: string
     }
   | { key: string; kind: "assistant"; text: string; streaming: boolean }
   | { key: string; kind: "thinking"; text: string; streaming: boolean }
@@ -586,6 +608,8 @@ export function buildTimeline(t: Transcript): TimelineItem[] {
       files: p.files,
       queued: false,
       pending: true,
+      failed: p.failed,
+      clientMsgId: p.clientMsgId,
     })
   }
 

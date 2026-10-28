@@ -244,6 +244,88 @@
   opacity: 0.55;
 }
 
+/* Not got through: at full strength again, since it is not on its way, with
+   the red "!" outside its left edge. */
+.bubble.user.failed {
+  position: relative;
+  opacity: 1;
+}
+
+.unsent {
+  position: absolute;
+  top: 50%;
+  right: calc(100% + 8px);
+  transform: translateY(-50%);
+}
+
+.unsent-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.375rem;
+  height: 1.375rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--red);
+  color: #fff;
+  font: 700 0.875rem/1 var(--ui);
+  cursor: pointer;
+}
+
+/* Finger-sized where fingers are. */
+@media (hover: none) {
+  .unsent-mark {
+    width: 1.75rem;
+    height: 1.75rem;
+    font-size: 1rem;
+  }
+}
+
+/* Fixed to the window, placed by `UnsentMark` under or over the mark. */
+.unsent-menu {
+  position: fixed;
+  z-index: 50;
+  width: 13rem;
+  box-sizing: border-box;
+  /* In the page's body, not the chat's: its type set again. */
+  font-family: var(--ui);
+  font-size: 0.95rem;
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg-card);
+  box-shadow: 0 8px 24px #0006;
+}
+
+.unsent-why {
+  padding: 6px 10px 8px;
+  color: var(--fg-dim);
+  font-size: 0.8rem;
+  white-space: normal;
+}
+
+.unsent-menu button {
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.unsent-menu button:hover {
+  background: color-mix(in srgb, var(--fg) 8%, transparent);
+}
+
+.unsent-menu button.danger {
+  color: var(--red);
+}
+
 .bubble.assistant {
   align-self: flex-start;
   background: transparent;

@@ -518,24 +518,14 @@ defmodule Loom.Agent.Session do
 
   @impl true
   def handle_call({:submit, text, opts}, _from, state) do
-    text = to_string(text)
-
-    # The client sends back paths that `Files.store/2` handed it. Checking them
-    # against this session's own directory is the one validation that matters:
-    # the model reads whatever path we name. See `Loom.Agent.Files`.
-    case Files.verify(state.id, Keyword.get(opts, :files, [])) do
-      {:error, reason} ->
-        {:reply, {:error, reason}, state}
-
-      {:ok, files} ->
-        # An attachment on its own is a message. Dragging in a screenshot and
-        # pressing send, with nothing typed, is a normal way to ask about it.
-        cond do
-          String.trim(text) == "" and files == [] -> {:reply, {:error, :empty}, state}
-          reload?(text) and files == [] -> reload(state, text, opts)
-          command?(text, "/cron") and files == [] -> list_cron(state, text, opts)
-          true -> accept(state, text, files, opts)
-        end
+    # A resend of a message that did arrive: on a weak connection the first
+    # push can land after the client gave up on it, and the user pressing
+    # "resend" must not make the model read it twice. The client matches the
+    # `:user` event it already has on `client_msg_id`.
+    if delivered?(state, Keyword.get(opts, :client_msg_id)) do
+      {:reply, {:ok, :duplicate}, state}
+    else
+      take(text, opts, state)
     end
   end
 
@@ -628,6 +618,36 @@ defmodule Loom.Agent.Session do
   end
 
   def handle_call(:info, _from, state), do: {:reply, meta(state), state}
+
+  defp take(text, opts, state) do
+    text = to_string(text)
+
+    # The client sends back paths that `Files.store/2` handed it. Checking them
+    # against this session's own directory is the one validation that matters:
+    # the model reads whatever path we name. See `Loom.Agent.Files`.
+    case Files.verify(state.id, Keyword.get(opts, :files, [])) do
+      {:error, reason} ->
+        {:reply, {:error, reason}, state}
+
+      {:ok, files} ->
+        # An attachment on its own is a message. Dragging in a screenshot and
+        # pressing send, with nothing typed, is a normal way to ask about it.
+        cond do
+          String.trim(text) == "" and files == [] -> {:reply, {:error, :empty}, state}
+          reload?(text) and files == [] -> reload(state, text, opts)
+          command?(text, "/cron") and files == [] -> list_cron(state, text, opts)
+          true -> accept(state, text, files, opts)
+        end
+    end
+  end
+
+  defp delivered?(_state, nil), do: false
+
+  defp delivered?(state, client_msg_id) do
+    Enum.any?(state.transcript, fn event ->
+      event.kind == :user and event.payload[:client_msg_id] == client_msg_id
+    end)
+  end
 
   # ── Backend output ──────────────────────────────────────────────────────
 
@@ -737,6 +757,7 @@ defmodule Loom.Agent.Session do
       # and leaves `status` as it was — which is what makes the restart notice.
       write_meta(%{state | status: settled_status(state)})
     end
+
     Store.close_logs(state.logs)
     :ok
   catch

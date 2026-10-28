@@ -300,6 +300,13 @@ tool card's `block_id`, the same pattern as text.
   and ordered by `last_active_at`: the last user message, reply or turn end.
   Status events do not count, so a restart does not make every session "now".
   It is derived from the transcript on restore, not stored.
+- **A message that does not get through stays.** The client's bubble is
+  optimistic, keyed by `client_msg_id`, and replaced by the `:user` event.
+  No reply in 20 s, or a refusal, marks it with a red "!" offering Resend or
+  Delete; unsent ones are kept in `localStorage` (`loom_unsent_<id>`) across
+  reloads. A resend goes under the same id, and the session answers
+  `:duplicate` for an id it already has, so one that did arrive late (phoenix.js
+  still sends a timed-out push on rejoin) is never read twice.
 
 ## 4. Storage
 

@@ -114,6 +114,22 @@ defmodule Loom.Agent.SessionTest do
       assert Agent.info(id).title == "fix the login bug"
     end
 
+    test "a resend of a message that arrived is not sent again" do
+      # On a weak connection the first push can land after the client gave up
+      # on it; the user's "resend" must not make the model read it twice.
+      id = new_session()
+      assert {:ok, :started} = Agent.submit(id, "once", client_msg_id: "c_1")
+      assert BackendStub.await_turn() == "once"
+
+      assert {:ok, :duplicate} = Agent.submit(id, "once", client_msg_id: "c_1")
+      BackendStub.refute_steer()
+      {:ok, %{events: events}} = Agent.attach(id)
+      assert Enum.count(events, &(&1.kind == :user)) == 1
+
+      # Another message is another message, even with the same words.
+      assert {:ok, :steered} = Agent.submit(id, "once", client_msg_id: "c_2")
+    end
+
     test "an empty message is refused" do
       id = new_session()
       assert {:error, :empty} = Agent.submit(id, "   ")
