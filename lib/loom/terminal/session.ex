@@ -231,7 +231,9 @@ defmodule Loom.Terminal.Session do
     if Process.alive?(state.pty) do
       if state.os_pid && state.os_pid > 1 do
         System.cmd("pkill", ["-KILL", "-s", "#{state.os_pid}"], stderr_to_stdout: true)
-        System.cmd("kill", ["-KILL", "-#{state.os_pid}"], stderr_to_stdout: true)
+        # `--` is not optional: procps-ng 4's kill reads `-KILL -1234` as
+        # `kill(-1, SIGKILL)`, every process this user owns — loom included.
+        System.cmd("kill", ["-KILL", "--", "-#{state.os_pid}"], stderr_to_stdout: true)
       end
 
       ExPTY.kill(state.pty, 9)
