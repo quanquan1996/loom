@@ -83,21 +83,31 @@ character is `/`.
 ### 2.5 Scheduled prompts
 
 `Loom.Cron` submits a fixed prompt to an existing session at every match of a
-five-field cron expression, always in UTC. The turn is an ordinary one, so its
-reply, outputs and canvas land in that session like any other; a backend's own
-scheduler would run outside Loom and update nothing. The message is marked
-`origin: "cron"` and a busy session steers or queues it as usual.
+five-field cron expression, read in the job's wall-clock time (`utc_offset`,
+minutes east of UTC; a fixed offset, no tz database, so summer time is an hour
+out). The turn is an ordinary one, so its reply, outputs and canvas land in
+that session like any other; a backend's own scheduler would run outside Loom
+and update nothing. The message is marked `origin: "cron"` and a busy session
+steers or queues it as usual.
 
 - **Truth is `~/.loom/cron.json`.** One process under the supervisor reads it
   at boot and rewrites it on every change; `next_at` is never stored. Minutes
-  missed while Loom was down are skipped, not caught up.
-- **No HTTP API.** Jobs are made on the node itself, by an agent or by hand,
-  with `bin/loom rpc`. The prompt goes in a `~S"""` heredoc, so quotes,
-  newlines and `#{}` arrive verbatim:
+  missed while Loom was down are skipped, not caught up. A paused job keeps
+  its place and never fires.
+- **The Tasks page** (`/api/tasks`, `LoomWeb.TaskController`) lists, makes,
+  edits, pauses, runs and deletes them. A task made there gets a session of
+  its own, named after it, where its runs land; deleting the task leaves the
+  session. Times default to Shanghai (480). A task can be said in words:
+  `Loom.Cron.Describe` asks a `Loom.OneShot` (haiku, given the user's local
+  time) for a name, a prompt and an expression, and parses the expression
+  before anything is made.
+- **Or by hand on the node**, by an agent or anyone with a shell, with
+  `bin/loom rpc`. The prompt goes in a `~S"""` heredoc, so quotes, newlines
+  and `#{}` arrive verbatim:
 
   ```sh
   bin/loom rpc 'IO.inspect(Loom.Cron.add(%{name: "CI", cron: "30 0 * * 1-5",
-    target: "a_…", prompt: ~S"""
+    target: "a_…", utc_offset: 480, prompt: ~S"""
   …
   """}))'
   bin/loom rpc 'IO.inspect(Loom.Cron.list())'
