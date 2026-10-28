@@ -20,6 +20,9 @@ defmodule Loom.Agent do
     end
   end
 
+  @doc "A fresh session id."
+  def new_id, do: "a_" <> (:crypto.strong_rand_bytes(9) |> Base.url_encode64(padding: false))
+
   @doc "Whether a session with `id` is currently alive."
   def exists?(id) do
     case Registry.lookup(Loom.Agent.Registry, id) do

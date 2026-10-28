@@ -130,4 +130,47 @@ defmodule Loom.CronTest do
     assert error =~ "no_such_session"
     BackendStub.refute_turn()
   end
+
+  describe "wall-clock time, pausing, editing" do
+    test "the expression is read in the job's offset", %{cron: cron} do
+      target = new_session()
+
+      {:ok, job} =
+        Cron.add(%{cron: "0 9 * * *", target: target, prompt: "hi", utc_offset: 480}, cron)
+
+      # 09:00 in Shanghai is 01:00 UTC.
+      assert %DateTime{hour: 1, minute: 0} = job.next_at
+
+      assert {:error, _} =
+               Cron.add(%{cron: "0 9 * * *", target: target, prompt: "x", utc_offset: 9999}, cron)
+    end
+
+    test "a paused job has no next run until it is resumed", %{cron: cron} do
+      {:ok, job} = Cron.add(%{cron: "* * * * *", target: new_session(), prompt: "hi"}, cron)
+      {:ok, paused} = Cron.update(job.id, %{"paused" => true}, cron)
+      assert paused.paused
+      assert paused.next_at == nil
+      {:ok, resumed} = Cron.update(job.id, %{"paused" => false}, cron)
+      assert %DateTime{} = resumed.next_at
+    end
+
+    test "update validates, and keeps what it is not given", %{cron: cron} do
+      target = new_session()
+      {:ok, job} = Cron.add(%{name: "n", cron: "0 9 * * *", target: target, prompt: "p"}, cron)
+
+      assert {:error, _} = Cron.update(job.id, %{"cron" => "nonsense"}, cron)
+      {:ok, job} = Cron.update(job.id, %{"prompt" => "  new  ", "cron" => "30  8 * * 1"}, cron)
+      assert %{name: "n", prompt: "new", cron: "30 8 * * 1", target: ^target} = job
+      assert {:error, :not_found} = Cron.update("c_nope", %{}, cron)
+    end
+
+    test "run fires now and keeps the schedule", %{cron: cron} do
+      target = new_session()
+      {:ok, job} = Cron.add(%{cron: "0 0 1 1 *", target: target, prompt: "now please"}, cron)
+      {:ok, ran} = Cron.run(job.id, cron)
+      assert BackendStub.await_turn() == "now please"
+      assert ran.next_at == job.next_at
+      assert ran.last_run_at
+    end
+  end
 end

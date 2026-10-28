@@ -43,6 +43,12 @@ defmodule LoomWeb.Router do
     get "/agents/:id/tree", AgentOutputController, :tree
     get "/agents/:id/workspace/*path", AgentOutputController, :workspace
 
+    get "/tasks", TaskController, :index
+    post "/tasks", TaskController, :create
+    patch "/tasks/:id", TaskController, :update
+    post "/tasks/:id/run", TaskController, :run
+    delete "/tasks/:id", TaskController, :delete
+
     get "/projects", ProjectController, :index
     post "/projects", ProjectController, :create
     patch "/projects/:id", ProjectController, :update

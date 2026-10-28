@@ -28,7 +28,7 @@ defmodule LoomWeb.AgentSessionController do
   end
 
   defp create_session(conn, backend, params) do
-    id = generate_id()
+    id = Agent.new_id()
     opts = [{:backend, backend} | build_opts(params)]
 
     case Agent.start_session(id, opts) do
@@ -93,10 +93,6 @@ defmodule LoomWeb.AgentSessionController do
 
   defp maybe_put(opts, _key, nil), do: opts
   defp maybe_put(opts, key, val), do: [{key, val} | opts]
-
-  defp generate_id do
-    "a_" <> (:crypto.strong_rand_bytes(9) |> Base.url_encode64(padding: false))
-  end
 
   defp view(info) do
     %{

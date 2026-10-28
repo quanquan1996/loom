@@ -1,14 +1,13 @@
 defmodule Loom.Projects.Classifier do
   @moduledoc """
   Which of the user's projects a new session's first message belongs to, if
-  any: the one model call Loom makes of its own.
+  any.
 
-  A one-shot `claude -p` on the smallest model, with no tools, no MCP servers,
-  no settings or memory and nothing persisted, told the projects and asked for
-  one id or `NONE`. About two seconds and a fifth of a cent (measured), which is
-  why it runs *before* the first turn rather than after it: the session then
-  starts in the project's workspace with its instructions in the system
-  prompt, as if it had been made there. See `Loom.Agent.Session`.
+  A `Loom.OneShot`, told the projects and asked for one id or `NONE`. About
+  two seconds, which is why it runs *before* the first turn rather than after
+  it: the session then starts in the project's workspace with its
+  instructions in the system prompt, as if it had been made there. See
+  `Loom.Agent.Session`.
 
   Anything that goes wrong — no `claude`, a timeout, an answer that is not one
   of the ids — is "no project": a session left where the user made it.
@@ -24,22 +23,17 @@ defmodule Loom.Projects.Classifier do
   def classify(_text, []), do: nil
 
   def classify(text, projects) do
-    with {:ok, exe} <- executable(),
-         {out, 0} <- System.cmd(exe, args(text, projects), cd: System.tmp_dir!(), env: env()),
-         {:ok, %{"result" => answer}} <- Jason.decode(out) do
-      pick(answer, projects)
-    else
-      other ->
+    case Loom.OneShot.ask(prompt(projects), String.slice(text, 0, @message_shown)) do
+      {:ok, answer} ->
+        pick(answer, projects)
+
+      {:error, reason} ->
         Logger.warning(
-          "Loom.Projects.Classifier: no answer (#{inspect(other) |> String.slice(0, 200)})"
+          "Loom.Projects.Classifier: no answer (#{inspect(reason) |> String.slice(0, 200)})"
         )
 
         nil
     end
-  rescue
-    error ->
-      Logger.warning("Loom.Projects.Classifier failed: #{inspect(error)}")
-      nil
   end
 
   @doc false
@@ -58,25 +52,6 @@ defmodule Loom.Projects.Classifier do
   end
 
   def pick(_answer, _projects), do: nil
-
-  defp args(text, projects) do
-    [
-      "-p",
-      "--model",
-      "haiku",
-      "--no-session-persistence",
-      "--tools",
-      "",
-      "--strict-mcp-config",
-      "--setting-sources",
-      "",
-      "--output-format",
-      "json",
-      "--system-prompt",
-      prompt(projects),
-      String.slice(text, 0, @message_shown)
-    ]
-  end
 
   defp prompt(projects) do
     listed =
@@ -99,22 +74,5 @@ defmodule Loom.Projects.Classifier do
     Projects:
     #{listed}
     """
-  end
-
-  defp executable do
-    configured = Application.get_env(:loom, Loom.Agent, [])[:claude_cli] || "claude"
-
-    case System.find_executable(configured) do
-      nil -> {:error, :no_claude}
-      path -> {:ok, path}
-    end
-  end
-
-  # What every child gets (`Loom.ChildEnv`), with loom's own variables unset
-  # rather than merely left out: `System.cmd` adds to the environment.
-  defp env do
-    keep = Loom.ChildEnv.map()
-    drop = for {key, _} <- System.get_env(), not Map.has_key?(keep, key), do: {key, nil}
-    Enum.to_list(keep) ++ drop
   end
 end

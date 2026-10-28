@@ -1,6 +1,6 @@
 defmodule Loom.Cron do
   @moduledoc """
-  Scheduled prompts: at each match of a cron expression (UTC, see
+  Scheduled prompts: at each match of a cron expression (see
   `Loom.Cron.Expr`), a fixed prompt is submitted to an existing session, as if
   the user had typed it. The reply lands in that session's transcript like any
   other turn, which is the whole reason this lives in loom rather than in a
@@ -10,14 +10,21 @@ defmodule Loom.Cron do
   boot and rewritten on every change, so a crash or a deploy loses nothing but
   the timer, which is rebuilt from the file.
 
-  There is no HTTP API. Jobs are made by an agent — or anyone with a shell — on
-  the node itself:
+  Jobs are made from the Tasks page (`LoomWeb.TaskController`), by an agent
+  or anyone with a shell on the node itself:
 
       bin/loom rpc 'IO.inspect(Loom.Cron.add(%{name: "…", cron: "…", target: "a_…", prompt: ~S\"""
       …
       \"""}))'
 
   and listed in any session with `/cron`.
+
+  - **Wall-clock time.** A job carries `utc_offset`, in minutes, and its
+    expression is read in that time: `0 9 * * 1` with 480 is Monday 09:00 in
+    Beijing. A fixed offset, not a zone — there is no tz database here — so a
+    place with summer time is an hour out for half the year. Without one it is
+    UTC, as jobs made before it were.
+  - **Paused** jobs keep their place and never fire until resumed.
 
   - A minute missed while loom was down is skipped, not caught up: the next
     match is counted from boot.
@@ -31,7 +38,7 @@ defmodule Loom.Cron do
   alias Loom.Cron.Expr
 
   @name __MODULE__
-  @persisted ~w(id name cron target prompt created_at last_run_at last_error)a
+  @persisted ~w(id name cron target prompt created_at last_run_at last_error utc_offset paused)a
 
   # Wake at least this often even with nothing due, so a clock that jumps (a
   # suspended laptop, an NTP step) is noticed within the hour.
@@ -50,6 +57,18 @@ defmodule Loom.Cron do
 
   @doc "Every job, soonest first, with `next_at` and the target's title."
   def list(server \\ @name), do: GenServer.call(server, :list)
+
+  @doc "One job, as `list/0` shows it: `{:ok, job}` or `{:error, :not_found}`."
+  def get(id, server \\ @name), do: GenServer.call(server, {:get, id})
+
+  @doc """
+  Change any of `:name`, `:prompt`, `:cron`, `:utc_offset` and `:paused`; the
+  target stays. Validated like `add/1`. `{:ok, job}` or `{:error, reason}`.
+  """
+  def update(id, attrs, server \\ @name), do: GenServer.call(server, {:update, id, attrs})
+
+  @doc "Fire a job now, off its schedule, which it keeps. `{:ok, job}`."
+  def run(id, server \\ @name), do: GenServer.call(server, {:run, id})
 
   @doc "Remove a job by id. `:ok` or `{:error, :not_found}`."
   def delete(id, server \\ @name), do: GenServer.call(server, {:delete, id})
@@ -90,6 +109,36 @@ defmodule Loom.Cron do
       |> Enum.map(&public/1)
 
     {:reply, jobs, state}
+  end
+
+  def handle_call({:get, id}, _from, state) do
+    case state.jobs do
+      %{^id => job} -> {:reply, {:ok, public(job)}, state}
+      _ -> {:reply, {:error, :not_found}, state}
+    end
+  end
+
+  def handle_call({:update, id, attrs}, _from, state) do
+    with {:ok, job} <- Map.fetch(state.jobs, id) |> found(),
+         {:ok, job} <- change(job, attrs) do
+      job = schedule(job, DateTime.utc_now())
+      state = save(put_in(state.jobs[id], job))
+      {:reply, {:ok, public(job)}, arm(state)}
+    else
+      error -> {:reply, error, state}
+    end
+  end
+
+  def handle_call({:run, id}, _from, state) do
+    case state.jobs do
+      %{^id => job} ->
+        fire(job)
+        job = %{job | last_run_at: DateTime.utc_now() |> DateTime.to_iso8601()}
+        {:reply, {:ok, public(job)}, save(put_in(state.jobs[id], job))}
+
+      _ ->
+        {:reply, {:error, :not_found}, state}
+    end
   end
 
   def handle_call({:delete, id}, _from, state) do
@@ -146,7 +195,8 @@ defmodule Loom.Cron do
 
     with {:ok, _} <- Expr.parse(attrs["cron"]) |> describe(),
          :ok <- check_prompt(prompt),
-         :ok <- check_target(target) do
+         :ok <- check_target(target),
+         {:ok, offset} <- check_offset(attrs["utc_offset"]) do
       {:ok,
        %{
          id: "c_" <> Base.url_encode64(:crypto.strong_rand_bytes(6), padding: false),
@@ -156,10 +206,41 @@ defmodule Loom.Cron do
          prompt: prompt,
          created_at: DateTime.utc_now() |> DateTime.to_iso8601(),
          last_run_at: nil,
-         last_error: nil
+         last_error: nil,
+         utc_offset: offset,
+         paused: attrs["paused"] == true
        }}
     end
   end
+
+  defp found(:error), do: {:error, :not_found}
+  defp found(ok), do: ok
+
+  defp change(job, attrs) do
+    attrs = Map.new(attrs, fn {k, v} -> {to_string(k), v} end)
+    prompt = if is_binary(attrs["prompt"]), do: String.trim(attrs["prompt"]), else: job.prompt
+    cron = attrs["cron"] || job.cron
+
+    with {:ok, _} <- Expr.parse(cron) |> describe(),
+         :ok <- check_prompt(prompt),
+         {:ok, offset} <- check_offset(Map.get(attrs, "utc_offset", job[:utc_offset])) do
+      {:ok,
+       %{
+         job
+         | name: if(attrs["name"] in [nil, ""], do: job.name, else: to_string(attrs["name"])),
+           prompt: prompt,
+           cron: cron |> String.split() |> Enum.join(" ")
+       }
+       |> Map.put(:utc_offset, offset)
+       |> Map.put(:paused, Map.get(attrs, "paused", job[:paused]) == true)}
+    end
+  end
+
+  # Minutes east of UTC, as a browser reports it (negated). UTC+14 to UTC-12
+  # are the ones that exist.
+  defp check_offset(nil), do: {:ok, 0}
+  defp check_offset(n) when is_integer(n) and n >= -720 and n <= 840, do: {:ok, n}
+  defp check_offset(_other), do: {:error, "utc_offset is minutes east of UTC, -720 to 840"}
 
   defp describe({:ok, expr}) do
     case Expr.next(expr, DateTime.utc_now()) do
@@ -193,12 +274,17 @@ defmodule Loom.Cron do
   defp name(name, _prompt), do: to_string(name)
 
   # `next_at` is derived, never stored: it is recomputed from now at boot,
-  # which is what skips the minutes loom was down for.
+  # which is what skips the minutes loom was down for. The expression is read
+  # in the job's wall-clock time: shifted there, matched, shifted back.
+  defp schedule(%{paused: true} = job, _now), do: Map.put(job, :next_at, nil)
+
   defp schedule(job, now) do
+    offset = job[:utc_offset] || 0
+
     next_at =
       with {:ok, expr} <- Expr.parse(job.cron),
-           {:ok, at} <- Expr.next(expr, now) do
-        at
+           {:ok, at} <- Expr.next(expr, DateTime.add(now, offset, :minute)) do
+        DateTime.add(at, -offset, :minute)
       else
         _ -> nil
       end
