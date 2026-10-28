@@ -139,16 +139,29 @@ An interrupt sends nothing. Tapping it opens that session.
 standing instructions, like ChatGPT's projects.
 
 - **The workspace is the cwd**, always `~/.loom/projects/<id>/workspace`.
-  Loom makes and owns it; the user never names a directory. Every session
-  made in the project starts there, so files one leaves are where the next looks, and Claude Code, which
-  keys its memory by cwd, keeps memory per project.
-- **Permanent.** A session's project is chosen when it is made
-  (`project_id` on `POST /api/agents`) and never changes, since `--resume`
-  and Codex threads are tied to the cwd.
+  Loom makes and owns it; the user never names a directory. Every session in
+  the project works there, so files one leaves are where the next looks, and
+  Claude Code, which keys its memory by cwd, keeps memory per project.
+- **A session can move.** Into a project, out of one or between them
+  (`project_id` on `PATCH /api/agents/:id`, refused mid-turn).
+  `Backend.relocate/3` carries the conversation on from the new cwd: Claude
+  Code's `--resume` finds it from any directory, and Codex resumes the thread
+  with a `cwd` override. Files it already made stay where they are.
 - **Instructions go in the system prompt**, after Loom's own, naming the
   workspace and carrying the user's text; nothing is written into the
-  workspace. Editing them lets the project's Claude Code sessions go, so the
-  next turn reads them; Codex reads them on its next app-server restart.
+  workspace. A conversation already under way cannot be given a new one —
+  Claude Code ignores `--append-system-prompt` on `--resume` (measured,
+  2.1.312) — so a move or an edit goes ahead of the next message the backend
+  gets instead, once, marked as Loom's and not shown.
+- **New sessions are filed.** A session's first message, outside any project
+  while projects exist, waits for `Loom.Projects.Classifier`: one `claude -p`
+  on haiku, without tools, settings or persistence, asked for a project id or
+  `NONE` (about 2 s). A match moves the session before the turn starts, so it
+  begins in the workspace with the instructions in its system prompt. 15 s
+  without an answer starts the turn where it is. The transcript says so
+  (`project_moved`, `auto: true`), and the session menu moves it back.
+- **The sidebar lists overlap.** Each project lists its sessions, and the
+  session list holds every session, pinned ones first (`pinned` on `PATCH`).
 - **Deleting a project deletes its sessions and its workspace.**
 - **Truth is `~/.loom/projects.json`.** Changes go out on the lobby channel.
   The file tree lists the workspace (hidden entries, symlinks and build
