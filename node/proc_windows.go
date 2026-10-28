@@ -1,14 +1,12 @@
 package main
 
 import (
-	"encoding/base64"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"syscall"
-	"unicode/utf16"
 
 	"golang.org/x/sys/windows"
 )
@@ -39,14 +37,11 @@ func shellCommand(shell, command string) *exec.Cmd {
 
 	switch strings.ToLower(strings.TrimSuffix(filepath.Base(shell), filepath.Ext(shell))) {
 	case "powershell", "pwsh":
-		// Encoded, so no quote in the command has to survive Windows' command
-		// line rules.
-		var b []byte
-		for _, u := range utf16.Encode([]rune(psPrelude + command)) {
-			b = append(b, byte(u), byte(u>>8))
-		}
+		// -Command, not -EncodedCommand: Windows PowerShell writes errors from
+		// an encoded command to a redirected stderr as CLIXML. Go quotes the
+		// one argument by the rules PowerShell parses it with.
 		cmd = exec.Command(shell, "-NoLogo", "-NoProfile", "-NonInteractive",
-			"-ExecutionPolicy", "Bypass", "-EncodedCommand", base64.StdEncoding.EncodeToString(b))
+			"-ExecutionPolicy", "Bypass", "-Command", psPrelude+command)
 	case "cmd":
 		// cmd parses its own command line, so it is handed one verbatim.
 		cmd = exec.Command(shell)

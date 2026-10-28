@@ -375,7 +375,7 @@ agent ──zsh──> loom-node exec mac -- '…'      CLI, on this host
   - The server lets a silent socket go after 45s.
 - **Running a command.** It runs as `$SHELL -lc` in its own process group:
   - on Windows it runs in PowerShell (`pwsh` if installed, else Windows
-    PowerShell) with `-NoProfile -EncodedCommand`. Output is forced to UTF-8
+    PowerShell) with `-NoProfile -Command`. Output is forced to UTF-8
     and the command runs in a hidden console. A job object stands in for the
     process group;
   - stdin is closed;
