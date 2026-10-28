@@ -41,7 +41,7 @@ defmodule LoomWeb.ProjectControllerTest do
   end
 
   test "creates, lists, updates and refuses", %{conn: conn} do
-    %{"id" => id, "workspace" => ws, "bound" => false} = create_project(conn, %{name: "Blog"})
+    %{"id" => id, "workspace" => ws} = create_project(conn, %{name: "Blog"})
     assert File.dir?(ws)
 
     assert %{"projects" => [%{"id" => ^id}]} = conn |> get(~p"/api/projects") |> json_response(200)

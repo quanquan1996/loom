@@ -16,24 +16,19 @@ defmodule Loom.ProjectsTest do
     dir
   end
 
-  test "a project without a directory gets a workspace of its own" do
+  test "a project gets a workspace of its own" do
     {:ok, p} = Projects.create(%{"name" => "  Report  "})
     assert p.name == "Report"
-    assert p.dir == nil
     assert File.dir?(Projects.workspace(p))
     assert String.starts_with?(Projects.workspace(p), Path.join(Projects.dir(), "projects"))
   end
 
-  test "a project can be bound to an existing directory, which deleting leaves alone" do
+  test "a directory asked for is ignored: the workspace is always Loom's" do
     dir = tmp_dir()
-    File.write!(Path.join(dir, "keep.txt"), "mine")
-
     {:ok, p} = Projects.create(%{"name" => "repo", "dir" => dir})
-    assert Projects.workspace(p) == dir
-    assert Projects.view(p).bound
-
-    :ok = Projects.delete(p.id)
-    assert File.read!(Path.join(dir, "keep.txt")) == "mine"
+    refute Projects.workspace(p) == dir
+    refute Map.has_key?(Projects.view(p), :dir)
+    assert String.starts_with?(Projects.workspace(p), Path.join(Projects.dir(), "projects"))
   end
 
   test "deleting a project Loom made removes its workspace" do
@@ -48,14 +43,11 @@ defmodule Loom.ProjectsTest do
 
   test "refuses what it cannot use" do
     assert {:error, _} = Projects.create(%{"name" => " "})
-    assert {:error, msg} = Projects.create(%{"name" => "x", "dir" => "relative/path"})
-    assert msg =~ "absolute"
-    assert {:error, msg} = Projects.create(%{"name" => "x", "dir" => "/no/such/dir/here"})
-    assert msg =~ "not a directory"
+    assert {:error, _} = Projects.create(%{"name" => "x", "instructions" => 42})
     assert Projects.list() == []
   end
 
-  test "update changes name and instructions, never the directory" do
+  test "update changes name and instructions, never the workspace" do
     {:ok, p} = Projects.create(%{"name" => "a"})
 
     {:ok, p2} =
@@ -63,7 +55,7 @@ defmodule Loom.ProjectsTest do
 
     assert p2.name == "b"
     assert p2.instructions == "Write in Chinese."
-    assert p2.dir == nil
+    assert Projects.workspace(p2) == Projects.workspace(p)
     assert {:error, :not_found} = Projects.update("p_nope", %{"name" => "c"})
   end
 
@@ -84,9 +76,8 @@ defmodule Loom.ProjectsTest do
 
   describe "workspace files" do
     setup do
-      dir = tmp_dir()
-      {:ok, p} = Projects.create(%{"name" => "files", "dir" => dir})
-      {:ok, dir: dir, project: p}
+      {:ok, p} = Projects.create(%{"name" => "files"})
+      {:ok, dir: Projects.workspace(p), project: p}
     end
 
     test "lists working files, not hidden, build or linked ones", %{dir: dir, project: p} do

@@ -6,13 +6,11 @@ import { Confirm } from "./Confirm"
 
 /**
  * Make a project, or edit one: its name and the instructions every session in
- * it is given. The directory is chosen once, when it is made — empty for a
- * workspace of Loom's own, or a path to bind an existing one (a checkout) —
- * because each session's working directory is fixed for its life.
+ * it is given. Where it lives is not asked: Loom gives every project a
+ * workspace of its own, shown once it exists.
  *
- * Deleting takes the project's sessions with it, and the workspace if Loom
- * made it; a bound directory is left as it is. So it asks first, and says
- * which.
+ * Deleting takes the project's sessions and its workspace with it, so it asks
+ * first.
  */
 export function ProjectDialog({
   project,
@@ -27,7 +25,6 @@ export function ProjectDialog({
   onClose: () => void
 }) {
   const [name, setName] = useState(project?.name ?? "")
-  const [dir, setDir] = useState("")
   const [instructions, setInstructions] = useState(project?.instructions ?? "")
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -46,7 +43,7 @@ export function ProjectDialog({
     try {
       const saved = project
         ? await updateProject(project.id, { name, instructions })
-        : await createProject({ name, instructions, ...(dir.trim() && { dir: dir.trim() }) })
+        : await createProject({ name, instructions })
       onSaved(saved)
       onClose()
     } catch (e) {
@@ -79,23 +76,11 @@ export function ProjectDialog({
             <input value={name} autoFocus onChange={(e) => setName(e.target.value)} placeholder="e.g. Blog" />
           </label>
 
-          {project ? (
+          {project && (
             <label>
-              <span>Workspace{project.bound ? " (bound)" : ""}</span>
+              <span>Workspace</span>
               <code className="project-path">{project.workspace}</code>
-            </label>
-          ) : (
-            <label>
-              <span>Directory</span>
-              <input
-                value={dir}
-                onChange={(e) => setDir(e.target.value)}
-                placeholder="empty for a new one, or e.g. ~/code/app"
-                autoCapitalize="off"
-                autoCorrect="off"
-                spellCheck={false}
-              />
-              <small>Every session in the project starts here. This cannot be changed later.</small>
+              <small>Every session in the project starts here.</small>
             </label>
           )}
 
@@ -132,10 +117,7 @@ export function ProjectDialog({
         <Confirm
           title={`Delete ${project.name}?`}
           detail={
-            `Its ${sessions} and their history` +
-            (project.bound
-              ? `. ${project.workspace} is left as it is.`
-              : `, and the workspace ${project.workspace} with everything in it.`) +
+            `Its ${sessions} and their history, and the workspace ${project.workspace} with everything in it.` +
             " This cannot be undone."
           }
           onYes={async () => {

@@ -508,24 +508,21 @@ export function installCommand(code: string): string {
 
 /**
  * Sessions under one name, sharing a working directory and standing
- * instructions. `dir` is set when the project is bound to a directory that
- * already existed; otherwise Loom made `workspace` for it.
+ * instructions. Loom makes the `workspace` and removes it with the project.
  */
 export type Project = {
   id: string
   name: string
-  dir: string | null
   instructions: string
   created_at: number
   workspace: string
-  bound: boolean
 }
 
-export function createProject(attrs: { name: string; dir?: string; instructions?: string }): Promise<Project> {
+export function createProject(attrs: { name: string; instructions?: string }): Promise<Project> {
   return apiCall("/api/projects", { method: "POST", body: JSON.stringify(attrs) })
 }
 
-/** The directory is fixed when it is made; only these change. */
+/** The workspace is fixed; only these change. */
 export function updateProject(id: string, attrs: { name?: string; instructions?: string }): Promise<Project> {
   return apiCall(`/api/projects/${id}`, { method: "PATCH", body: JSON.stringify(attrs) })
 }

@@ -138,20 +138,18 @@ An interrupt sends nothing. Tapping it opens that session.
 `Loom.Projects` groups sessions under a name, a working directory and
 standing instructions, like ChatGPT's projects.
 
-- **The workspace is the cwd.** Loom makes one under
-  `~/.loom/projects/<id>/workspace`, or the project is bound to a directory
-  that already exists (a checkout). Every session made in the project starts
-  there, so files one leaves are where the next looks, and Claude Code, which
+- **The workspace is the cwd**, always `~/.loom/projects/<id>/workspace`.
+  Loom makes and owns it; the user never names a directory. Every session
+  made in the project starts there, so files one leaves are where the next looks, and Claude Code, which
   keys its memory by cwd, keeps memory per project.
-- **Permanent both ways.** A session's project is chosen when it is made
+- **Permanent.** A session's project is chosen when it is made
   (`project_id` on `POST /api/agents`) and never changes, since `--resume`
-  and Codex threads are tied to the cwd. A project's directory never changes.
+  and Codex threads are tied to the cwd.
 - **Instructions go in the system prompt**, after Loom's own, naming the
   workspace and carrying the user's text; nothing is written into the
   workspace. Editing them lets the project's Claude Code sessions go, so the
   next turn reads them; Codex reads them on its next app-server restart.
-- **Deleting a project deletes its sessions**, and the workspace if Loom made
-  it. A bound directory is never touched.
+- **Deleting a project deletes its sessions and its workspace.**
 - **Truth is `~/.loom/projects.json`.** Changes go out on the lobby channel.
   The file tree lists the workspace (hidden entries, symlinks and build
   directories skipped, 2000 files at most), download only.
@@ -189,7 +187,7 @@ tool card's `block_id`, the same pattern as text.
 ~/.loom/sessions/<id>/output/…       files the agent made for the user
 ~/.loom/cron.json                    scheduled prompts (§2.5)
 ~/.loom/projects.json                projects (§2.7)
-~/.loom/projects/<id>/workspace/…    a project's workspace, unless bound
+~/.loom/projects/<id>/workspace/…    a project's workspace
 ```
 
 The base is `~/.loom` (or `LOOM_HOME`), not `priv/`, because a deploy replaces

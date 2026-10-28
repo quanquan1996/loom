@@ -4,17 +4,18 @@ defmodule Loom.Projects do
   every session made in it. The ChatGPT idea, on a machine the agents can
   actually work in.
 
-  - **The workspace is the sessions' cwd.** A project either owns one, made
-    under `<home>/projects/<id>/workspace`, or is bound to a directory that
-    already exists (a git checkout). Every session in it starts there, so
+  - **The workspace is the sessions' cwd**, always
+    `<home>/projects/<id>/workspace`: Loom makes it, owns it, and removes it
+    with the project. Never a directory the user names, so where a project's
+    files are is never a question. Every session in it starts there, so
     working files one session leaves are where the next one looks. Claude Code
     keys its memory by cwd, so each project gets memory of its own for free.
-  - **The binding is permanent, both ways.** A session's cwd is fixed when it
-    is made (`--resume` and Codex threads are tied to it), so a session never
-    moves between projects, and a project's directory never changes.
+  - **The binding is permanent.** A session's cwd is fixed when it is made
+    (`--resume` and Codex threads are tied to it), so a session never moves
+    between projects.
   - **Instructions go in the system prompt**, appended to Loom's own, rather
-    than into a `CLAUDE.md` in the workspace: a bound repo's own files stay the
-    repo's, and both backends get the same text. See `Loom.Agent.Session`.
+    than into a `CLAUDE.md` in the workspace, so both backends get the same
+    text and the agents cannot overwrite it. See `Loom.Agent.Session`.
 
   One process owns `<home>/projects.json`, the truth for what exists. Changes
   are broadcast on the lobby topic as `{:project_summary, project}` and
@@ -25,12 +26,13 @@ defmodule Loom.Projects do
   require Logger
 
   @name __MODULE__
-  @persisted ~w(id name dir instructions created_at)a
+  @persisted ~w(id name instructions created_at)a
   @name_limit 80
   @instructions_limit 20_000
 
-  # The workspace listing for the file tree. A bound repo can be enormous, so
-  # what is never a working file is skipped and the rest is capped.
+  # The workspace listing for the file tree. An agent can clone a repo or
+  # install packages in there, so what is never a working file is skipped and
+  # the rest is capped.
   @skip_dirs ~w(node_modules _build deps target dist build __pycache__ venv)
   @max_files 2000
 
@@ -47,14 +49,13 @@ defmodule Loom.Projects do
   def get(id, server), do: GenServer.call(server, {:get, id})
 
   @doc """
-  Make a project from `name`, an optional `dir` (an existing directory to bind
-  to; none makes a workspace of its own) and optional `instructions`. String
-  keys, as they come from JSON. `{:ok, project}` or `{:error, message}`.
+  Make a project, and its workspace, from `name` and optional `instructions`.
+  String keys, as they come from JSON. `{:ok, project}` or `{:error, message}`.
   """
   def create(attrs, server \\ @name), do: GenServer.call(server, {:create, attrs})
 
   @doc """
-  Change `name` and/or `instructions`. The directory never changes.
+  Change `name` and/or `instructions`.
 
   The project's live sessions are then told to rebuild their instructions.
   From the caller, not the server: a session starting up asks this server for
@@ -71,17 +72,15 @@ defmodule Loom.Projects do
   end
 
   @doc """
-  Forget a project, and remove its workspace if Loom made it. A bound
-  directory is the user's and is never touched. Its sessions are the caller's
-  to delete first; see `LoomWeb.ProjectController`.
+  Forget a project and remove its workspace. Its sessions are the caller's to
+  delete first; see `LoomWeb.ProjectController`.
   """
   def delete(id, server \\ @name), do: GenServer.call(server, {:delete, id})
 
-  @doc "Where Loom keeps projects and the workspaces it makes."
+  @doc "Where Loom keeps projects and their workspaces."
   def dir, do: Application.get_env(:loom, __MODULE__, [])[:dir] || Loom.Agent.Store.home()
 
-  @doc "A project's working directory: the bound one, or its own."
-  def workspace(%{dir: dir}) when is_binary(dir), do: dir
+  @doc "A project's working directory, which every session in it starts in."
   def workspace(%{id: id}), do: Path.join([dir(), "projects", id, "workspace"])
 
   @doc """
@@ -108,11 +107,11 @@ defmodule Loom.Projects do
     end
   end
 
-  @doc "The JSON shape: the stored fields plus the workspace and whether it is bound."
+  @doc "The JSON shape: the stored fields plus the workspace."
   def view(project) do
     project
     |> Map.take(@persisted)
-    |> Map.merge(%{workspace: workspace(project), bound: is_binary(project.dir)})
+    |> Map.put(:workspace, workspace(project))
   end
 
   # ── Workspace files ───────────────────────────────────────────────────────
@@ -213,12 +212,10 @@ defmodule Loom.Projects do
 
   def handle_call({:create, attrs}, _from, state) do
     with {:ok, name} <- valid_name(attrs["name"]),
-         {:ok, dir} <- valid_dir(attrs["dir"]),
          {:ok, instructions} <- valid_instructions(attrs["instructions"]) do
       project = %{
         id: "p_" <> (:crypto.strong_rand_bytes(6) |> Base.url_encode64(padding: false)),
         name: name,
-        dir: dir,
         instructions: instructions,
         created_at: System.system_time(:millisecond)
       }
@@ -251,9 +248,8 @@ defmodule Loom.Projects do
 
   def handle_call({:delete, id}, _from, state) do
     case fetch(state, id) do
-      {:ok, project} ->
-        # Only what Loom made, and only its own directory under `projects/`.
-        if project.dir == nil, do: File.rm_rf(Path.join([dir(), "projects", id]))
+      {:ok, _project} ->
+        File.rm_rf(Path.join([dir(), "projects", id]))
         state = save(%{state | projects: Map.delete(state.projects, id)})
         broadcast({:project_removed, id})
         {:reply, :ok, state}
@@ -282,26 +278,6 @@ defmodule Loom.Projects do
   end
 
   defp valid_name(_), do: {:error, "a project needs a name"}
-
-  defp valid_dir(dir) when dir in [nil, ""], do: {:ok, nil}
-
-  defp valid_dir(dir) when is_binary(dir) do
-    dir = String.trim(dir)
-    expanded = Path.expand(dir)
-
-    cond do
-      not (String.starts_with?(dir, "/") or String.starts_with?(dir, "~")) ->
-        {:error, "the directory must be an absolute path"}
-
-      not File.dir?(expanded) ->
-        {:error, "#{expanded} is not a directory"}
-
-      true ->
-        {:ok, expanded}
-    end
-  end
-
-  defp valid_dir(_), do: {:error, "the directory must be a path"}
 
   defp valid_instructions(nil), do: {:ok, ""}
 
