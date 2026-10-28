@@ -52,8 +52,15 @@ defmodule Loom.Application do
       Loom.Nodes,
       # Notifications on the user's devices when a turn ends.
       Loom.Push,
+      # Sleep: each scope's memory gone over by night. See its doc.
+      Loom.Dream,
+      # Virtual employees: agents at work on a heartbeat, within a budget.
+      # After the push service, which they report through.
+      Loom.Employees,
       # Restarts the node once every session is idle, on request. See its doc.
       Loom.Restarter,
+      # The shape of loom's browser's window, narrowed while a phone looks.
+      Loom.Browser,
       # Start to serve requests, typically the last entry
       LoomWeb.Endpoint
     ]

@@ -123,7 +123,7 @@ export async function deleteSession(id: string): Promise<void> {
 // opaque rather than being flattened into a lowest common denominator.
 export type AgentUsage = Record<string, unknown>
 
-export type AgentBackend = "claude_code" | "codex"
+export type AgentBackend = "claude_code" | "codex" | "kiro"
 
 /**
  * `starting` is the gap between asking the backend to begin and it saying
@@ -145,6 +145,14 @@ export type AgentInfo = {
   project_id?: string | null
   // Shown above everything else in the sidebar.
   pinned?: boolean
+  // "dream" for a scope's sleep session, which the lists leave out and the
+  // moon opens; see `Sleep.tsx`. "employee_chat" and "employee_work" for a
+  // virtual employee's, opened from its page; see `Employees.tsx`. Older
+  // servers do not send it.
+  kind?: "dream" | "employee_chat" | "employee_work" | null
+  employee_id?: string | null
+  // How far the user has read; with `seq`, the moon's unread mark.
+  seen_seq?: number
   created_at: number
   // The last message either way, as ms since the epoch: what orders the
   // sidebar and what its age shows. Older servers do not send it.
@@ -207,7 +215,7 @@ export async function renameAgent(
  */
 export function updateAgent(
   id: string,
-  attrs: { pinned?: boolean; project_id?: string | null },
+  attrs: { pinned?: boolean; project_id?: string | null; seen_seq?: number },
 ): Promise<AgentInfo> {
   return apiCall(`/api/agents/${id}`, { method: "PATCH", body: JSON.stringify(attrs) })
 }
@@ -552,6 +560,69 @@ export function deleteProject(id: string): Promise<void> {
   return apiCall(`/api/projects/${id}`, { method: "DELETE" })
 }
 
+// ── Sleep (see Loom.Dream, LoomWeb.DreamController) ───────────────────────
+//
+// A scope is a project id, or "home" for the sessions outside any project:
+// Claude Code keeps one memory directory for each.
+
+export type Dream = {
+  scope: string
+  // Its sleep session, once there is one.
+  session: string | null
+  enabled: boolean
+  last_run_at: number | null
+  // Newest first.
+  runs: { at: number; sessions: number; undone?: boolean }[]
+  can_undo: boolean
+  // Sessions active since the last sleep: what the next one would go over.
+  pending_sessions: number
+  memory_dir: string | null
+  memories: number
+  // Local hours, [start, end), in `utc_offset` (minutes east of UTC).
+  window: [number, number]
+  utc_offset: number
+}
+
+export type Memory = {
+  file: string
+  name: string
+  description: string | null
+  type: string | null
+  mtime: number
+  archived: boolean
+}
+
+export function getDream(scope: string): Promise<Dream> {
+  return apiCall(`/api/dreams/${scope}`, { method: "GET" })
+}
+
+/** The scope's sleep session, made if there is none yet. */
+export async function openDream(scope: string): Promise<AgentInfo> {
+  const { session } = await apiCall<{ session: AgentInfo }>(`/api/dreams/${scope}/session`, { method: "POST" })
+  return session
+}
+
+export function runDream(scope: string): Promise<Dream> {
+  return apiCall(`/api/dreams/${scope}/run`, { method: "POST" })
+}
+
+export function undoDream(scope: string): Promise<Dream> {
+  return apiCall(`/api/dreams/${scope}/undo`, { method: "POST" })
+}
+
+/** `enabled` is the scope's; `window` and `utc_offset` are every scope's. */
+export function updateDream(
+  scope: string,
+  attrs: Partial<Pick<Dream, "enabled" | "window" | "utc_offset">>,
+): Promise<Dream> {
+  return apiCall(`/api/dreams/${scope}`, { method: "PATCH", body: JSON.stringify(attrs) })
+}
+
+export async function dreamMemories(scope: string): Promise<Memory[]> {
+  const { memories } = await apiCall<{ memories: Memory[] }>(`/api/dreams/${scope}/memories`, { method: "GET" })
+  return memories
+}
+
 // ── Tasks (see Loom.Cron, LoomWeb.TaskController) ─────────────────────────
 
 /**
@@ -655,4 +726,167 @@ export function deleteAgentOutputOrAttachment(
   path: string,
 ): Promise<void> {
   return source === "files" ? deleteAttachment(id, path) : deleteOutput(id, path)
+}
+
+// ── Virtual employees (see Loom.Employees, LoomWeb.EmployeeController) ────
+
+export type EmployeeStatus = "working" | "sleeping" | "paused" | "approval" | "blocked"
+export type KpiStatus = "todo" | "doing" | "review" | "done" | "parked"
+export type Priority = "high" | "normal" | "low"
+
+export type Kpi = {
+  id: string
+  title: string
+  detail: string | null
+  // What done means.
+  criteria: string | null
+  due: string | null
+  priority: Priority
+  progress: number
+  status: KpiStatus
+  // The employee's latest word on it.
+  note: string | null
+  created_at: number
+  updated_at: number
+}
+
+export type Report = { level: "info" | "important" | "urgent"; text: string; at?: number }
+
+export type Employee = {
+  id: string
+  name: string
+  role: string
+  persona: string
+  language: string
+  project_ids: string[]
+  projects: { id: string; name: string }[]
+  // Local hours [from, to), or null for all day.
+  hours: [number, number] | null
+  heartbeat_min: number
+  min_gap_min: number
+  max_turn_min: number
+  budget_usd: number
+  daily_report: string
+  // ISO weekday, 1 is Monday.
+  weekly_report: { day: number; time: string }
+  ask_first: string[]
+  // Chosen at hiring, for good.
+  backend: AgentBackend
+  model: string
+  // Where the backend reports no cost (Codex, Kiro), the budget is turns.
+  budget_turns: number
+  budget_unit: "usd" | "turns"
+  paused: boolean
+  status: EmployeeStatus
+  chat_session: string
+  work_session: string
+  created_at: number
+  kpis: Kpi[]
+  // Newest first: one line per work turn.
+  log: { at: number; summary?: string; report?: Report }[]
+  wake_at: number | null
+  wake_reason: string | null
+  last_wake_at: number | null
+  attention: Report | null
+  // In `budget_unit`.
+  spent_today: number
+  cap_today: number
+  // Dollars, where the backend reports them.
+  usd_today: number
+  // Day (YYYY-MM-DD, the user's) to dollars, and to turns.
+  spend_days: Record<string, number>
+  turn_days: Record<string, number>
+  workspace: string
+  // Things waiting for its next wake-up.
+  pending_notes: number
+}
+
+export type EmployeeSettings = Partial<
+  Pick<
+    Employee,
+    | "name"
+    | "role"
+    | "persona"
+    | "language"
+    | "project_ids"
+    | "hours"
+    | "heartbeat_min"
+    | "min_gap_min"
+    | "max_turn_min"
+    | "budget_usd"
+    | "budget_turns"
+    | "backend"
+    | "daily_report"
+    | "weekly_report"
+    | "ask_first"
+    | "model"
+  >
+>
+
+export type EmployeeReport = { file: string; kind: "daily" | "weekly"; title: string; mtime: number; size: number }
+
+const one = async (call: Promise<{ employee: Employee }>) => (await call).employee
+
+export function createEmployee(attrs: EmployeeSettings): Promise<Employee> {
+  return one(apiCall("/api/employees", { method: "POST", body: JSON.stringify(attrs) }))
+}
+
+export function updateEmployee(id: string, attrs: EmployeeSettings): Promise<Employee> {
+  return one(apiCall(`/api/employees/${id}`, { method: "PATCH", body: JSON.stringify(attrs) }))
+}
+
+/** Its sessions and workspace go with it. */
+export function deleteEmployee(id: string): Promise<void> {
+  return apiCall(`/api/employees/${id}`, { method: "DELETE" })
+}
+
+export function pauseEmployee(id: string, paused: boolean): Promise<Employee> {
+  return one(apiCall(`/api/employees/${id}/pause`, { method: "POST", body: JSON.stringify({ paused }) }))
+}
+
+export function wakeEmployee(id: string, note?: string): Promise<Employee> {
+  return one(apiCall(`/api/employees/${id}/wake`, { method: "POST", body: JSON.stringify({ note }) }))
+}
+
+/** What it reported has been read: the banner goes. */
+export function employeeSeen(id: string): Promise<Employee> {
+  return one(apiCall(`/api/employees/${id}/seen`, { method: "POST" }))
+}
+
+/** More budget, for today only. */
+export function approveEmployee(id: string, usd: number): Promise<Employee> {
+  return one(apiCall(`/api/employees/${id}/approve`, { method: "POST", body: JSON.stringify({ usd }) }))
+}
+
+export type KpiAttrs = Partial<Pick<Kpi, "title" | "detail" | "criteria" | "due" | "priority" | "progress" | "status" | "note">>
+
+export function addKpi(id: string, attrs: KpiAttrs): Promise<Employee> {
+  return one(apiCall(`/api/employees/${id}/kpis`, { method: "POST", body: JSON.stringify(attrs) }))
+}
+
+export function updateKpi(id: string, kpi: string, attrs: KpiAttrs): Promise<Employee> {
+  return one(apiCall(`/api/employees/${id}/kpis/${kpi}`, { method: "PATCH", body: JSON.stringify(attrs) }))
+}
+
+export function deleteKpi(id: string, kpi: string): Promise<Employee> {
+  return one(apiCall(`/api/employees/${id}/kpis/${kpi}`, { method: "DELETE" }))
+}
+
+/** Accept a KPI put up for review, or send it back with a note. */
+export function reviewKpi(id: string, kpi: string, accept: boolean, note?: string): Promise<Employee> {
+  return one(
+    apiCall(`/api/employees/${id}/kpis/${kpi}/review`, { method: "POST", body: JSON.stringify({ accept, note }) }),
+  )
+}
+
+export async function employeeReports(id: string): Promise<EmployeeReport[]> {
+  const { reports } = await apiCall<{ reports: EmployeeReport[] }>(`/api/employees/${id}/reports`, { method: "GET" })
+  return reports
+}
+
+export async function employeeReport(id: string, file: string): Promise<string> {
+  const { text } = await apiCall<{ text: string }>(`/api/employees/${id}/reports/${encodeURIComponent(file)}`, {
+    method: "GET",
+  })
+  return text
 }

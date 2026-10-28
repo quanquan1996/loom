@@ -1,4 +1,4 @@
-# Backends: Claude Code and Codex
+# Backends: Claude Code, Codex and Kiro
 
 Loom hands the agent itself to these two CLIs. Everything below was measured,
 not read from docs. Measured with Claude Code 2.1.296 and Codex 0.162.1, on
@@ -264,6 +264,36 @@ against the same local server (CC 2.1.300, `CLAUDE_CODE_MAX_RETRIES=2`):
 The switch lasts until the turn ends; the next one tries the usual model
 first. A model with a context window smaller than the conversation would fail
 there too, so the fallback should be a 1M one when the usual model is.
+
+## 6.14 Kiro CLI over ACP
+
+Kiro is a third backend (`Loom.Agent.Backend.Kiro`), measured with kiro-cli
+1.28.1 on 2026-10-28. `kiro-cli chat` is a TUI for a person (or one-shot text
+with `--no-interactive`); `kiro-cli acp` speaks the Agent Client Protocol,
+JSON-RPC on stdio, with typed streaming updates, cancel and resume, so that is
+what Loom drives. The process model is Claude Code's: one process per session,
+kept warm, released when idle.
+
+- **Handshake per spawn:** `initialize`, then `session/new` (the reply names
+  the conversation; persisted as `kiro_session_id`) or `session/load`, then
+  `session/prompt`, whose reply (`stopReason`) ends the turn. Text arrives as
+  `agent_message_chunk`, tools as `tool_call` / `tool_call_update`.
+- **`session/load` replays the conversation** as `session/update`s before it
+  answers. Dropped: they are history.
+- **Spawn `kiro-cli-chat`, kill the tree.** `kiro-cli` is a launcher; killed,
+  it leaves `kiro-cli-chat` holding the conversation's lock, and the next load
+  fails with "Session is active in another process".
+- **No system prompt in ACP.** Each session gets a Kiro agent,
+  `~/.kiro/agents/loom-<session>.json`, whose `prompt` is Loom's instructions,
+  with every tool, named by `--agent`. Unlike Claude Code it is read on every
+  spawn, so new instructions reach a running conversation.
+- **One prompt at a time:** no steering; a message mid-turn waits for the
+  turn's end. `session/cancel` (a notification) interrupts; the prompt then
+  answers `cancelled`.
+- **No cost:** `_kiro.dev/metadata` carries only `contextUsagePercentage`,
+  read as tokens of a 1M window. A virtual employee on Kiro (or Codex) has a
+  budget in turns a day instead of dollars.
+- **Login** is Kiro's own (`kiro-cli login`); Loom adds nothing.
 
 ## 7. Not done: permission prompts
 

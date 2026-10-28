@@ -1,5 +1,5 @@
 import { ChevronLeft, Maximize, Minimize, Plus, X } from "lucide-react"
-import { lazy, Suspense, useEffect, useRef, useState } from "react"
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react"
 import { Canvas } from "./Canvas"
 import { moved, touches, type CanvasItem } from "./canvasItems"
 import { Confirm } from "./Confirm"
@@ -13,6 +13,8 @@ import { SettingsDialog } from "./Settings"
 import { useSettings } from "./settings"
 import { Tasks } from "./Tasks"
 import { isOpen, PROJECTS_SECTION, Sidebar, sidebarOrder } from "./Sidebar"
+import { isDream, scopeOf, Sleep, type SleepTab } from "./Sleep"
+import { EmployeePage, HireDialog, isEmployeeSession, type EmployeeTab } from "./Employees"
 import { Terminal } from "./Terminal"
 // noVNC is only for the browser pane, so it loads when that is first opened.
 const Browser = lazy(() => import("./Browser").then((m) => ({ default: m.Browser })))
@@ -30,7 +32,9 @@ import {
   getToken,
   listSessions,
   onUnauthorized,
+  openDream,
   type AgentBackend,
+  type Employee,
   type Project,
 } from "./api"
 import { dropSocket } from "./socket"
@@ -73,10 +77,30 @@ function App() {
   // Opened from a notification: `?session=` names the session to show, and
   // goes from the address bar once read.
   const [activeId, setActiveId] = useState<string | null>(takeSessionParam)
-  const { sessions, devices, upsertDevice, projects, upsertProject, loaded, upsert, drop } = useLobby(
+  const {
+    sessions: everything,
+    devices,
+    upsertDevice,
+    projects,
+    upsertProject,
+    employees,
+    upsertEmployee,
+    dropEmployee,
+    loaded,
+    upsert,
+    drop,
+  } = useLobby(
     authed,
     push.endpoint ? { endpoint: push.endpoint, session: visible ? activeId : null } : null,
   )
+  // The sleep sessions stay out of every list; the moons open them. See Sleep.tsx.
+  // A virtual employee's two sessions likewise; its page opens them.
+  const sessions = useMemo(
+    () => everything.filter((s) => !isDream(s) && !isEmployeeSession(s)),
+    [everything],
+  )
+  const employeeSessions = useMemo(() => everything.filter(isEmployeeSession), [everything])
+  const dreams = useMemo(() => everything.filter(isDream), [everything])
   const narrow = useNarrow()
   // This device's appearance and default agent; see settings.ts.
   const [settings, changeSettings] = useSettings()
@@ -193,11 +217,11 @@ function App() {
   useEffect(() => {
     if (!loaded) return
     setActiveId((current) =>
-      current && sessions.some((s) => s.id === current)
+      current && everything.some((s) => s.id === current)
         ? current
         : (sessions[0]?.id ?? null),
     )
-  }, [loaded, sessions])
+  }, [loaded, everything, sessions])
 
   // What the sidebar has folded or unfolded against its defaults (see
   // `isOpen`). Remembered, like the sidebar.
@@ -243,10 +267,36 @@ function App() {
   // The main column shows the active session, or the Tasks page instead.
   const [view, setView] = useState<"chat" | "tasks">("chat")
 
+  // An employee's page shows one of its sessions, or a page of its own: which
+  // one is the tab, null for whichever session is the active one.
+  const [employeeTab, setEmployeeTab] = useState<EmployeeTab | null>(null)
+  const [hiring, setHiring] = useState(false)
+  // By id from the sidebar; the employee itself when it was only just hired.
+  const openEmployee = (which: string | Employee, tab: EmployeeTab = "chat") => {
+    const e = typeof which === "string" ? employees.find((x) => x.id === which) : which
+    if (!e) return
+    select(tab === "updates" ? e.work_session : e.chat_session)
+    setEmployeeTab(tab === "chat" || tab === "updates" ? null : tab)
+  }
+
   const select = (id: string) => {
+    setEmployeeTab(null)
     setActiveId(id)
     setView("chat")
     setDrawerOpen(false)
+  }
+
+  // A moon: the scope's sleep session, made on first use, on its report.
+  const [sleepTab, setSleepTab] = useState<SleepTab>("report")
+  const openSleep = async (scope: string) => {
+    let id = dreams.find((d) => scopeOf(d) === scope)?.id
+    if (!id) {
+      const made = await openDream(scope)
+      upsert(made)
+      id = made.id
+    }
+    setSleepTab("report")
+    select(id)
   }
 
   // A notification tapped while the app is already open: the worker names the
@@ -254,6 +304,7 @@ function App() {
   useEffect(() => {
     const onMessage = (e: MessageEvent) => {
       if (e.data?.type === "open-session" && typeof e.data.session === "string") {
+        setEmployeeTab(null)
         setActiveId(e.data.session)
         setDrawerOpen(false)
       }
@@ -420,6 +471,7 @@ function App() {
     "Space f": { desc: "full window", run: () => side !== null && toggleFull() },
     "Space n c": { desc: "new Claude Code session", run: () => void create("claude_code") },
     "Space n x": { desc: "new Codex session", run: () => void create("codex") },
+    "Space n k": { desc: "new Kiro session", run: () => void create("kiro") },
   }
   const keymap: Keymap = treeWalk
     ? {
@@ -478,7 +530,11 @@ function App() {
   if (!authed) return <Login onSuccess={() => setAuthed(true)} />
   if (!loaded) return <div className="loading">connecting…</div>
 
-  const active = sessions.find((s) => s.id === activeId) ?? null
+  const active = everything.find((s) => s.id === activeId) ?? null
+  // By its sessions rather than `employee_id`: a summary from an older
+  // server, or an older route, may not carry it.
+  const activeEmployee =
+    (active && employees.find((e) => e.chat_session === active.id || e.work_session === active.id)) ?? null
 
   const sidebar = (
     <Sidebar
@@ -520,8 +576,33 @@ function App() {
         if (narrow) setDrawerOpen(false)
         setSide((s) => (s === "browser" ? null : "browser"))
       }}
+      dreams={dreams}
+      onOpenDream={(scope) => void openSleep(scope)}
+      employees={employees}
+      employeeSessions={employeeSessions}
+      activeEmployeeId={view === "chat" ? (activeEmployee?.id ?? null) : null}
+      onOpenEmployee={(id) => openEmployee(id)}
+      onHire={() => {
+        setHiring(true)
+        setDrawerOpen(false)
+      }}
     />
   )
+
+  const chatProps = active && {
+    sidebarOpen: !narrow && sidebarOpen,
+    onToggleSidebar: () => (narrow ? setDrawerOpen(true) : setSidebarOpen((open) => !open)),
+    terminalOpen,
+    terminalCount: ptyIds.length,
+    onToggleTerminal: toggleTerminal,
+    canvasOpen: side === "canvas",
+    onToggleCanvas: toggleCanvas,
+    onOpenCanvas: (item: CanvasItem) => openCanvas(active.id, item),
+    onFilesChanged: (outputs: string[]) => {
+      setFilesRev((n) => n + 1)
+      refreshCanvas(active.id, outputs)
+    },
+  }
 
   return (
     <div className={"app" + (side !== null ? " side-open" : "") + (maximized ? " maximized" : "")}>
@@ -548,27 +629,37 @@ function App() {
               onToggleSidebar={() => (narrow ? setDrawerOpen(true) : setSidebarOpen(true))}
               onOpenSession={select}
             />
-          ) : active ? (
-            // Keyed by id so switching sessions rebuilds the channel and the
-            // transcript rather than mixing two conversations.
-            <Chat
+          ) : active && chatProps && activeEmployee ? (
+            <EmployeePage
+              key={activeEmployee.id}
+              employee={activeEmployee}
+              chatSession={everything.find((s) => s.id === activeEmployee.chat_session)}
+              workSession={everything.find((s) => s.id === activeEmployee.work_session)}
+              tab={employeeTab ?? (active.kind === "employee_work" ? "updates" : "chat")}
+              onTab={(tab) => openEmployee(activeEmployee.id, tab)}
+              onSeen={async (seq) => upsert(await updateAgent(activeEmployee.work_session, { seen_seq: seq }))}
+              onUpsert={upsertEmployee}
+              onDeleted={() => {
+                dropEmployee(activeEmployee.id)
+                select(sessions[0]?.id ?? "")
+              }}
+              projects={projects}
+              chat={chatProps}
+            />
+          ) : active && chatProps && isDream(active) ? (
+            <Sleep
               key={active.id}
               session={active}
-              sidebarOpen={!narrow && sidebarOpen}
-              onToggleSidebar={() =>
-                narrow ? setDrawerOpen(true) : setSidebarOpen((open) => !open)
-              }
-              terminalOpen={terminalOpen}
-              terminalCount={ptyIds.length}
-              onToggleTerminal={toggleTerminal}
-              canvasOpen={side === "canvas"}
-              onToggleCanvas={toggleCanvas}
-              onOpenCanvas={(item) => openCanvas(active.id, item)}
-              onFilesChanged={(outputs) => {
-                setFilesRev((n) => n + 1)
-                refreshCanvas(active.id, outputs)
-              }}
+              scopeName={projects.find((p) => p.id === scopeOf(active))?.name ?? "outside projects"}
+              tab={sleepTab}
+              onTab={setSleepTab}
+              onSeen={async (seq) => upsert(await updateAgent(active.id, { seen_seq: seq }))}
+              chat={chatProps}
             />
+          ) : active && chatProps ? (
+            // Keyed by id so switching sessions rebuilds the channel and the
+            // transcript rather than mixing two conversations.
+            <Chat key={active.id} session={active} {...chatProps} />
           ) : (
             <div className="placeholder">
               <p>No session selected.</p>
@@ -584,6 +675,9 @@ function App() {
                   onClick={() => create("codex")}
                 >
                   new Codex session
+                </button>
+                <button className="text-btn" onClick={() => create("kiro")}>
+                  new Kiro session
                 </button>
               </div>
             </div>
@@ -710,6 +804,16 @@ function App() {
             if (projectDialog === "new") reveal(project.id)
           }}
           onClose={() => setProjectDialog(null)}
+        />
+      )}
+      {hiring && (
+        <HireDialog
+          projects={projects}
+          onHired={(e) => {
+            upsertEmployee(e)
+            openEmployee(e)
+          }}
+          onClose={() => setHiring(false)}
         />
       )}
       {settingsOpen && (

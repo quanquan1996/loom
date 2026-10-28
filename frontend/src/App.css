@@ -934,6 +934,10 @@
   color: var(--blue);
 }
 
+.session-backend.kiro {
+  color: #a78bfa;
+}
+
 .session-queued {
   flex: 0 0 auto;
   min-width: 14px;

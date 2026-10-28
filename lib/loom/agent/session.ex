@@ -156,6 +156,13 @@ defmodule Loom.Agent.Session do
   def pin(id, pinned?), do: GenServer.call(via(id), {:pin, pinned?})
 
   @doc """
+  Record that the user has read the session up to `seq`. Local to loom, and
+  only ever moves forward. What the sleep session's unread mark is made of; see
+  `Loom.Dream`.
+  """
+  def seen(id, seq), do: GenServer.call(via(id), {:seen, seq})
+
+  @doc """
   Move the session into a project (by id), or out of any with nil.
 
   The conversation carries on where it is, from the project's workspace: the
@@ -216,6 +223,8 @@ defmodule Loom.Agent.Session do
         blank_state(id)
         | backend: backend,
           project_id: project && project.id,
+          kind: Keyword.get(opts, :kind),
+          employee_id: Keyword.get(opts, :employee),
           title: Keyword.get(opts, :title),
           created_at: now,
           last_active_at: now,
@@ -223,7 +232,9 @@ defmodule Loom.Agent.Session do
           outputs: outputs(id)
       }
 
-      case Backend.impl(backend).start(id, backend_meta(id, opts, project)) do
+      employee = {Keyword.get(opts, :employee), Keyword.get(opts, :kind)}
+
+      case Backend.impl(backend).start(id, backend_meta(id, opts, project, employee)) do
         {:ok, handle} ->
           state = %{state | handle: handle}
           persist_meta(state)
@@ -266,20 +277,34 @@ defmodule Loom.Agent.Session do
   # A session in a project starts in its workspace. One outside any project has
   # no root: the backend falls back to `:workspace` (or the user's home).
   # `:cwd` is a test or operator override.
-  defp backend_meta(id, opts, project) do
+  # `:model` pins Claude Code's model; a virtual employee's is chosen for it.
+  defp backend_meta(id, opts, project, employee) do
     cwd = Keyword.get(opts, :cwd) || (project && Loom.Projects.workspace(project))
     if cwd, do: File.mkdir_p!(cwd)
 
-    %{cc_cwd: cwd, codex_cwd: cwd, instructions: instructions(id, project)}
+    %{
+      cc_cwd: cwd,
+      codex_cwd: cwd,
+      cc_model: Keyword.get(opts, :model),
+      kiro_cwd: cwd,
+      kiro_model: Keyword.get(opts, :kiro_model),
+      instructions: instructions(id, project, employee)
+    }
   end
 
-  # Loom's own, plus the project's when there is one. Built again on every
-  # restore, so a renamed project or edited instructions are what the backend
-  # is told next.
-  defp instructions(id, nil), do: Output.instructions(id)
+  # Loom's own, plus the project's when there is one, or a virtual employee's
+  # standing orders (`Loom.Employees`). Built again on every restore, so a
+  # renamed project or edited instructions are what the backend is told next.
+  defp instructions(id, project, {employee_id, kind}) when is_binary(employee_id),
+    do: instructions(id, project, nil) <> "\n" <> Loom.Employees.Prompt.system(employee_id, kind)
 
-  defp instructions(id, project),
+  defp instructions(id, nil, _employee), do: Output.instructions(id)
+
+  defp instructions(id, project, _employee),
     do: Output.instructions(id) <> "\n" <> Loom.Projects.instructions(project)
+
+  # For a move between projects, which an employee's sessions never make.
+  defp instructions(id, project), do: instructions(id, project, nil)
 
   defp project_of(nil), do: nil
 
@@ -303,7 +328,16 @@ defmodule Loom.Agent.Session do
          {:ok, logs} <- Store.open_logs(id),
          project = project_of(meta[:project_id]),
          {:ok, handle} <-
-           reattach(backend, id, Map.put(meta, :instructions, instructions(id, project)), logs) do
+           reattach(
+             backend,
+             id,
+             Map.put(
+               meta,
+               :instructions,
+               instructions(id, project, {meta[:employee_id], meta[:kind]})
+             ),
+             logs
+           ) do
       transcript = Store.read_events(id, @transcript_limit)
 
       state = %{
@@ -312,6 +346,9 @@ defmodule Loom.Agent.Session do
           handle: handle,
           project_id: meta[:project_id],
           pinned: meta[:pinned] == true,
+          kind: if(is_binary(meta[:kind]), do: meta[:kind]),
+          employee_id: if(is_binary(meta[:employee_id]), do: meta[:employee_id]),
+          seen_seq: if(is_integer(meta[:seen_seq]), do: meta[:seen_seq], else: 0),
           notice: if(is_binary(meta[:notice]), do: meta[:notice]),
           title: meta[:title],
           created_at: meta[:created_at],
@@ -380,6 +417,14 @@ defmodule Loom.Agent.Session do
       project_id: nil,
       # Shown above everything else in the sidebar.
       pinned: false,
+      # nil for a conversation; "dream" for a project's sleep session, which
+      # the sidebar keeps out of its lists. See `Loom.Dream`.
+      kind: nil,
+      # The virtual employee whose chat or work this is, for "employee_chat"
+      # and "employee_work". See `Loom.Employees`.
+      employee_id: nil,
+      # How far the user has read, for an unread mark. See `seen/2`.
+      seen_seq: 0,
       # Told to the backend ahead of the next turn's message, once: what changed
       # about its project since the conversation began. See `moved_notice/2`.
       notice: nil,
@@ -488,6 +533,20 @@ defmodule Loom.Agent.Session do
     persist_meta(state)
     {:reply, :ok, state}
   end
+
+  def handle_call({:seen, seq}, _from, state) when is_integer(seq) do
+    seen = seq |> min(state.seq) |> max(state.seen_seq)
+
+    if seen == state.seen_seq do
+      {:reply, :ok, state}
+    else
+      state = %{state | seen_seq: seen}
+      persist_meta(state)
+      {:reply, :ok, state}
+    end
+  end
+
+  def handle_call({:seen, _seq}, _from, state), do: {:reply, {:error, :not_a_seq}, state}
 
   def handle_call({:move, _project_id}, _from, %{status: status} = state)
       when status in [:starting, :running] do
@@ -685,8 +744,9 @@ defmodule Loom.Agent.Session do
       })
 
     # What the backend receives differs from what is displayed: it needs the
-    # paths, the user does not want to read them.
-    message = Files.prompt(text, files)
+    # paths, the user does not want to read them. A caller with a long prompt
+    # of its own (`Loom.Dream`) shows a line and sends the whole of it.
+    message = Keyword.get(opts, :prompt) || Files.prompt(text, files)
 
     cond do
       state.classifying != nil ->
@@ -716,7 +776,8 @@ defmodule Loom.Agent.Session do
   # it could belong to: asked which, before the turn starts, so that the
   # session begins in the right place. See `Loom.Projects.Classifier`.
   defp classify?(state, text) do
-    state.project_id == nil and state.turns == 0 and String.trim(text) != "" and
+    state.project_id == nil and state.kind == nil and state.turns == 0 and
+      String.trim(text) != "" and
       classifier() != nil and Loom.Projects.list() != []
   end
 
@@ -802,6 +863,17 @@ defmodule Loom.Agent.Session do
     |> finish_turn()
   end
 
+  # What a turn cost, for budgets (`Loom.Employees`): told, not kept.
+  defp apply_out(state, {:event, :cost, %{usd: usd}}) do
+    Phoenix.PubSub.broadcast(
+      Loom.PubSub,
+      Loom.Agent.turns_topic(),
+      {:turn_cost, state.id, usd}
+    )
+
+    state
+  end
+
   defp apply_out(state, {:event, kind, payload}), do: emit(state, kind, payload)
 
   defp failure_message(%{reason: reason}) when is_binary(reason), do: reason
@@ -883,7 +955,7 @@ defmodule Loom.Agent.Session do
     Phoenix.PubSub.broadcast(
       Loom.PubSub,
       Loom.Agent.turns_topic(),
-      {:turn_ended, state.id, %{title: state.title, outcome: outcome}}
+      {:turn_ended, state.id, %{title: state.title, outcome: outcome, kind: state.kind}}
     )
 
     state
@@ -1031,6 +1103,9 @@ defmodule Loom.Agent.Session do
       backend: state.backend,
       project_id: state.project_id,
       pinned: state.pinned,
+      kind: state.kind,
+      employee_id: state.employee_id,
+      seen_seq: state.seen_seq,
       notice: state.notice,
       title: state.title,
       created_at: state.created_at,
@@ -1104,6 +1179,9 @@ defmodule Loom.Agent.Session do
       backend_label: Backend.label(state.backend),
       project_id: state.project_id,
       pinned: state.pinned,
+      kind: state.kind,
+      employee_id: state.employee_id,
+      seen_seq: state.seen_seq,
       title: state.title,
       created_at: state.created_at,
       last_active_at: state.last_active_at,

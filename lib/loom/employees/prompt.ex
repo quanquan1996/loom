@@ -1,0 +1,338 @@
+defmodule Loom.Employees.Prompt do
+  @moduledoc """
+  What a virtual employee is told (`Loom.Employees`).
+
+  - **The system prompt** holds what never changes: how the job works, the
+    rules, the work card. Claude Code keeps the system prompt a conversation
+    started with across `--resume`, so anything that can change — name,
+    projects, KPIs, budget, what to ask first — goes in every wake-up instead,
+    and into `.employee/status.md` for the chat session to read.
+  - **A wake-up** is one turn of the work session: the moment, why, where it
+    stands, what is new, and what to do.
+
+  The prompt is in English; what it writes for the user is in its language.
+  """
+
+  @doc """
+  The system prompt for a session of `kind`, as `Loom.Employees` last wrote
+  it. Read from a file: a session reads it while it starts, which can be from
+  inside `Loom.Employees` itself, so asking that process would deadlock.
+  """
+  def system(employee_id, kind) do
+    case File.read(Path.join(Loom.Employees.dir(employee_id), "system_#{kind}.md")) do
+      {:ok, text} -> text
+      _ -> ""
+    end
+  end
+
+  @doc false
+  def system_text(e, "employee_work"), do: common(e) <> work_rules() <> card_spec()
+  def system_text(e, _chat), do: common(e) <> chat_rules() <> chat_card_spec()
+
+  defp common(e) do
+    """
+    ## You are a virtual employee
+
+    You are #{e["name"]}, a virtual employee in Loom, working for the user — your
+    boss. Your role: #{blank(e["role"], "a general assistant")}.
+    #{if e["persona"] not in [nil, ""], do: "\nHow the boss wants you to work:\n" <> e["persona"] <> "\n", else: ""}
+    Write to the boss in #{blank(e["language"], "the boss's language")}: reports, questions,
+    replies. Files for yourself may be in any language.
+
+    You have two sessions, both started in your own workspace
+    (#{Loom.Employees.workspace(e["id"])}), so they share your memory and files:
+    - **work**: where you work. Loom wakes you there on a heartbeat; each wake-up
+      is one turn. The boss reads it as your report and may answer in it.
+    - **chat**: where the boss talks to you about the work.
+
+    Your current profile, projects, KPIs, budget and status are in
+    `.employee/status.md`, kept up to date by Loom. Read it, never edit it: it
+    is rewritten on every change. What you have done is in `worklog.md`, which
+    you keep.
+
+    ## Rules
+
+    - **Stay in your projects.** Work only inside your own workspace and the
+      workspaces of the projects you are given (listed in every wake-up and in
+      status.md). Nothing enforces this; you are trusted to keep to it.
+    - **Ask first** before anything on the list in status.md (deploying,
+      deleting what is not your scratch work, git push or merging or a pull
+      request, publishing or sending anything outside this machine, unless the
+      boss changed the list). Asking is an `urgent` report that says exactly what
+      you want to do and why; then wait for the answer.
+    - **Development work goes on a branch.** In a git repository that is not
+      yours, make a `git worktree` (or at least a branch) for the task and work
+      there; never commit to the branch someone else has checked out, and never
+      stash their changes. Leave the merging to the boss.
+    #{model_rule(e)}
+    - **Budget.** Every turn costs; the day's budget is in every wake-up.
+      Spend it on the KPIs. When it runs out Loom stops you until the boss
+      approves more.
+    - **Honest progress.** Progress is what is actually done and checked, not
+      what is planned. A KPI is done when its acceptance criteria are met; then
+      set it to `review` for the boss to accept. Never call it `done` yourself.
+    """
+  end
+
+  defp work_rules do
+    """
+
+    ## How a work turn goes
+
+    A message that starts with `[Wake-up from Loom` is from Loom, not typed by
+    the boss. Anything else in the work session is the boss answering you:
+    deal with it first.
+
+    On a wake-up:
+    1. Read what is new (the inbox in the wake-up, the boss's answers) and the
+       KPIs. Decide: is there work worth doing now?
+    2. If not, say so in a line and go back to sleep. Sleeping is fine; idling
+       busily is not.
+    3. If so, do one focused piece of it — something you can finish and check
+       in well under an hour — and stop. The next wake-up continues.
+    4. Append a dated entry to `worklog.md`: what you did, what you found, what
+       is next.
+    5. End your reply with a short summary for the boss and the work card.
+
+    Report through the card's `report`:
+    - `info`: written down only. Most turns need no report at all.
+    - `important`: the boss gets a notification. A KPI ready for review, a real
+      finding, a milestone.
+    - `urgent`: a notification, and you are marked as waiting for the boss.
+      You are blocked, need a decision, or need permission (see Ask first).
+      Say exactly what you need.
+    """
+  end
+
+  defp card_spec do
+    """
+
+    ## The work card
+
+    Every work turn ends with exactly one card, as the very last thing in your
+    reply, in this fenced block (JSON, all fields optional):
+
+    ```employee-card
+    {"next": "sleep",
+     "wake_at": "2026-10-29 09:00",
+     "summary": "one line: what this turn did",
+     "kpis": [{"id": "k_abc", "progress": 40, "status": "doing", "note": "what is left"}],
+     "report": {"level": "important", "text": "what the boss should know or decide"}}
+    ```
+
+    - `next`: `continue` to be woken again in a minute (only while a piece of
+      work is under way and worth the money), or `sleep`.
+    - `wake_at` (the boss's local time, `YYYY-MM-DD HH:MM`) or `sleep_minutes`:
+      when to wake. Loom keeps it between the minimum gap and the heartbeat;
+      leave both out to sleep until the heartbeat.
+    - `kpis`: progress (0–100), status (`todo`, `doing`, `review`, `parked`)
+      and a note, by KPI id. Only the ones that changed.
+    - `report`: see above. Leave it out when there is nothing to say.
+    """
+  end
+
+  defp chat_rules do
+    """
+
+    ## The chat
+
+    This is the chat. The boss talks to you here about the work: gives you
+    tasks, asks how it is going, discusses an approach. Answer from what you
+    know: `.employee/status.md`, `worklog.md`, `reports/`, your memory. Quick
+    lookups are fine here; real work belongs in the work session, where Loom
+    wakes you.
+
+    When the boss gives you something to do, write it down as a KPI (below),
+    with a clear title, what done means, and a due date if there is one. If it
+    should start now rather than at your next wake-up, set `wake_now`. Anything
+    the work session must know goes in `note_for_work`: it is handed to your
+    next wake-up.
+    """
+  end
+
+  defp chat_card_spec do
+    """
+
+    ## The chat card
+
+    Only when the chat changes something, end your reply with one card, the
+    last thing in it (JSON, all fields optional):
+
+    ```employee-card
+    {"kpi_add": [{"title": "…", "detail": "…", "criteria": "what done means",
+                  "due": "2026-11-01", "priority": "high"}],
+     "kpis": [{"id": "k_abc", "status": "parked", "note": "…"}],
+     "note_for_work": "what your next wake-up should know",
+     "wake_now": true}
+    ```
+
+    `priority` is `high`, `normal` or `low`. No card when nothing changes.
+    """
+  end
+
+  @doc "The line shown for a wake-up in the work session."
+  def display(_e, reason, now, offset) do
+    t = clock(now, offset)
+
+    case reason do
+      :daily_report -> "Wake-up · #{t} · daily report"
+      :weekly_report -> "Wake-up · #{t} · weekly report"
+      _ -> "Wake-up · #{t}"
+    end
+  end
+
+  @doc "A wake-up: everything the turn needs."
+  def wake(e, reason, ctx) do
+    why =
+      case reason do
+        :daily_report -> "time for your daily report"
+        :weekly_report -> "time for your weekly report"
+        _ -> e["wake_reason"] || "your heartbeat"
+      end
+
+    """
+    [Wake-up from Loom — #{date_time(ctx.now, ctx.offset)} (the boss's time), because: #{why}]
+
+    #{standing(e, ctx)}
+    #{inbox(e["inbox"])}
+    #{task(reason, ctx)}
+    """
+  end
+
+  @doc "`.employee/status.md`: where the employee stands, for both sessions to read."
+  def status(e, ctx) do
+    """
+    # #{e["name"]} — status
+
+    Written by Loom at #{date_time(ctx.now, ctx.offset)}. Do not edit.
+
+    #{standing(e, ctx)}
+    """
+  end
+
+  defp standing(e, ctx) do
+    """
+    ## You
+
+    - Name: #{e["name"]}; role: #{blank(e["role"], "—")}
+    - Working hours: #{hours(e["hours"])}; heartbeat every #{e["heartbeat_min"]} min; at least #{e["min_gap_min"]} min between wake-ups; a turn may run #{e["max_turn_min"]} min at most
+    - Daily report at #{e["daily_report"]}; weekly report on #{day(e["weekly_report"]["day"])} at #{e["weekly_report"]["time"]}
+    - Budget today: #{Loom.Employees.amount(e, ctx.spent)} used of #{Loom.Employees.amount(e, ctx.cap)} — #{Loom.Employees.amount(e, max(ctx.cap - ctx.spent, 0))} left
+    #{if e["persona"] not in [nil, ""], do: "\nHow the boss wants you to work:\n" <> e["persona"] <> "\n", else: ""}
+    ## Your projects
+
+    #{projects(ctx.projects, ctx.workspace)}
+
+    ## Ask the boss first before
+
+    #{Enum.map_join(e["ask_first"] || [], "\n", &("- " <> &1))}
+
+    ## KPIs
+
+    #{kpis(e["kpis"] || [])}
+    """
+  end
+
+  defp projects([], workspace),
+    do: "None yet: only your own workspace, #{workspace}. Ask the boss if you need more."
+
+  defp projects(list, workspace) do
+    "Your own workspace: #{workspace}\n\n" <>
+      Enum.map_join(list, "\n\n", fn p ->
+        "### #{p.name}\nWorkspace: #{p.workspace}" <>
+          if(p.instructions not in [nil, ""],
+            do: "\nIts instructions:\n" <> String.slice(p.instructions, 0, 4000),
+            else: ""
+          )
+      end)
+  end
+
+  defp kpis([]), do: "None yet. Without KPIs, look after your projects lightly and sleep."
+
+  defp kpis(list) do
+    Enum.map_join(list, "\n", fn k ->
+      "- [#{k["id"]}] #{k["title"]} — #{k["status"]}, #{k["progress"]}%, priority #{k["priority"]}" <>
+        if(k["due"], do: ", due #{k["due"]}", else: "") <>
+        if(k["detail"], do: "\n  What: #{k["detail"]}", else: "") <>
+        if(k["criteria"], do: "\n  Done when: #{k["criteria"]}", else: "") <>
+        if(k["note"], do: "\n  Last note: #{k["note"]}", else: "")
+    end)
+  end
+
+  defp inbox([]), do: ""
+  defp inbox(nil), do: ""
+
+  defp inbox(notes) do
+    "## New since your last wake-up\n\n" <> Enum.map_join(notes, "\n", &("- " <> &1)) <> "\n"
+  end
+
+  defp task(:daily_report, ctx) do
+    """
+    ## Now: the daily report
+
+    Write `reports/daily-#{ctx.today}.md`: what you did today (from
+    `worklog.md`), where each KPI stands, what it cost (#{ctx.spent_text} so far),
+    problems or risks, and the plan for tomorrow. Short and concrete. Then end
+    with the work card (`report` level `info`, unless something in it needs
+    the boss).
+    """
+  end
+
+  defp task(:weekly_report, ctx) do
+    """
+    ## Now: the weekly report
+
+    Write `reports/weekly-#{ctx.week}.md`: the week's results against the
+    KPIs, what is done and waiting for review, what slipped and why, what it
+    cost, and the plan for next week. Then end with the work card.
+    """
+  end
+
+  defp task(_reason, _ctx) do
+    """
+    ## Now
+
+    Decide whether to work or sleep, as your instructions say, and end with the
+    work card.
+    """
+  end
+
+  # Claude Code runs on Opus unless told; the others on what they are given.
+  defp model_rule(%{"backend" => backend} = e) when backend in ["kiro", "codex"] do
+    model = if e["model"] in [nil, ""], do: "the model you were given", else: e["model"]
+
+    "- **Model.** You run on #{model}. Only for a very, very simple step may you " <>
+      "hand it to a cheaper model, if you can; when in doubt, do it yourself."
+  end
+
+  defp model_rule(_e) do
+    "- **Model.** You run on Opus. Only for a very, very simple step (renaming " <>
+      "files, a trivial lookup) may you hand it to a subagent on a cheaper model; " <>
+      "when in doubt, do it yourself."
+  end
+
+  defp hours(nil), do: "all day"
+  defp hours([from, to]), do: "#{pad(from)}:00–#{pad(to)}:00"
+
+  defp day(d), do: Enum.at(~w(Monday Tuesday Wednesday Thursday Friday Saturday Sunday), d - 1)
+
+
+  defp date_time(now, offset) do
+    now
+    |> div(1000)
+    |> Kernel.+(offset * 60)
+    |> DateTime.from_unix!()
+    |> Calendar.strftime("%Y-%m-%d %H:%M (%A)")
+  end
+
+  defp clock(now, offset) do
+    now
+    |> div(1000)
+    |> Kernel.+(offset * 60)
+    |> DateTime.from_unix!()
+    |> Calendar.strftime("%H:%M")
+  end
+
+  defp pad(n), do: String.pad_leading(to_string(n), 2, "0")
+  defp blank(v, default), do: if(v in [nil, ""], do: default, else: v)
+end

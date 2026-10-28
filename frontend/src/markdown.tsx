@@ -1,6 +1,7 @@
 import { Check, Copy, Square as SquareIcon, SquareCheck } from "lucide-react"
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
 import { marked, type Token, type Tokens } from "marked"
+import { WorkCard } from "./WorkCard"
 
 /**
  * Markdown for assistant messages, rendered from `marked`'s token stream.
@@ -71,6 +72,9 @@ function Block({ token }: { token: Token }): ReactNode {
 
     case "code": {
       const t = token as Tokens.Code
+      // What a virtual employee ends a turn with, for Loom: shown as what it
+      // means rather than as JSON. See `WorkCard.tsx`.
+      if (t.lang === "employee-card") return <WorkCard text={t.text} />
       return (
         <div className="code-block">
           <pre className="code">{t.text}</pre>

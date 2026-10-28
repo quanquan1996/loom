@@ -6,6 +6,7 @@ import {
   ChevronDown,
   ChevronRight,
   Clock as ClockIcon,
+  Moon,
   PanelLeftOpen,
   Plus,
   Square,
@@ -63,6 +64,11 @@ type Props = {
   // A turn left outputs (their top-level paths), or a message brought
   // attachments (no paths).
   onFilesChanged: (outputs: string[]) => void
+  // Beside the title: the sleep session's tabs (see `Sleep.tsx`).
+  tabs?: ReactNode
+  // Under the header, across the whole column: a virtual employee's tabs and
+  // where it stands (see `Employees.tsx`).
+  subhead?: ReactNode
 }
 
 // How a card or link deep in the transcript opens something in the canvas.
@@ -79,6 +85,8 @@ export function Chat({
   onToggleCanvas,
   onOpenCanvas,
   onFilesChanged,
+  tabs,
+  subhead,
 }: Props) {
   const { transcript, joinError, submit, interrupt, dropQueued, rename } = useAgent(
     session.id,
@@ -155,6 +163,7 @@ export function Chat({
           backendLabel={session.backend_label}
           onRename={rename}
         />
+        {tabs}
 
         <div className="chat-meta">
           <StatusPill
@@ -197,6 +206,7 @@ export function Chat({
           </button>
         </div>
       </header>
+      {subhead}
 
       {joinError && <div className="chat-banner">{joinError}</div>}
 
@@ -425,6 +435,7 @@ function ItemView({ item, sessionId, onAnswer }: ItemProps) {
           {item.queued && <span className="tag">queued</span>}
           {item.origin === "phone" && <span className="tag">phone</span>}
           {item.origin === "cron" && <span className="tag"><ClockIcon /> cron</span>}
+          {item.origin === "dream" && <span className="tag"><Moon /> dream</span>}
           {item.at && <Clock at={item.at} />}
         </div>
       )

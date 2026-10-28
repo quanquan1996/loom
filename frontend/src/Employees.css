@@ -1,0 +1,823 @@
+/* ── Virtual employees ─────────────────────────────────────────────────────
+   After ChatGPT: round avatars, pill tabs that scroll sideways on a phone,
+   cards a shade above the page. Built from the theme's own colours, so the
+   light appearance needs nothing of its own. Amber is the one colour of
+   its own: the budget. */
+
+:root {
+  --emp-amber: #f5b942;
+  --emp-card: color-mix(in srgb, var(--fg) 5%, var(--bg));
+  --emp-card-hover: color-mix(in srgb, var(--fg) 8%, var(--bg));
+}
+
+.emp-avatar {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: #fff;
+  font-weight: 600;
+  line-height: 1;
+  user-select: none;
+}
+
+.emp-avatar.sm {
+  width: 1.5rem;
+  height: 1.5rem;
+  font-size: 0.75rem;
+}
+
+.emp-avatar.md {
+  width: 1.75rem;
+  height: 1.75rem;
+  font-size: 0.85rem;
+}
+
+.emp-avatar.lg {
+  width: 2.5rem;
+  height: 2.5rem;
+  font-size: 1.1rem;
+}
+
+.emp-title {
+  margin-right: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.emp-title-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.emp-title-role {
+  color: var(--fg-dim);
+  font-size: 0.85rem;
+  font-weight: 400;
+}
+
+/* ── The bar under the header ───────────────────────────────────────── */
+
+.emp-bar {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 16px 10px;
+  border-bottom: 1px solid var(--line);
+  font-family: var(--ui);
+}
+
+.emp-tabs {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  /* The pills run to the edge on a phone, as ChatGPT's chips do. */
+  margin: 0 -16px;
+  padding: 0 16px;
+}
+
+.emp-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.emp-tab {
+  position: relative;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--fg-dim);
+  font: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.emp-tab svg {
+  width: 15px;
+  height: 15px;
+}
+
+.emp-tab:hover {
+  color: var(--fg);
+  background: var(--emp-card);
+}
+
+.emp-tab.on {
+  border-color: transparent;
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.emp-tab-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--red);
+}
+
+.emp-tab-count {
+  min-width: 1.1rem;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--blue);
+  color: #fff;
+  font-size: 0.7rem;
+  line-height: 1.1rem;
+  text-align: center;
+}
+
+.emp-state {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  font-size: 0.85rem;
+}
+
+.emp-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.emp-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--fg-dim);
+}
+
+.emp-status.green .emp-status-dot {
+  background: var(--green);
+  animation: emp-pulse 1.6s ease-in-out infinite;
+}
+
+.emp-status.amber .emp-status-dot {
+  background: var(--emp-amber);
+}
+
+.emp-status.red .emp-status-dot {
+  background: var(--red);
+}
+
+@keyframes emp-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.emp-spend {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.emp-spend svg {
+  width: 14px;
+  height: 14px;
+  color: var(--fg-dim);
+}
+
+.emp-state-actions {
+  display: inline-flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.emp-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.emp-pill svg {
+  width: 13px;
+  height: 13px;
+}
+
+.emp-pill:hover {
+  background: var(--emp-card-hover);
+}
+
+.emp-pill.strong {
+  border-color: transparent;
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.emp-pill.strong:hover {
+  opacity: 0.85;
+}
+
+.emp-dim {
+  color: var(--fg-dim);
+}
+
+.emp-error {
+  color: var(--red);
+  font-size: 0.85rem;
+}
+
+.emp-approval {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--emp-amber) 14%, transparent);
+  font-size: 0.875rem;
+}
+
+.emp-approval-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.emp-approval-custom {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+
+.emp-approval-custom input {
+  width: 3.5rem;
+  padding: 5px 0;
+  border: 0;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  font-size: 16px;
+  outline: none;
+}
+
+.emp-attention {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 9px 14px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--emp-card);
+  color: var(--fg);
+  font: inherit;
+  font-size: 0.875rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.emp-attention svg {
+  flex: 0 0 auto;
+  width: 15px;
+  height: 15px;
+  margin-top: 2px;
+  color: var(--blue);
+}
+
+.emp-attention.urgent {
+  background: color-mix(in srgb, var(--red) 13%, transparent);
+}
+
+.emp-attention.urgent svg {
+  color: var(--red);
+}
+
+.emp-attention span {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ── Panes ──────────────────────────────────────────────────────────── */
+
+.emp-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 16px 48px;
+  font-family: var(--ui);
+}
+
+.emp-column {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: var(--measure);
+  margin: 0 auto;
+}
+
+.emp-section {
+  margin: 18px 0 2px;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.emp-empty {
+  padding: 20px 4px;
+  color: var(--fg-dim);
+}
+
+.emp-summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.emp-stat {
+  min-width: 5.5rem;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: var(--emp-card);
+  font-size: 0.8rem;
+}
+
+.emp-stat-value {
+  font-size: 1.15rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.emp-new {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--fg);
+  color: var(--bg);
+  font: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.emp-new svg {
+  width: 15px;
+  height: 15px;
+}
+
+.kpi-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: var(--emp-card);
+  cursor: pointer;
+}
+
+.kpi-card:hover {
+  background: var(--emp-card-hover);
+}
+
+.kpi-card.done,
+.kpi-card.parked {
+  opacity: 0.6;
+}
+
+.kpi-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.75rem;
+}
+
+.kpi-status {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--line);
+  color: var(--fg-dim);
+  font-weight: 500;
+}
+
+.kpi-status.doing {
+  background: color-mix(in srgb, var(--blue) 18%, transparent);
+  color: var(--blue);
+}
+
+.kpi-status.review {
+  background: color-mix(in srgb, var(--emp-amber) 20%, transparent);
+  color: var(--emp-amber);
+}
+
+.kpi-status.done {
+  background: color-mix(in srgb, var(--green) 18%, transparent);
+  color: var(--green);
+}
+
+.kpi-prio {
+  text-transform: capitalize;
+  color: var(--fg-dim);
+}
+
+.kpi-prio.high {
+  color: var(--red);
+}
+
+.kpi-due {
+  margin-left: auto;
+}
+
+.kpi-title {
+  font-weight: 600;
+}
+
+.kpi-criteria,
+.kpi-note {
+  color: var(--fg-dim);
+  font-size: 0.85rem;
+}
+
+.kpi-note {
+  font-style: italic;
+}
+
+.kpi-progress,
+.emp-spend-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.kpi-track {
+  flex: 1 1 auto;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--line);
+}
+
+.kpi-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--green);
+  transition: width 0.3s;
+}
+
+.kpi-fill.over {
+  background: var(--emp-amber);
+}
+
+.kpi-review {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.emp-report-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--emp-card);
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.emp-report-row:hover {
+  background: var(--emp-card-hover);
+}
+
+.emp-report-kind {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--line);
+  font-size: 0.75rem;
+}
+
+.emp-report-kind.weekly {
+  background: color-mix(in srgb, var(--blue) 18%, transparent);
+  color: var(--blue);
+}
+
+.emp-report-title {
+  flex: 1 1 auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.emp-back {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px 4px 4px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--fg-dim);
+  font: inherit;
+  cursor: pointer;
+}
+
+.emp-back:hover {
+  color: var(--fg);
+}
+
+.emp-back svg {
+  width: 16px;
+  height: 16px;
+}
+
+.emp-report {
+  padding: 4px 2px;
+}
+
+.emp-log-row {
+  display: flex;
+  gap: 12px;
+  font-size: 0.875rem;
+}
+
+.emp-log-when {
+  flex: 0 0 6.5rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.emp-log-report.important {
+  color: var(--blue);
+}
+
+.emp-log-report.urgent {
+  color: var(--red);
+}
+
+.emp-spend-row > span:first-child {
+  flex: 0 0 3rem;
+}
+
+.emp-spend-row > span:last-child {
+  flex: 0 0 4rem;
+  text-align: right;
+}
+
+/* ── Forms: the project dialog's, with rows and chips ───────────────── */
+
+.emp-settings {
+  gap: 12px;
+}
+
+.emp-form-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.emp-form-row > label {
+  flex: 1 1 8rem;
+  min-width: 0;
+}
+
+.emp-settings textarea,
+.emp-modal select,
+.emp-settings select {
+  font: inherit;
+  font-size: 16px;
+}
+
+.emp-modal select,
+.emp-settings select,
+.emp-settings > textarea {
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-field);
+  color: var(--fg);
+}
+
+.emp-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.emp-field > .emp-dim,
+.emp-field > small {
+  font-size: 0.85rem;
+}
+
+.emp-field-label {
+  font-size: 0.85rem;
+  color: var(--fg-dim);
+}
+
+.emp-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.emp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--fg-dim);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.emp-chip svg {
+  width: 13px;
+  height: 13px;
+}
+
+.emp-chip.on {
+  border-color: transparent;
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.emp-settings-actions {
+  margin-top: 12px;
+}
+
+.emp-modal.wide {
+  width: min(36rem, calc(100vw - 32px));
+}
+
+.emp-modal {
+  max-height: calc(100dvh - 48px);
+  overflow-y: auto;
+}
+
+/* ── The sidebar ─────────────────────────────────────────────────────── */
+
+.emp-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.emp-row:hover,
+.emp-row.active {
+  background: var(--bg-card);
+}
+
+.emp-row-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
+.emp-row-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.emp-row-sub {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--fg-dim);
+  font-size: 0.75rem;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.emp-row-sub .emp-status-dot {
+  width: 6px;
+  height: 6px;
+}
+
+.emp-row-sub.green .emp-status-dot {
+  background: var(--green);
+  animation: emp-pulse 1.6s ease-in-out infinite;
+}
+
+.emp-row-sub.amber .emp-status-dot {
+  background: var(--emp-amber);
+}
+
+.emp-row-sub.red .emp-status-dot {
+  background: var(--red);
+}
+
+.emp-row-news {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--red);
+}
+
+.emp-hire-row {
+  color: var(--fg-dim);
+}
+
+.emp-hire-row svg {
+  width: 1.75rem;
+  height: 1rem;
+}
+
+/* ── The work card, in the transcript (WorkCard.tsx) ─────────────────── */
+
+.work-card {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 8px 0;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  font-family: var(--ui);
+  font-size: 0.85rem;
+}
+
+.work-card.pending {
+  color: var(--fg-dim);
+}
+
+.work-card.important {
+  border-color: color-mix(in srgb, var(--blue) 45%, transparent);
+}
+
+.work-card.urgent {
+  border-color: color-mix(in srgb, var(--red) 50%, transparent);
+}
+
+.work-card-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.work-card-row svg {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  margin-top: 2px;
+  color: var(--fg-dim);
+}
+
+.work-card.important .work-card-report svg {
+  color: var(--blue);
+}
+
+.work-card.urgent .work-card-report svg {
+  color: var(--red);
+}
+
+.work-card-dim {
+  color: var(--fg-dim);
+}
+
+@media (max-width: 640px) {
+  .emp-state-actions {
+    margin-left: 0;
+  }
+
+  .emp-approval-actions {
+    margin-left: 0;
+  }
+
+  .emp-log-when {
+    flex-basis: 5.5rem;
+  }
+}

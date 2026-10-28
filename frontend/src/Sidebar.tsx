@@ -15,12 +15,16 @@ import {
   Pin,
   Plus,
   Settings,
+  UserPlus,
+  Users,
 } from "lucide-react"
 import { useEffect, useState } from "react"
-import type { AgentBackend, AgentInfo, Device, Project } from "./api"
+import type { AgentBackend, AgentInfo, Device, Employee, Project } from "./api"
+import { Avatar, hasNews, short, STATUS } from "./Employees"
 import { RenameInput } from "./Confirm"
 import { DevicesDialog } from "./Devices"
 import { SessionMenu } from "./SessionMenu"
+import { MoonButton, scopeOf } from "./Sleep"
 import { backendShort } from "./format"
 import type { Push } from "./push"
 import { lastActive } from "./useLobby"
@@ -33,9 +37,11 @@ import { lastActive } from "./useLobby"
 export const PROJECTS_SECTION = "section:projects"
 export const SESSIONS_SECTION = "section:sessions"
 export const PINNED_SECTION = "section:pinned"
+export const EMPLOYEES_SECTION = "section:employees"
 
+const OPEN_AT_FIRST = [SESSIONS_SECTION, PINNED_SECTION, EMPLOYEES_SECTION]
 export const isOpen = (toggled: Set<string>, key: string) =>
-  key === SESSIONS_SECTION || key === PINNED_SECTION ? !toggled.has(key) : toggled.has(key)
+  OPEN_AT_FIRST.includes(key) ? !toggled.has(key) : toggled.has(key)
 
 /**
  * The sidebar's lists, which overlap on purpose: each project (most recently
@@ -104,6 +110,16 @@ type Props = {
   // What "+" starts, with no menu to choose from; see Settings.
   defaultBackend: AgentBackend
   onOpenSettings: () => void
+  // The sleep sessions, which the lists leave out: one moon each. See Sleep.tsx.
+  dreams: AgentInfo[]
+  onOpenDream: (scope: string) => void
+  // Virtual employees, and their work sessions for the unread mark; see
+  // Employees.tsx. The one whose page is showing, if any.
+  employees: Employee[]
+  employeeSessions: AgentInfo[]
+  activeEmployeeId: string | null
+  onOpenEmployee: (id: string) => void
+  onHire: () => void
 }
 
 export function Sidebar({
@@ -133,6 +149,13 @@ export function Sidebar({
   onToggleBrowser,
   defaultBackend,
   onOpenSettings,
+  dreams,
+  onOpenDream,
+  employees,
+  employeeSessions,
+  activeEmployeeId,
+  onOpenEmployee,
+  onHire,
 }: Props) {
   // Ages are relative, so they go stale without any new data. A local clock,
   // not a poll: nothing is fetched.
@@ -149,6 +172,8 @@ export function Sidebar({
   const [menu, setMenu] = useState<{ id: string; anchor: DOMRect } | null>(null)
   const menuFor = menu && sessions.find((s) => s.id === menu.id)
   const projectName = (s: AgentInfo) => projects.find((p) => p.id === s.project_id)?.name
+  const dreamOf = (scope: string) => dreams.find((d) => scopeOf(d) === scope)
+  const homeDream = dreamOf("home")
 
   const row = (s: AgentInfo, nested: boolean) => (
     <div
@@ -265,6 +290,15 @@ export function Sidebar({
                         <Settings />
                       </button>
                     </span>
+                    {/* Nothing to sleep on until something has happened here. */}
+                    {(inside.length > 0 || dreamOf(project.id)) && (
+                      <MoonButton
+                        dream={dreamOf(project.id)}
+                        active={dreamOf(project.id)?.id === activeId}
+                        what={` — ${project.name}`}
+                        onOpen={() => onOpenDream(project.id)}
+                      />
+                    )}
                     {inside.length > 0 && <span className="nav-count">{inside.length}</span>}
                   </div>
                   {unfolded && (
@@ -276,6 +310,58 @@ export function Sidebar({
                       )}
                     </div>
                   )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* Virtual employees: a row each, with where it stands. Open until folded. */}
+        <div
+          className={"nav-item" + (open(EMPLOYEES_SECTION) ? " open" : "")}
+          role="button"
+          aria-expanded={open(EMPLOYEES_SECTION)}
+          onClick={() => onToggle(EMPLOYEES_SECTION)}
+        >
+          <Users className="nav-icon" />
+          <span className="nav-label">Employees</span>
+          {employees.length > 0 && <span className="nav-count">{employees.length}</span>}
+          <span className="nav-actions" onClick={(e) => e.stopPropagation()}>
+            <button className="session-del nav-btn" onClick={onHire} title="Hire a virtual employee">
+              <UserPlus />
+            </button>
+          </span>
+          <ChevronRight className="nav-chevron" />
+        </div>
+        {open(EMPLOYEES_SECTION) && (
+          <div className="nav-children">
+            {employees.length === 0 && (
+              <button className="project-row project-new-row" onClick={onHire}>
+                <UserPlus className="project-icon" />
+                <span className="session-label">Hire one</span>
+              </button>
+            )}
+            {employees.map((e) => {
+              const status = STATUS[e.status]
+              const news = hasNews(employeeSessions.find((s) => s.id === e.work_session))
+              return (
+                <div
+                  key={e.id}
+                  className={"emp-row" + (e.id === activeEmployeeId ? " active" : "")}
+                  onClick={() => onOpenEmployee(e.id)}
+                  title={e.role ? `${e.name} — ${e.role}` : e.name}
+                >
+                  <Avatar employee={e} />
+                  <span className="emp-row-text">
+                    <span className="emp-row-name">{e.name}</span>
+                    <span className={"emp-row-sub " + status.tone}>
+                      <span className="emp-status-dot" />
+                      {status.label} · {short(e, e.spent_today)}/{Math.round(e.cap_today)}
+                      {e.budget_unit === "turns" && " turns"}
+                    </span>
+                  </span>
+                  {news && <span className="emp-row-news" title="New updates" />}
+                  <span className={"session-backend " + e.backend}>{backendShort(e.backend)}</span>
                 </div>
               )
             })}
@@ -357,6 +443,17 @@ export function Sidebar({
             {online}/{devices.length}
           </span>
         </button>
+        {/* Sleep for the sessions outside any project, which share one memory;
+            each project's is the moon on its row. Always here, like its
+            neighbours, even before there is anything to dream on. */}
+        <MoonButton
+          className="devices-btn push-btn foot"
+          label="Dream"
+          dream={homeDream}
+          active={homeDream?.id === activeId}
+          what=" — sessions outside any project"
+          onOpen={() => onOpenDream("home")}
+        />
         {/* This device's preferences: appearance, and the agent "+" starts. */}
         <button className="devices-btn push-btn" onClick={onOpenSettings} title="Settings">
           <Settings />

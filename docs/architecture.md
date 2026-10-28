@@ -177,6 +177,89 @@ standing instructions, like ChatGPT's projects.
   The file tree lists the workspace (hidden entries, symlinks and build
   directories skipped, 2000 files at most), download only.
 
+### 2.8 Sleep
+
+`Loom.Dream` goes over each scope's Claude Code memory by night. A scope is a
+project, or `home` for the sessions outside any; Claude Code keys memory by
+cwd, so each has one directory. Claude Code's own consolidation (auto-dream) is
+gated by a server flag a Bedrock login never gets (measured, 2.1.312).
+
+- **A hidden session sleeps.** One Claude Code session per scope, `kind:
+  "dream"`, in the scope's cwd, so it has the same memory directory and Claude
+  Code's memory instructions. The lists leave it out; the moon on a project's
+  row (and Sleep at the sidebar's foot, for `home`) opens it, with Report,
+  Memory and Settings tabs. Each night is one turn with `origin: "dream"`:
+  the transcript shows a line, the backend gets `Loom.Dream.Prompt`. The reply
+  is the report, and the user answers proposals in the same session.
+- **When:** in the night window (03:00–06:00 Shanghai by default, one setting
+  for every scope), 12 hours after the last sleep at least, with a session
+  active since then, none mid-turn and none touched for 30 minutes. One scope
+  per 10-minute tick. Or now, from the Memory tab.
+- **The prompt** replays every session since the last night (user messages in
+  full, the ending, narrow greps), weighs corrections and "remember this"
+  highest, adds a source line to what it writes, archives to `archive/`
+  rather than deleting, and proposes, never does, anything outside the memory
+  directory: skills, `~/.claude/CLAUDE.md`.
+- **Undo.** The memory directory is a git repository: committed before each
+  sleep and after each turn of the sleep session. Undo restores the directory
+  as it was before the last sleep, as a new commit.
+- **Unread** is `seen_seq` on the session (`PATCH /api/agents/:id`), set as
+  the report is read; the moon shows a dot while `seq` is past it.
+- **Truth is `~/.loom/dream.json`**: the window, the offset, and per scope its
+  session, `enabled`, and recent runs. `/api/dreams/:scope` and its
+  `session`, `run`, `undo` and `memories` routes serve the tabs.
+
+### 2.9 Virtual employees
+
+`Loom.Employees`: an agent that keeps working while Loom is up, on the
+projects it is given, toward KPIs the user sets, within a daily budget, and
+says when it needs the user.
+
+- **Two hidden sessions each**, on the agent chosen at hiring (Claude Code on
+  Opus by default, `--model` from `cc_model`; Kiro on claude-opus-5.5,
+  `kiro_model`; or Codex), both in the employee's own workspace
+  (`~/.loom/employees/<id>/workspace`) so they share memory and files:
+  `kind: "employee_chat"`, where the user talks to it, and
+  `"employee_work"`, where it works. The work session is the report: every
+  turn is a wake-up or the user answering. Neither is in the lists; the
+  Employees section of the sidebar opens a page with Chat, KPIs, Updates (the
+  work session), Daily & weekly and Settings.
+- **A heartbeat, not a loop.** A one-minute tick wakes an employee when its
+  `wake_at` comes (within its hours), or for the daily and weekly report
+  (`reports/daily-YYYY-MM-DD.md`, `reports/weekly-YYYY-Www.md`). A wake-up is
+  one turn, `origin: "employee"`, with `Loom.Employees.Prompt.wake/3` behind a
+  one-line display. It ends with a **work card** (`Loom.Employees.Card`), a
+  fenced `employee-card` JSON block: when to wake (kept between the minimum
+  gap and the heartbeat; `continue` is a minute), KPI progress (never `done`,
+  which becomes `review` for the user to accept), a report. No card: sleep
+  until the heartbeat. The chat ends with a card only to add KPIs, hand a note
+  to the next wake-up, or wake it now. The transcript renders the card
+  (`WorkCard.tsx`).
+- **The system prompt is fixed at the first turn** (§2.7's gotcha), so it
+  holds only the rules; name, projects, KPIs, budget and what to ask first
+  are in every wake-up and in `.employee/status.md`, rewritten on every
+  change, for the chat to read. The system prompt is read by the session from
+  `~/.loom/employees/<id>/system_<kind>.md`: a session starting from inside
+  `Loom.Employees` cannot ask it.
+- **Budget.** Claude Code's `total_cost_usd` is the running total of its
+  process, so the backend emits each turn's difference as a `:cost` event,
+  which the session broadcasts as `{:turn_cost, id, usd}` on the turns topic
+  and does not keep. Every turn of both sessions counts toward the day (the
+  user's wall clock, UTC+8). Kiro and Codex report no cost, so theirs is in
+  turns a day (`budget_turns`), counted at each turn's end. Spent, the work turn is interrupted, nothing
+  wakes, and the user is notified once; an approval adds to that day only.
+  A turn past `max_turn_min` is interrupted too.
+- **Reports**: `info` is only logged; `important` is a notification
+  (`Loom.Push.notify/4`); `urgent` a notification and the status "Needs
+  you" until a later turn reports otherwise. The work session's own turn ends
+  notify nothing (`kind` rides on `{:turn_ended, …}`).
+- **Permissions are soft**: the projects and their workspaces are named in
+  the prompt, with what to ask first. Same Unix user as every agent.
+- **Truth is `~/.loom/employees.json`.** Pushed on the lobby as `employee`
+  and `employee_removed`; `/api/employees` and its `pause`, `wake`,
+  `approve`, `kpis` and `reports` routes serve the page. Sleep (§2.8) leaves
+  employee sessions out of every scope.
+
 ## 3. Client protocol
 
 ```
@@ -211,6 +294,8 @@ tool card's `block_id`, the same pattern as text.
 ~/.loom/cron.json                    scheduled prompts (§2.5)
 ~/.loom/projects.json                projects (§2.7)
 ~/.loom/projects/<id>/workspace/…    a project's workspace
+~/.loom/employees.json               virtual employees (§2.9)
+~/.loom/employees/<id>/…             an employee's system prompts and workspace
 ```
 
 The base is `~/.loom` (or `LOOM_HOME`), not `priv/`, because a deploy replaces
@@ -410,6 +495,7 @@ Loom.Supervisor
 ├─ Loom.Cron                      scheduled prompts
 ├─ Loom.Nodes                     the user's devices (loom-node)
 ├─ Loom.Push                      notifications when a turn ends
+├─ Loom.Employees                 virtual employees' heartbeat and budget
 ├─ Loom.Restarter                 restart-when-idle, for deploys
 └─ LoomWeb.Endpoint
 ```

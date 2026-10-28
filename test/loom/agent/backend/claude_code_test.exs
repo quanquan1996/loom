@@ -412,6 +412,28 @@ defmodule Loom.Agent.Backend.ClaudeCodeTest do
   end
 
   describe "turn completion" do
+    test "a turn's cost is its share of the process's running total" do
+      result = fn total ->
+        %{"type" => "result", "subtype" => "success", "usage" => %{}, "total_cost_usd" => total}
+      end
+
+      {handle, out} = feed(handle(), [result.(0.5)])
+      assert [{:event, :cost, %{usd: 0.5}} | _] = out
+
+      # The same process, a turn later: only the difference.
+      {handle, out} = feed(handle, [result.(0.8)])
+      assert [{:event, :cost, %{usd: usd}} | _] = out
+      assert_in_delta usd, 0.3, 1.0e-9
+
+      # A process that started over counts from nothing.
+      {_handle, out} = feed(handle, [result.(0.1)])
+      assert [{:event, :cost, %{usd: 0.1}} | _] = out
+
+      # An interrupted turn was still paid for.
+      {_handle, out} = feed(handle(%{interrupted?: true}), [result.(0.2)])
+      assert [{:event, :cost, %{usd: 0.2}}] = out
+    end
+
     test "the process is kept, so the next turn starts warm" do
       # Measured: turn 2 on the same process reaches `init` in 0.02 s against
       # 4.65 s cold. Reaping here would make every turn pay the cold start.

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { Channel } from "phoenix"
 import { getSocket } from "./socket"
-import type { AgentInfo, Device, Project } from "./api"
+import type { AgentInfo, Device, Employee, Project } from "./api"
 
 export type Watching = { endpoint: string; session: string | null }
 
@@ -15,6 +15,10 @@ type Lobby = {
   projects: Project[]
   upsertProject: (project: Project) => void
   dropProject: (id: string) => void
+  // Virtual employees, oldest first; see `Employees.tsx`.
+  employees: Employee[]
+  upsertEmployee: (employee: Employee) => void
+  dropEmployee: (id: string) => void
   loaded: boolean
   // For the caller's own create/delete, so the sidebar does not wait for the
   // push. The push still arrives and is merged by `seq`.
@@ -43,6 +47,7 @@ export function useLobby(enabled: boolean, watching: Watching | null = null): Lo
   const [loaded, setLoaded] = useState(false)
   const [devices, setDevices] = useState<Map<string, Device>>(new Map())
   const [projects, setProjects] = useState<Map<string, Project>>(new Map())
+  const [employees, setEmployees] = useState<Map<string, Employee>>(new Map())
   const joinedChannel = useRef<Channel | null>(null)
   const watchingRef = useRef(watching)
   watchingRef.current = watching
@@ -69,6 +74,20 @@ export function useLobby(enabled: boolean, watching: Watching | null = null): Lo
 
   const dropProject = useCallback((id: string) => {
     setProjects((current) => {
+      if (!current.has(id)) return current
+      const next = new Map(current)
+      next.delete(id)
+      return next
+    })
+  }, [])
+
+  // Like a project: one process owns them and sends them in order.
+  const upsertEmployee = useCallback((employee: Employee) => {
+    setEmployees((current) => new Map(current).set(employee.id, employee))
+  }, [])
+
+  const dropEmployee = useCallback((id: string) => {
+    setEmployees((current) => {
       if (!current.has(id)) return current
       const next = new Map(current)
       next.delete(id)
@@ -111,12 +130,24 @@ export function useLobby(enabled: boolean, watching: Watching | null = null): Lo
     channel.on("node_removed", ({ id }: { id: string }) => dropDevice(id))
     channel.on("project", upsertProject)
     channel.on("project_removed", ({ id }: { id: string }) => dropProject(id))
+    channel.on("employee", upsertEmployee)
+    channel.on("employee_removed", ({ id }: { id: string }) => dropEmployee(id))
 
     channel
       .join()
       .receive(
         "ok",
-        ({ sessions, nodes, projects }: { sessions: AgentInfo[]; nodes: Device[]; projects?: Project[] }) => {
+        ({
+          sessions,
+          nodes,
+          projects,
+          employees,
+        }: {
+          sessions: AgentInfo[]
+          nodes: Device[]
+          projects?: Project[]
+          employees?: Employee[]
+        }) => {
         joined = true
         if (leaveWhenJoined) {
           channel.leave()
@@ -127,6 +158,7 @@ export function useLobby(enabled: boolean, watching: Watching | null = null): Lo
         setById(new Map(sessions.map((s) => [s.id, s])))
         setDevices(new Map((nodes ?? []).map((d) => [d.id, d])))
         setProjects(new Map((projects ?? []).map((p) => [p.id, p])))
+        setEmployees(new Map((employees ?? []).map((e) => [e.id, e])))
         setLoaded(true)
         },
       )
@@ -138,7 +170,7 @@ export function useLobby(enabled: boolean, watching: Watching | null = null): Lo
       if (joined) channel.leave()
       else leaveWhenJoined = true
     }
-  }, [enabled, upsert, drop, upsertDevice, dropDevice, upsertProject, dropProject])
+  }, [enabled, upsert, drop, upsertDevice, dropDevice, upsertProject, dropProject, upsertEmployee, dropEmployee])
 
   const endpoint = watching?.endpoint
   const session = watching?.session
@@ -159,8 +191,15 @@ export function useLobby(enabled: boolean, watching: Watching | null = null): Lo
     () => [...projects.values()].sort((a, b) => a.created_at - b.created_at),
     [projects],
   )
+  const employeeList = useMemo(
+    () => [...employees.values()].sort((a, b) => a.created_at - b.created_at),
+    [employees],
+  )
   return {
     sessions,
+    employees: employeeList,
+    upsertEmployee,
+    dropEmployee,
     devices: deviceList,
     upsertDevice,
     projects: projectList,

@@ -52,6 +52,7 @@ export function SettingsDialog({
               options={[
                 ["claude_code", "Claude Code"],
                 ["codex", "Codex"],
+                ["kiro", "Kiro"],
               ]}
               onChange={(backend) => onChange({ backend })}
             />

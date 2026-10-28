@@ -150,6 +150,11 @@ defmodule Loom.Agent.Backend.ClaudeCode do
       # Appended to Claude Code's own system prompt on every spawn — it is a
       # flag, not something the conversation remembers across `--resume`.
       instructions: Backend.meta_get(meta, :instructions),
+      # `--model`, when the session pins one; Claude Code's default otherwise.
+      model: Backend.meta_get(meta, :cc_model),
+      # `total_cost_usd` as the running process last reported it: a running
+      # total since that process started, so a turn's cost is the difference.
+      cost_seen: 0.0,
       # Whether Claude Code has this conversation on disk, so the next spawn
       # resumes it rather than naming it. Set by `system/init`, not by the spawn:
       # a session that is released or restarted before its first turn got going
@@ -224,7 +229,10 @@ defmodule Loom.Agent.Backend.ClaudeCode do
           :exit_status,
           :use_stdio,
           :hide,
-          args: @base_args ++ fallback_args() ++ session_args(handle) ++ instruction_args(handle),
+          args:
+            @base_args ++
+              model_args(handle) ++
+              fallback_args() ++ session_args(handle) ++ instruction_args(handle),
           cd: handle.cwd,
           env: Loom.ChildEnv.port_env()
         ])
@@ -234,6 +242,7 @@ defmodule Loom.Agent.Backend.ClaudeCode do
          handle
          | port: port,
            os_pid: os_pid(port),
+           cost_seen: 0.0,
            buffer: "",
            tools: %{},
            message_id: nil,
@@ -289,6 +298,9 @@ defmodule Loom.Agent.Backend.ClaudeCode do
     end
   end
 
+  defp model_args(%{model: model}) when is_binary(model) and model != "", do: ["--model", model]
+  defp model_args(_handle), do: []
+
   defp instruction_args(%{instructions: text}) when is_binary(text) and text != "",
     do: ["--append-system-prompt", text]
 
@@ -329,7 +341,12 @@ defmodule Loom.Agent.Backend.ClaudeCode do
 
   @impl Backend
   def persist(handle) do
-    %{cc_session_id: handle.session_id, cc_cwd: handle.cwd, cc_started: handle.started?}
+    %{
+      cc_session_id: handle.session_id,
+      cc_cwd: handle.cwd,
+      cc_started: handle.started?,
+      cc_model: Map.get(handle, :model)
+    }
   end
 
   @impl Backend
@@ -580,42 +597,56 @@ defmodule Loom.Agent.Backend.ClaudeCode do
     # The process deliberately survives: the next turn starts in 0.02 s instead
     # of 6 s. It is released on the session's idle timer, not here.
     usage = message["usage"] || %{}
+    {handle, cost} = cost(handle, message)
 
     cond do
       handle.interrupted? ->
         # The turn we asked to stop. Claude Code reports it as
         # `error_during_execution`, which is not an error — and the session
         # emits its own abort event, so saying anything here double-reports it.
-        {%{handle | interrupted?: false}, []}
+        # What it cost is still owed.
+        {%{handle | interrupted?: false}, cost}
 
       result_ok?(message) ->
         handle = %{handle | context_window: context_window(message)}
 
         {handle,
-         [
-           {:event, :turn_done,
-            %{
-              stop_reason: message["stop_reason"],
-              usage: usage,
-              context_tokens: handle.context_tokens,
-              context_window: handle.context_window
-            }}
-         ]}
+         cost ++
+           [
+             {:event, :turn_done,
+              %{
+                stop_reason: message["stop_reason"],
+                usage: usage,
+                context_tokens: handle.context_tokens,
+                context_window: handle.context_window
+              }}
+           ]}
 
       true ->
         {handle,
-         [
-           {:event, :turn_failed,
-            %{
-              reason: failure_reason(message),
-              terminal_reason: message["terminal_reason"],
-              usage: usage
-            }}
-         ]}
+         cost ++
+           [
+             {:event, :turn_failed,
+              %{
+                reason: failure_reason(message),
+                terminal_reason: message["terminal_reason"],
+                usage: usage
+              }}
+           ]}
     end
   end
 
   defp translate(handle, _message), do: {handle, []}
+
+  # This turn's share of the process's running total. A smaller total than
+  # last seen means a process that started over, so all of it is this turn's.
+  defp cost(handle, %{"total_cost_usd" => total}) when is_number(total) do
+    seen = Map.get(handle, :cost_seen, 0.0)
+    usd = if total >= seen, do: total - seen, else: total
+    {Map.put(handle, :cost_seen, total * 1.0), [{:event, :cost, %{usd: usd}}]}
+  end
+
+  defp cost(handle, _message), do: {handle, []}
 
   # `is_error` first: a turn the API gave up on still says `"subtype":
   # "success"`, with the error in `result` and `api_error_status`.

@@ -41,3 +41,14 @@ config :loom, LoomWeb.NodeController, await_ms: 200
 config :loom, Loom.Projects,
   dir: Path.join(System.tmp_dir!(), "loom-test-#{System.pid()}"),
   classifier: nil
+
+# Nor the real sleep schedule, and no sleeping on its own during a run.
+config :loom, Loom.Dream,
+  path: Path.join(System.tmp_dir!(), "loom-test-#{System.pid()}/dream.json"),
+  tick: :timer.hours(24)
+
+# Nor employees waking on their own; the tests drive them by hand.
+config :loom, Loom.Employees,
+  path: Path.join(System.tmp_dir!(), "loom-test-#{System.pid()}/employees.json"),
+  tick: :timer.hours(24),
+  run: false

@@ -49,6 +49,30 @@ defmodule LoomWeb.Router do
     post "/tasks/:id/run", TaskController, :run
     delete "/tasks/:id", TaskController, :delete
 
+    get "/dreams", DreamController, :index
+    get "/dreams/:scope", DreamController, :show
+    patch "/dreams/:scope", DreamController, :update
+    post "/dreams/:scope/session", DreamController, :session
+    post "/dreams/:scope/run", DreamController, :run
+    post "/dreams/:scope/undo", DreamController, :undo
+    get "/dreams/:scope/memories", DreamController, :memories
+
+    get "/employees", EmployeeController, :index
+    post "/employees", EmployeeController, :create
+    get "/employees/:id", EmployeeController, :show
+    patch "/employees/:id", EmployeeController, :update
+    delete "/employees/:id", EmployeeController, :delete
+    post "/employees/:id/pause", EmployeeController, :pause
+    post "/employees/:id/wake", EmployeeController, :wake
+    post "/employees/:id/approve", EmployeeController, :approve
+    post "/employees/:id/seen", EmployeeController, :seen
+    post "/employees/:id/kpis", EmployeeController, :add_kpi
+    patch "/employees/:id/kpis/:kpi", EmployeeController, :update_kpi
+    delete "/employees/:id/kpis/:kpi", EmployeeController, :delete_kpi
+    post "/employees/:id/kpis/:kpi/review", EmployeeController, :review_kpi
+    get "/employees/:id/reports", EmployeeController, :reports
+    get "/employees/:id/reports/:file", EmployeeController, :report
+
     get "/projects", ProjectController, :index
     post "/projects", ProjectController, :create
     patch "/projects/:id", ProjectController, :update

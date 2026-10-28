@@ -6,7 +6,7 @@ defmodule Loom.Agent do
   @doc """
   Start a new agent session (or return the existing one for `id`).
 
-  `:backend` is required and permanent: `:claude_code` or `:codex`. The
+  `:backend` is required and permanent: `:claude_code`, `:codex` or `:kiro`. The
   conversation lives in that engine's own store, so there is nothing to migrate
   if it changes.
   """
@@ -101,6 +101,7 @@ defmodule Loom.Agent do
   defdelegate drop_queued(id, index), to: Session
   defdelegate rename(id, title), to: Session
   defdelegate pin(id, pinned?), to: Session
+  defdelegate seen(id, seq), to: Session
   defdelegate move(id, project_id), to: Session
   defdelegate attach(id, since_seq \\ 0), to: Session
   defdelegate info(id), to: Session
