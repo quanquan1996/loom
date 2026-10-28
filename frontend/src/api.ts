@@ -153,6 +153,9 @@ export type AgentInfo = {
   employee_id?: string | null
   // How far the user has read; with `seq`, the moon's unread mark.
   seen_seq?: number
+  // Where the agent last said something; past `seen_seq`, a conversation is
+  // unread. Older servers do not send it.
+  reply_seq?: number
   created_at: number
   // The last message either way, as ms since the epoch: what orders the
   // sidebar and what its age shows. Older servers do not send it.

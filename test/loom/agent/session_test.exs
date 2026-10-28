@@ -372,6 +372,39 @@ defmodule Loom.Agent.SessionTest do
     end
   end
 
+  describe "unread" do
+    test "a reply is unread until it is seen, and status events do not make it so" do
+      id = new_session()
+      {:ok, :started} = Agent.submit(id, "hi")
+      _ = BackendStub.await_turn()
+      finish_turn(id)
+
+      assert_eventually(fn -> Agent.info(id).status == :idle end)
+      %{reply_seq: reply, seen_seq: 0, seq: seq} = Agent.info(id)
+      assert reply > 0 and reply <= seq
+
+      assert :ok = Agent.seen(id, reply)
+      assert Agent.info(id).seen_seq == reply
+      assert {:ok, %{reply_seq: ^reply, seen_seq: ^reply}} = Store.read_meta(id)
+    end
+
+    test "a session from before the mark starts with every reply read" do
+      id = new_session()
+      {:ok, :started} = Agent.submit(id, "hi")
+      _ = BackendStub.await_turn()
+      finish_turn(id)
+      assert_eventually(fn -> Agent.info(id).status == :idle end)
+
+      {:ok, meta} = Store.read_meta(id)
+      Agent.stop_session(id)
+      Store.write_meta(id, Map.delete(meta, :reply_seq))
+      {:ok, _pid} = Agent.start_session(id, backend: :claude_code)
+
+      # Restored, not started afresh.
+      assert %{title: "hi", reply_seq: 0} = Agent.info(id)
+    end
+  end
+
   describe "the transcript" do
     test "events are numbered, persisted and replayable" do
       id = new_session()

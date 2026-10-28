@@ -22,6 +22,8 @@
   --accent: #ececec;
   --green: #10a37f;
   --blue: #66b5ff;
+  /* The unread mark: the system's own blue, brighter than a link's. */
+  --unread: #0a84ff;
   --red: #f87171;
   --ui: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
     "Hiragino Sans GB", "Microsoft YaHei", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -150,8 +152,43 @@ samp,
   background: color-mix(in srgb, var(--fg) 9%, transparent);
 }
 
+/* The foot a shade off the lists above it, so the two read as two parts:
+   what you open, and the switches under it. Mixed from --fg, so it is a
+   step lighter on dark and a step darker on light. */
 .sidebar-foot {
-  border-top-color: transparent;
+  border-top-color: color-mix(in srgb, var(--fg) 6%, transparent);
+  background: color-mix(in srgb, var(--fg) 5%, var(--bg-raised));
+}
+
+.sidebar-foot .devices-btn:hover {
+  background: color-mix(in srgb, var(--fg) 6%, transparent);
+}
+
+/* In the drawer the shade runs on under the home indicator. */
+.drawer .sidebar {
+  padding-bottom: 0;
+}
+
+.drawer .sidebar-foot {
+  padding-bottom: max(4px, env(safe-area-inset-bottom));
+}
+
+/* Unread: a blue dot by the time, which turns blue too, and the title a
+   weight up: the mail app's mark. */
+.session-unread {
+  flex: 0 0 auto;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--unread);
+}
+
+.sidebar .session.unread .session-label {
+  font-weight: 600;
+}
+
+.sidebar .session.unread .session-when {
+  color: var(--unread);
 }
 
 /* ── Chat ───────────────────────────────────────────────────────────────── */
@@ -456,8 +493,20 @@ pre.code {
    16px body text with a 1.75 line, 14px in the sidebar, a 260px sidebar
    and a 52px header: the web page. A phone is the app; see the end. */
 
+/* Times the text size chosen in Settings (settings.ts sets --font-scale on
+   <html>, per device). */
 html {
-  font-size: 100%;
+  font-size: calc(100% * var(--font-scale, 1));
+}
+
+/* iOS zooms the page into any field under 16px when it is focused, so on a
+   touch screen a smaller text size stops short of the fields. */
+@media (pointer: coarse) {
+  input,
+  textarea,
+  select {
+    font-size: max(1rem, 16px) !important;
+  }
 }
 
 :root {
@@ -718,6 +767,7 @@ pre.code,
   --fg-dim: #5d5d5d;
   --accent: #0d0d0d;
   --blue: #2964aa;
+  --unread: #007aff;
   --red: #d03b3b;
   --green: #10a37f;
   --surface-code: #f9f9f9;
@@ -829,6 +879,17 @@ pre.code,
 .segmented svg {
   width: 0.95rem;
   height: 0.95rem;
+}
+
+/* Text size's "A"s: one box for all, so the buttons match whatever the
+   glyph's size. */
+.text-size-a {
+  display: inline-block;
+  width: 1.25rem;
+  height: 1.25rem;
+  line-height: 1.25rem;
+  text-align: center;
+  font-weight: 500;
 }
 
 @media (max-width: 640px) {

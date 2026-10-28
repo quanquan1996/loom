@@ -2,10 +2,10 @@ import { Moon, Sun, X } from "lucide-react"
 import { useEffect, type ReactNode } from "react"
 import { createPortal } from "react-dom"
 import type { AgentBackend } from "./api"
-import type { Appearance, Settings } from "./settings"
+import { FONT_SCALES, type Appearance, type FontScale, type Settings } from "./settings"
 
 /**
- * The gear at the foot of the sidebar: this device's appearance, and the
+ * The gear at the foot of the sidebar: this device's appearance and text size, and the
  * engine "+" starts a session on. Each choice takes effect as it is made;
  * there is nothing to save.
  */
@@ -43,6 +43,27 @@ export function SettingsDialog({
                 ["dark", "Dark", <Moon key="m" />],
               ]}
               onChange={(appearance) => onChange({ appearance })}
+            />
+          </Row>
+
+          <Row label="Text size" hint={`On this device. ${16 * settings.fontScale}px; 16px is the default.`}>
+            <Segmented<string>
+              value={String(settings.fontScale)}
+              options={FONT_SCALES.map((scale) => [
+                String(scale),
+                "",
+                // Each option an "A" at its own size, smallest to largest; in px,
+                // so the row does not shift as the choice rescales the page.
+                <span
+                  key="a"
+                  className="text-size-a"
+                  style={{ fontSize: `${12 + (scale - 0.8125) * 24}px` }}
+                  aria-label={`${16 * scale}px`}
+                >
+                  A
+                </span>,
+              ])}
+              onChange={(v) => onChange({ fontScale: Number(v) as FontScale })}
             />
           </Row>
 

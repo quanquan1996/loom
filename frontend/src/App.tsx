@@ -659,7 +659,13 @@ function App() {
           ) : active && chatProps ? (
             // Keyed by id so switching sessions rebuilds the channel and the
             // transcript rather than mixing two conversations.
-            <Chat key={active.id} session={active} {...chatProps} />
+            <Chat
+              key={active.id}
+              session={active}
+              {...chatProps}
+              onSeen={(seq) => updateAgent(active.id, { seen_seq: seq }).then(upsert, () => {})}
+              reading={!narrow || (!drawerOpen && side === null)}
+            />
           ) : (
             <div className="placeholder">
               <p>No session selected.</p>

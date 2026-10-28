@@ -112,6 +112,9 @@ defmodule Loom.Agent.Session do
   # a restart restores every session, and must not make them all "just now".
   @activity [:user, :assistant_text, :turn_done]
 
+  # What the agent says, for `reply_seq`.
+  @replies [:assistant_text, :turn_done]
+
   # ── Public API ──────────────────────────────────────────────────────────
 
   def start_link(opts) do
@@ -354,6 +357,7 @@ defmodule Loom.Agent.Session do
           kind: if(is_binary(meta[:kind]), do: meta[:kind]),
           employee_id: if(is_binary(meta[:employee_id]), do: meta[:employee_id]),
           seen_seq: if(is_integer(meta[:seen_seq]), do: meta[:seen_seq], else: 0),
+          reply_seq: reply_seq(meta, transcript),
           notice: if(is_binary(meta[:notice]), do: meta[:notice]),
           title: meta[:title],
           created_at: meta[:created_at],
@@ -476,6 +480,10 @@ defmodule Loom.Agent.Session do
       employee_id: nil,
       # How far the user has read, for an unread mark. See `seen/2`.
       seen_seq: 0,
+      # Where the agent last said something: the sidebar's unread mark is
+      # this past `seen_seq`. Not `seq`, which also counts status and queue
+      # events nobody reads.
+      reply_seq: 0,
       # Told to the backend ahead of the next turn's message, once: what changed
       # about its project since the conversation began. See `moved_notice/2`.
       notice: nil,
@@ -1111,6 +1119,7 @@ defmodule Loom.Agent.Session do
 
     {transcript, truncated_before} = retain([event | state.transcript], state.truncated_before)
     state = %{state | seq: seq, transcript: transcript, truncated_before: truncated_before}
+    state = if kind in @replies, do: %{state | reply_seq: seq}, else: state
 
     cond do
       kind not in @activity ->
@@ -1126,6 +1135,20 @@ defmodule Loom.Agent.Session do
       true ->
         %{state | last_active_at: event.at}
     end
+  end
+
+  # The header's, or a reply in the log past it: a node killed outright left
+  # the header behind. A session from before the mark has none in its header,
+  # so its old replies are not all marked unread at once.
+  defp reply_seq(meta, transcript) do
+    after_header = meta[:seq] || 0
+
+    logged =
+      Enum.find_value(transcript, 0, fn event ->
+        event.kind in @replies && event.seq > after_header && event.seq
+      end)
+
+    max(if(is_integer(meta[:reply_seq]), do: meta[:reply_seq], else: 0), logged)
   end
 
   defp last_active(transcript) do
@@ -1195,6 +1218,7 @@ defmodule Loom.Agent.Session do
       kind: state.kind,
       employee_id: state.employee_id,
       seen_seq: state.seen_seq,
+      reply_seq: state.reply_seq,
       notice: state.notice,
       title: state.title,
       created_at: state.created_at,
@@ -1271,6 +1295,7 @@ defmodule Loom.Agent.Session do
       kind: state.kind,
       employee_id: state.employee_id,
       seen_seq: state.seen_seq,
+      reply_seq: state.reply_seq,
       title: state.title,
       created_at: state.created_at,
       last_active_at: state.last_active_at,

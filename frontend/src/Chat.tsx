@@ -70,6 +70,12 @@ type Props = {
   // Under the header, across the whole column: a virtual employee's tabs and
   // where it stands (see `Employees.tsx`).
   subhead?: ReactNode
+  // Read up to here, from any device; clears the sidebar's unread mark. Only
+  // for a plain conversation: the sleep and employee pages keep their own.
+  onSeen?: (seq: number) => void
+  // Whether the chat is what is on screen: not under the phone's drawer or a
+  // pane over it.
+  reading?: boolean
 }
 
 // How a card or link deep in the transcript opens something in the canvas.
@@ -94,6 +100,8 @@ export function Chat({
   onFilesChanged,
   tabs,
   subhead,
+  onSeen,
+  reading = true,
 }: Props) {
   const { transcript, joinError, submit, resend, discard, interrupt, dropQueued, rename } = useAgent(
     session.id,
@@ -112,6 +120,20 @@ export function Chat({
     },
   )
   const busy = isBusy(transcript)
+  // At the end of the transcript, where the newest reply is.
+  const [atEnd, setAtEnd] = useState(true)
+  const pageVisible = usePageVisible()
+  const replySeq = session.reply_seq ?? 0
+  const seenSeq = session.seen_seq ?? 0
+  // Each seq once, while the summary that says so is on its way back.
+  const sentSeqRef = useRef(0)
+  // Read means seen: the page in front, this chat on it, scrolled to the end.
+  useEffect(() => {
+    if (!onSeen || !reading || !pageVisible || !atEnd) return
+    if (replySeq <= seenSeq || replySeq <= sentSeqRef.current) return
+    sentSeqRef.current = replySeq
+    onSeen(replySeq)
+  }, [onSeen, reading, pageVisible, atEnd, replySeq, seenSeq])
   // Kept while the transcript is: the timeline follows the end whenever the
   // items change, so a fresh array on every render (the app's keys re-render
   // it) would pull it back down just after `gg` or `k` scrolled it up.
@@ -228,6 +250,7 @@ export function Chat({
             sessionId={session.id}
             truncatedBefore={transcript.truncatedBefore}
             onAnswer={submit}
+            onAtEnd={setAtEnd}
           />
         </OutputLink.Provider>
         </Unsent.Provider>
@@ -252,6 +275,17 @@ export function Chat({
   )
 }
 
+/** Whether the page is in front: not a background tab, not a locked phone. */
+function usePageVisible(): boolean {
+  const [visible, setVisible] = useState(() => document.visibilityState === "visible")
+  useEffect(() => {
+    const onChange = () => setVisible(document.visibilityState === "visible")
+    document.addEventListener("visibilitychange", onChange)
+    return () => document.removeEventListener("visibilitychange", onChange)
+  }, [])
+  return visible
+}
+
 // ── Timeline ───────────────────────────────────────────────────────────────
 
 // How many items are rendered at first, and added each time the reader nears
@@ -266,11 +300,13 @@ function Timeline({
   sessionId,
   truncatedBefore,
   onAnswer,
+  onAtEnd,
 }: {
   items: TimelineItem[]
   sessionId: string
   truncatedBefore: number | null
   onAnswer: (text: string) => void
+  onAtEnd: (atEnd: boolean) => void
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const pinnedRef = useRef(true)
@@ -317,6 +353,7 @@ function Timeline({
     }
     pinnedRef.current = atBottom
     setPinned(atBottom)
+    onAtEnd(atBottom)
   }
 
   // The user taking over mid-jump wins.
@@ -337,6 +374,7 @@ function Timeline({
     pinnedRef.current = true
     setPinned(true)
     jumpingRef.current = true
+    onAtEnd(true)
     // A long transcript is tens of thousands of pixels: smooth all the way it
     // takes seconds. Cut to a screen above the end, then glide the rest, which
     // still shows which way it went.

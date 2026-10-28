@@ -184,7 +184,8 @@ export function Sidebar({
         (nested ? " nested" : "") +
         (menu?.id === s.id ? " menu-open" : "") +
         (s.id === activeId ? " active" : "") +
-        (s.id === cursorId ? " cursor" : "")
+        (s.id === cursorId ? " cursor" : "") +
+        (unread(s) ? " unread" : "")
       }
       onClick={() => onSelect(s.id)}
     >
@@ -199,6 +200,7 @@ export function Sidebar({
           {s.queued}
         </span>
       )}
+      {unread(s) && <span className="session-unread" title="Unread: a reply not yet read on any device" />}
       <span className="session-when" title={"last active " + new Date(lastActive(s)).toLocaleString()}>
         {when(lastActive(s))}
       </span>
@@ -299,6 +301,8 @@ export function Sidebar({
                         onOpen={() => onOpenDream(project.id)}
                       />
                     )}
+                    {/* Folded, its unread show on the row. */}
+                    {!unfolded && inside.some(unread) && <span className="session-unread" title="Unread replies" />}
                     {inside.length > 0 && <span className="nav-count">{inside.length}</span>}
                   </div>
                   {unfolded && (
@@ -534,6 +538,14 @@ function NewSessionButton({
       <Plus />
     </button>
   )
+}
+
+/**
+ * A reply that no device has read yet: `Chat` marks it read once it is on a
+ * screen, scrolled to. Not while the turn is still going; the dot says that.
+ */
+function unread(s: AgentInfo): boolean {
+  return s.status === "idle" && (s.reply_seq ?? 0) > (s.seen_seq ?? 0)
 }
 
 function when(ms: number): string {

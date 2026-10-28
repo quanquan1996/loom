@@ -107,6 +107,7 @@ defmodule LoomWeb.AgentSessionController do
       kind: info.kind,
       employee_id: Map.get(info, :employee_id),
       seen_seq: info.seen_seq,
+      reply_seq: Map.get(info, :reply_seq, 0),
       created_at: info.created_at,
       last_active_at: info.last_active_at,
       status: info.status,
