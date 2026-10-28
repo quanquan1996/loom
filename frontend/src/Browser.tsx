@@ -8,6 +8,10 @@ import { getToken } from "./api"
  * the user can take it over: log in to a site once, get past a check that
  * wants a human. Over VNC: `LoomWeb.VncSocket` carries it, noVNC draws it.
  *
+ * On a phone the pane asks for a window of its own shape (see
+ * `Loom.Browser`), so sites lay themselves out for a narrow screen and the
+ * page fills the pane, rather than a desktop screen shrunk to unreadable.
+ *
  * Mounted only while shown, so a closed pane holds no connection open.
  */
 export function Browser({
@@ -25,9 +29,8 @@ export function Browser({
   const rfb = useRef<RFB | null>(null)
   const [state, setState] = useState<"connecting" | "connected" | "closed">("connecting")
   const [attempt, setAttempt] = useState(0)
-  // Fit the whole screen in the pane, or show it at 1:1 and pan by dragging;
-  // a phone wants the second to read anything.
-  const [fit, setFit] = useState(!narrow)
+  // Fit the whole screen in the pane, or show it at 1:1 and pan by dragging.
+  const [fit, setFit] = useState(true)
   const [typing, setTyping] = useState(false)
   const [text, setText] = useState("")
 
@@ -35,18 +38,41 @@ export function Browser({
     const el = screen.current
     if (!el) return
     const proto = location.protocol === "https:" ? "wss:" : "ws:"
-    const url = `${proto}//${location.host}/browser/vnc?token=${encodeURIComponent(getToken() ?? "")}`
+    let url = `${proto}//${location.host}/browser/vnc?token=${encodeURIComponent(getToken() ?? "")}`
+    if (narrow) url += `&w=${el.clientWidth}&h=${el.clientHeight}`
     const r = new RFB(el, url, { wsProtocols: [] })
     r.background = "transparent"
-    r.addEventListener("connect", () => setState("connected"))
-    r.addEventListener("disconnect", () => setState("closed"))
+    // A replaced connection's goodbye arrives after its successor started.
+    r.addEventListener("connect", () => rfb.current === r && setState("connected"))
+    r.addEventListener("disconnect", () => rfb.current === r && setState("closed"))
     rfb.current = r
     setState("connecting")
     return () => {
       rfb.current = null
       r.disconnect()
     }
-  }, [attempt])
+  }, [attempt, narrow])
+
+  // A phone turned on its side wants a window of the other shape. The screen's
+  // orientation, not the pane's: the keyboard coming up squashes the pane
+  // without the phone having turned. Connect again once the pane has settled.
+  useEffect(() => {
+    if (!narrow) return
+    let timer: number | undefined
+    const turned = () => {
+      clearTimeout(timer)
+      timer = window.setTimeout(() => setAttempt((n) => n + 1), 400)
+    }
+    // Older iOS has no `screen.orientation`, only the window's event.
+    const [target, event] = window.screen.orientation
+      ? [window.screen.orientation, "change"]
+      : [window, "orientationchange"]
+    target.addEventListener(event, turned)
+    return () => {
+      clearTimeout(timer)
+      target.removeEventListener(event, turned)
+    }
+  }, [narrow])
 
   useEffect(() => {
     const r = rfb.current
