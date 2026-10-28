@@ -289,7 +289,7 @@ export function Sidebar({
           </>
         )}
 
-        <Heading label="Sessions" open={open(SESSIONS_SECTION)} onToggle={() => onToggle(SESSIONS_SECTION)} />
+        <Heading label="Recents" open={open(SESSIONS_SECTION)} onToggle={() => onToggle(SESSIONS_SECTION)} />
         {open(SESSIONS_SECTION) &&
           (recent.length ? (
             recent.map((s) => row(s, false))
