@@ -7,6 +7,12 @@ defmodule Loom.OneShot do
 
   Used to file a new session into a project (`Loom.Projects.Classifier`) and
   to read a task the user described in words (`Loom.Cron.Describe`).
+
+  No settings, but their `env`: on a host logged in through Bedrock that is
+  where the login is (`CLAUDE_CODE_USE_BEDROCK`, `AWS_REGION` in
+  `~/.claude/settings.json`), and the service's own environment has none of
+  it. Without them every call answered "Not logged in" and each new session
+  was quietly left out of its project.
   """
 
   @doc "The model's reply to `text` under `system`: `{:ok, reply}` or `{:error, reason}`."
@@ -51,11 +57,30 @@ defmodule Loom.OneShot do
     end
   end
 
-  # What every child gets (`Loom.ChildEnv`), with loom's own variables unset
-  # rather than merely left out: `System.cmd` adds to the environment.
-  defp env do
-    keep = Loom.ChildEnv.map()
+  # What every child gets (`Loom.ChildEnv`), plus the `env` of Claude Code's
+  # user settings, which `--setting-sources ""` would otherwise drop; with
+  # loom's own variables unset rather than merely left out: `System.cmd` adds
+  # to the environment.
+  @doc false
+  def env do
+    keep = Map.merge(Loom.ChildEnv.map(), settings_env())
     drop = for {key, _} <- System.get_env(), not Map.has_key?(keep, key), do: {key, nil}
     Enum.to_list(keep) ++ drop
+  end
+
+  # Settings win, as they do in Claude Code itself.
+  defp settings_env do
+    dir = System.get_env("CLAUDE_CONFIG_DIR") || Path.expand("~/.claude")
+
+    with {:ok, body} <- File.read(Path.join(dir, "settings.json")),
+         {:ok, %{"env" => env}} when is_map(env) <- Jason.decode(body) do
+      for {key, value} <- env,
+          is_binary(key),
+          value != nil,
+          into: %{},
+          do: {key, to_string(value)}
+    else
+      _ -> %{}
+    end
   end
 end
