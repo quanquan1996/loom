@@ -442,8 +442,7 @@ pre.code {
 
 /* ── Sizes: ChatGPT's proportions ───────────────────────────────────────
    16px body text with a 1.75 line, 14px in the sidebar, a 260px sidebar
-   and a 52px header on a desktop; the phone app's larger sidebar type, its
-   bold list headings, on a phone. */
+   and a 52px header: the web page. A phone is the app; see the end. */
 
 html {
   font-size: 100%;
@@ -571,17 +570,45 @@ pre.code,
   font-size: 0.9375rem;
 }
 
-/* The phone app: bigger type in the drawer, bold headings over its lists. */
+/* ── The phone: ChatGPT's iOS app, measured ──────────────────────────────
+   From a screenshot of its drawer (3x, iOS dark mode): a pure black ground
+   and pure white text, 52pt rows, labels of about 19px with a 22pt icon,
+   33pt from the screen's edge, list headings the same size in bold, and a
+   25pt title. The desktop keeps the web page's #212121 above. */
 @media (max-width: 640px) {
+  :root {
+    --bg: #000000;
+    --bg-raised: #000000;
+    --bg-card: #2f2f2f;
+    --fg: #ffffff;
+    --fg-dim: #8e8e8e;
+    --accent: #ffffff;
+    --line: #ffffff24;
+  }
+
+  .sidebar .session-list {
+    padding: 4px 12px 16px;
+  }
+
+  .sidebar-head {
+    padding-inline: 32px 12px;
+  }
+
+  .brand {
+    font-size: 1.5625rem;
+  }
+
   .nav-item,
   .project-row,
   .sidebar .session {
-    min-height: 2.75rem;
+    min-height: 3.25rem;
+    border-radius: 12px;
   }
 
   .nav-item {
     gap: 14px;
-    font-size: 1.0625rem;
+    padding: 0 12px 0 20px;
+    font-size: 1.1875rem;
   }
 
   .nav-icon {
@@ -589,19 +616,78 @@ pre.code,
     height: 1.375rem;
   }
 
-  .project-row,
+  .project-row {
+    gap: 14px;
+    padding: 0 12px 0 32px;
+    font-size: 1.125rem;
+  }
+
+  .project-icon {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+
+  .project-sessions {
+    margin-left: 42px;
+  }
+
+  .sidebar .session {
+    padding: 0 10px 0 20px;
+  }
+
   .sidebar .session .session-label,
   .project-sessions .session .session-label {
-    font-size: 1.0625rem;
+    font-size: 1.1875rem;
   }
 
   .list-heading {
+    margin-top: 20px;
+    padding: 8px 20px;
     color: var(--fg);
-    font-size: 1.0625rem;
+    font-size: 1.1875rem;
     font-weight: 600;
   }
 
-  .brand {
-    font-size: 1.375rem;
+  .sidebar .session:hover,
+  .nav-item:hover,
+  .project-row:hover {
+    background: #ffffff12;
+  }
+
+  .sidebar .session.active {
+    background: #ffffff1f;
+  }
+
+  /* The drawer's foot, in the same hand as its lists, a size down. */
+  .devices-btn {
+    gap: 14px;
+    padding: 11px 32px;
+    font-size: 1.0625rem;
+  }
+
+  .push-btn svg {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+
+  /* The chat: the app's 17pt body, its bubble a lighter grey on the black. */
+  .bubble,
+  .bubble.assistant {
+    font-size: 1.0625rem;
+  }
+
+  .composer-box {
+    background: #212121;
+  }
+
+  pre.code {
+    background: #171717;
+  }
+
+  .modal,
+  .session-menu,
+  .backend-menu,
+  .command-menu {
+    background: #262626;
   }
 }
