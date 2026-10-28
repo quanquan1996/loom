@@ -90,7 +90,7 @@ defmodule Loom.Agent.Backend.Codex do
     instructions = Backend.meta_get(meta, :instructions)
     cwd = Backend.meta_get(meta, :codex_cwd) || default_cwd()
 
-    case Server.resume_thread(id, resume_opts(instructions)) do
+    case Server.resume_thread(id, resume_opts(instructions, Backend.meta_get(meta, :codex_cwd))) do
       {:ok, ^id} ->
         # A turn id recorded before a restart refers to a turn that is no longer
         # running — the server would reject an interrupt for it anyway.
@@ -120,8 +120,9 @@ defmodule Loom.Agent.Backend.Codex do
   end
 
   # Given again on every resume, including the silent one after an app-server
-  # respawn, so the thread is never running without them.
-  defp resume_opts(instructions), do: [developer_instructions: instructions]
+  # respawn, so the thread is never running without them. The cwd only when
+  # one is known: a header from before it was kept leaves the thread's own.
+  defp resume_opts(instructions, cwd), do: [developer_instructions: instructions, cwd: cwd]
 
   defp new(thread_id, instructions, cwd) do
     %{
@@ -146,7 +147,7 @@ defmodule Loom.Agent.Backend.Codex do
   # Reattaching before starting the turn is what makes a restart invisible to
   # the user beyond the one turn that died.
   def run_turn(%{stale?: true} = handle, text) do
-    case Server.resume_thread(handle.thread_id, resume_opts(handle.instructions)) do
+    case Server.resume_thread(handle.thread_id, resume_opts(handle.instructions, cwd(handle))) do
       {:ok, _} ->
         run_turn(%{handle | stale?: false}, text)
 
@@ -234,9 +235,18 @@ defmodule Loom.Agent.Backend.Codex do
     end
   end
 
+  # `stale?` is the reattach the app-server respawn already needs; resuming
+  # passes the new cwd and instructions. The thread's own history is untouched.
+  @impl Backend
+  def relocate(handle, cwd, instructions) do
+    {:ok, %{handle | cwd: cwd || default_cwd(), instructions: instructions, stale?: true}}
+  end
+
+  # `codex_cwd` too: a thread that never ran a turn is reopened from scratch,
+  # and must be reopened where it was.
   @impl Backend
   def persist(handle) do
-    %{codex_thread_id: handle.thread_id, codex_turn_id: handle.turn_id}
+    %{codex_thread_id: handle.thread_id, codex_turn_id: handle.turn_id, codex_cwd: cwd(handle)}
   end
 
   @impl Backend

@@ -148,6 +148,19 @@ defmodule Loom.Agent.Session do
   """
   def rename(id, title), do: GenServer.call(via(id), {:rename, title})
 
+  @doc "Pin the session to the top of the sidebar, or unpin it. Local to loom."
+  def pin(id, pinned?), do: GenServer.call(via(id), {:pin, pinned?})
+
+  @doc """
+  Move the session into a project (by id), or out of any with nil.
+
+  The conversation carries on where it is, from the project's workspace: the
+  backend is relocated there with the project's instructions (see
+  `Backend.relocate/3`). Files the session already wrote stay where they are.
+  Refused mid-turn, as a running turn cannot change directory.
+  """
+  def move(id, project_id), do: GenServer.call(via(id), {:move, project_id})
+
   @doc """
   Attach for replay. Returns the session's metadata plus every event after
   `since_seq` (pass 0 for the whole retained transcript).
@@ -292,6 +305,7 @@ defmodule Loom.Agent.Session do
         | backend: backend,
           handle: handle,
           project_id: meta[:project_id],
+          pinned: meta[:pinned] == true,
           title: meta[:title],
           created_at: meta[:created_at],
           last_active_at: last_active(transcript) || meta[:created_at],
@@ -355,8 +369,10 @@ defmodule Loom.Agent.Session do
       backend: nil,
       # Backend-private. Only `Backend.persist/1` knows what of it to keep.
       handle: nil,
-      # The project it was made in, if any; never changes. See `Loom.Projects`.
+      # The project it is in, if any; see `move/2` and `Loom.Projects`.
       project_id: nil,
+      # Shown above everything else in the sidebar.
+      pinned: false,
       title: nil,
       created_at: nil,
       # When the last message went either way; orders the sidebar. Derived from
@@ -455,6 +471,34 @@ defmodule Loom.Agent.Session do
     end
   end
 
+  def handle_call({:pin, pinned?}, _from, state) do
+    state = %{state | pinned: pinned? == true}
+    persist_meta(state)
+    {:reply, :ok, state}
+  end
+
+  def handle_call({:move, _project_id}, _from, %{status: status} = state)
+      when status in [:starting, :running] do
+    {:reply, {:error, :busy}, state}
+  end
+
+  def handle_call({:move, project_id}, _from, state) do
+    with {:ok, project} <- requested_project(project: project_id) do
+      cwd = project && Loom.Projects.workspace(project)
+      if cwd, do: File.mkdir_p!(cwd)
+      state = cancel_release(state)
+
+      {:ok, handle} =
+        Backend.impl(state.backend).relocate(state.handle, cwd, instructions(state.id, project))
+
+      state = %{state | handle: handle, project_id: project && project.id}
+      persist_meta(state)
+      {:reply, :ok, state}
+    else
+      {:error, reason} -> {:reply, {:error, reason}, state}
+    end
+  end
+
   def handle_call({:attach, since_seq}, _from, state) do
     events =
       state.transcript
@@ -496,14 +540,23 @@ defmodule Loom.Agent.Session do
     {:noreply, release_backend(state)}
   end
 
-  # The project's name or instructions changed. Both handles carry the text
-  # they hand the backend; Claude Code reads it on its next spawn, so the warm
-  # process is let go as `/reload` would. Codex only reads it when a thread is
-  # started or resumed, which is after the next app-server restart.
-  def handle_info(:refresh_instructions, %{handle: handle} = state) when is_map(handle) do
+  # The project's name or instructions changed. Mid-turn, the new text goes
+  # into the handle and Claude Code lets its process go once the turn ends, as
+  # `/reload` would; Codex reads it at its next resume.
+  def handle_info(:refresh_instructions, %{handle: handle, status: status} = state)
+      when is_map(handle) and status in [:starting, :running] do
     text = instructions(state.id, project_of(state.project_id))
     state = %{state | handle: Map.replace(handle, :instructions, text)}
     handle_info(:reload_backend, state)
+  end
+
+  # Between turns, the same as a move to where it already is.
+  def handle_info(:refresh_instructions, %{handle: handle} = state) when is_map(handle) do
+    project = project_of(state.project_id)
+    cwd = project && Loom.Projects.workspace(project)
+    state = cancel_release(state)
+    {:ok, handle} = Backend.impl(state.backend).relocate(handle, cwd, instructions(state.id, project))
+    {:noreply, %{state | handle: handle}}
   end
 
   def handle_info(:refresh_instructions, state), do: {:noreply, state}
@@ -879,6 +932,7 @@ defmodule Loom.Agent.Session do
       id: state.id,
       backend: state.backend,
       project_id: state.project_id,
+      pinned: state.pinned,
       title: state.title,
       created_at: state.created_at,
       status: state.status,
@@ -922,6 +976,7 @@ defmodule Loom.Agent.Session do
       backend: state.backend,
       backend_label: Backend.label(state.backend),
       project_id: state.project_id,
+      pinned: state.pinned,
       title: state.title,
       created_at: state.created_at,
       last_active_at: state.last_active_at,

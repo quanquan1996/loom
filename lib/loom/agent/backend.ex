@@ -203,6 +203,19 @@ defmodule Loom.Agent.Backend do
   @callback release(handle) :: {:ok, handle}
 
   @doc """
+  Carry on the same conversation from another working directory, with new
+  instructions: what moving a session into or out of a project, or editing the
+  project, comes down to. `cwd` nil means the default one. Only called between
+  turns.
+
+  Claude Code lets its process go, and the next spawn starts in `cwd` and
+  `--resume`s, which finds the conversation from any directory. Codex marks the
+  thread for reattaching, and the next turn resumes it with the new `cwd` and
+  developer instructions.
+  """
+  @callback relocate(handle, cwd :: String.t() | nil, instructions :: String.t()) :: {:ok, handle}
+
+  @doc """
   Release everything this handle owns.
 
   For Claude Code that means making sure the whole process tree is gone — it is

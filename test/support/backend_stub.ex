@@ -119,6 +119,11 @@ defmodule Loom.BackendStub do
     end
   end
 
+  def handle_call({:relocated, cwd, instructions}, _from, state) do
+    if state.notify, do: send(state.notify, {:stub_relocated, cwd, instructions})
+    {:reply, :ok, state}
+  end
+
   def handle_call(:released, _from, state) do
     if state.notify, do: send(state.notify, :stub_released)
     {:reply, :ok, %{state | released: state.released + 1}}
@@ -191,6 +196,12 @@ defmodule Loom.BackendStub do
 
   @impl Loom.Agent.Backend
   def persist(handle), do: %{stub_ref: handle.ref}
+
+  @impl Loom.Agent.Backend
+  def relocate(handle, cwd, instructions) do
+    :ok = GenServer.call(__MODULE__, {:relocated, cwd, instructions})
+    {:ok, handle}
+  end
 
   @impl Loom.Agent.Backend
   def stop(_handle) do

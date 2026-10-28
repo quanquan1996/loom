@@ -323,6 +323,11 @@ defmodule Loom.Agent.Backend.ClaudeCode do
   def release(handle), do: {:ok, teardown(handle)}
 
   @impl Backend
+  def relocate(handle, cwd, instructions) do
+    {:ok, %{teardown(handle) | cwd: cwd || default_cwd(), instructions: instructions}}
+  end
+
+  @impl Backend
   def persist(handle) do
     %{cc_session_id: handle.session_id, cc_cwd: handle.cwd, cc_started: handle.started?}
   end

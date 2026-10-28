@@ -40,6 +40,21 @@ defmodule Loom.Agent.Backend.CodexTest do
   defp events(out), do: for({:event, kind, payload} <- out, do: {kind, payload})
   defp deltas(out), do: for({:delta, delta} <- out, do: delta)
 
+  describe "relocating" do
+    test "marks the thread for reattaching where it now is, and keeps that cwd" do
+      {:ok, moved} = Codex.relocate(handle(%{cwd: "/old", instructions: "old"}), "/ws", "new")
+      assert moved.stale?
+      assert %{cwd: "/ws", instructions: "new"} = moved
+      assert %{codex_cwd: "/ws", codex_thread_id: @thread} = Codex.persist(moved)
+    end
+
+    test "nil goes back to the default directory" do
+      {:ok, moved} = Codex.relocate(handle(%{cwd: "/ws", instructions: "x"}), nil, "y")
+      refute moved.cwd == "/ws"
+      assert is_binary(moved.cwd)
+    end
+  end
+
   describe "routing" do
     test "a notification for another thread is not ours" do
       # One session must never consume another's output — they share one

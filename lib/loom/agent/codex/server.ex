@@ -267,6 +267,9 @@ defmodule Loom.Agent.Codex.Server do
       %{"threadId" => thread_id, "excludeTurns" => true}
       |> Map.merge(@access)
       |> maybe_put("developerInstructions", opts[:developer_instructions])
+      # Like the access above, an override: a session moved into a project
+      # carries on in its workspace.
+      |> maybe_put("cwd", opts[:cwd])
 
     {:noreply,
      send_request(state, "thread/resume", params, {:claim_resume, from, owner, thread_id})}

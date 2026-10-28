@@ -69,15 +69,61 @@ defmodule LoomWeb.ProjectControllerTest do
     assert {:ok, %{project_id: ^pid}} = Loom.Agent.Store.read_meta(id)
   end
 
-  test "editing a project lets its sessions' backends go, to read it again", %{conn: conn} do
-    %{"id" => pid} = create_project(conn, %{name: "Live"})
+  test "editing a project hands its sessions the new instructions", %{conn: conn} do
+    %{"id" => pid, "workspace" => ws} = create_project(conn, %{name: "Live"})
     conn |> post(~p"/api/agents", %{backend: "claude_code", project_id: pid}) |> json_response(201)
     conn |> post(~p"/api/agents", %{backend: "claude_code"}) |> json_response(201)
 
     conn |> patch(~p"/api/projects/#{pid}", %{instructions: "New rules."}) |> json_response(200)
-    assert_receive :stub_released
+    assert_receive {:stub_relocated, ^ws, instructions}
+    assert instructions =~ "New rules."
     # Only the session in the project.
-    refute_receive :stub_released, 100
+    refute_receive {:stub_relocated, _, _}, 100
+  end
+
+  test "a loose session moves into a project, carrying on in its workspace", %{conn: conn} do
+    %{"id" => pid, "workspace" => ws} = create_project(conn, %{name: "Home", instructions: "Be brief."})
+    %{"id" => id} = conn |> post(~p"/api/agents", %{backend: "claude_code"}) |> json_response(201)
+
+    assert %{"project_id" => ^pid} =
+             conn |> patch(~p"/api/agents/#{id}", %{project_id: pid}) |> json_response(200)
+
+    assert_receive {:stub_relocated, ^ws, instructions}
+    assert instructions =~ ~s("Home")
+    assert instructions =~ "Be brief."
+    assert {:ok, %{project_id: ^pid}} = Loom.Agent.Store.read_meta(id)
+
+    # And out again, to the default directory and Loom's own instructions.
+    assert %{"project_id" => nil} =
+             conn |> patch(~p"/api/agents/#{id}", %{project_id: nil}) |> json_response(200)
+
+    assert_receive {:stub_relocated, nil, instructions}
+    refute instructions =~ "Home"
+  end
+
+  test "a move is refused mid-turn, and to a project that does not exist", %{conn: conn} do
+    %{"id" => pid} = create_project(conn, %{name: "Busy"})
+    %{"id" => id} = conn |> post(~p"/api/agents", %{backend: "claude_code"}) |> json_response(201)
+
+    assert %{"error" => "no such project"} =
+             conn |> patch(~p"/api/agents/#{id}", %{project_id: "p_nope"}) |> json_response(422)
+
+    {:ok, :started} = Agent.submit(id, "work")
+    BackendStub.await_turn()
+
+    assert %{"error" => "the session is in the middle of a turn"} =
+             conn |> patch(~p"/api/agents/#{id}", %{project_id: pid}) |> json_response(422)
+
+    assert Agent.info(id).project_id == nil
+  end
+
+  test "pinning is kept in the header", %{conn: conn} do
+    %{"id" => id, "pinned" => false} =
+      conn |> post(~p"/api/agents", %{backend: "claude_code"}) |> json_response(201)
+
+    assert %{"pinned" => true} = conn |> patch(~p"/api/agents/#{id}", %{pinned: true}) |> json_response(200)
+    assert {:ok, %{pinned: true}} = Loom.Agent.Store.read_meta(id)
+    assert %{"pinned" => false} = conn |> patch(~p"/api/agents/#{id}", %{pinned: false}) |> json_response(200)
   end
 
   test "a session outside any project has no project and no cwd", %{conn: conn} do

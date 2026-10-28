@@ -52,13 +52,28 @@ defmodule LoomWeb.AgentSessionController do
     })
   end
 
-  # PATCH /api/agents/:id — rename. Local to loom; never pushed to the backend.
-  def update(conn, %{"id" => id, "title" => title}) do
-    case Agent.rename(id, title) do
+  # PATCH /api/agents/:id — any of `title` (rename), `pinned` and `project_id`
+  # (move into that project, or out of any with null). The first two are local
+  # to loom and never pushed to the backend; a move relocates it.
+  def update(conn, %{"id" => id} = params) do
+    changes =
+      [
+        {"title", &Agent.rename(id, &1)},
+        {"pinned", &Agent.pin(id, &1)},
+        {"project_id", &Agent.move(id, &1)}
+      ]
+      |> Enum.filter(fn {key, _} -> Map.has_key?(params, key) end)
+
+    case Enum.find_value(changes, :ok, fn {key, change} -> refused(change.(params[key])) end) do
       :ok -> json(conn, view(Agent.info(id)))
       {:error, reason} -> conn |> put_status(:unprocessable_entity) |> json(%{error: reason})
     end
   end
+
+  defp refused(:ok), do: nil
+  defp refused({:error, :busy}), do: {:error, "the session is in the middle of a turn"}
+  defp refused({:error, {:unknown_project, _}}), do: {:error, "no such project"}
+  defp refused({:error, reason}), do: {:error, reason}
 
   # DELETE /api/agents/:id — stop the session *and* discard its history.
   #
@@ -90,6 +105,7 @@ defmodule LoomWeb.AgentSessionController do
       backend: info.backend,
       backend_label: info.backend_label,
       project_id: info.project_id,
+      pinned: info.pinned,
       created_at: info.created_at,
       last_active_at: info.last_active_at,
       status: info.status,
