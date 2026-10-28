@@ -10,6 +10,13 @@
      the app's #212121 on a phone's black (below). */
   --task-card: #2a2a2a;
   --task-card-hover: #303030;
+  --task-kind: #63a8f8;
+  --task-prompt: #cdcdcd;
+  --task-dim: #afafaf;
+  --task-rule: #424242;
+  --task-dash: #333333;
+  --task-round: #1f1f1f;
+  --task-error: #3a1d1d;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -57,7 +64,7 @@
 }
 
 .tasks-round:hover {
-  background: #ffffff12;
+  background: color-mix(in srgb, var(--fg) 7%, transparent);
   color: var(--fg);
 }
 
@@ -119,7 +126,7 @@
 }
 
 .task-kind {
-  color: #63a8f8;
+  color: var(--task-kind);
   font-size: 0.875rem;
 }
 
@@ -137,7 +144,7 @@
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
   overflow: hidden;
-  color: #cdcdcd;
+  color: var(--task-prompt);
   font-size: 1rem;
   line-height: 1.4;
 }
@@ -150,11 +157,11 @@
 .task-rule {
   height: 1px;
   margin: 12px 0 8px;
-  background: #424242;
+  background: var(--task-rule);
 }
 
 .task-when {
-  color: #afafaf;
+  color: var(--task-dim);
   font-size: 0.9375rem;
 }
 
@@ -165,7 +172,7 @@
 
 .tasks-section {
   margin: 20px 4px 4px;
-  color: #afafaf;
+  color: var(--task-dim);
   font-size: 1rem;
   font-weight: 400;
 }
@@ -176,7 +183,7 @@
   flex-direction: column;
   gap: 6px;
   padding: 16px 18px;
-  border: 1.5px dashed #333333;
+  border: 1.5px dashed var(--task-dash);
   border-radius: 22px;
   background: transparent;
   color: var(--fg);
@@ -186,7 +193,7 @@
 }
 
 .task-template:hover {
-  background: #ffffff08;
+  background: color-mix(in srgb, var(--fg) 3%, transparent);
 }
 
 .task-template-head {
@@ -214,7 +221,7 @@
 }
 
 .task-template-desc {
-  color: #afafaf;
+  color: var(--task-dim);
   font-size: 0.9375rem;
   line-height: 1.4;
 }
@@ -240,7 +247,7 @@
   margin-bottom: 8px;
   padding: 8px 14px;
   border-radius: 14px;
-  background: #3a1d1d;
+  background: var(--task-error);
   color: var(--red);
   font-size: 0.875rem;
 }
@@ -253,10 +260,10 @@
   padding: 7px 8px;
   box-sizing: border-box;
   border-radius: 1.75rem;
-  background: #2f2f2f;
+  background: var(--composer, #2f2f2f);
   box-shadow:
-    0 0 0 1px #ffffff0d,
-    0 6px 24px rgb(0 0 0 / 45%);
+    0 0 0 1px color-mix(in srgb, var(--fg) 5%, transparent),
+    0 6px 24px var(--shadow, rgb(0 0 0 / 45%));
 }
 
 /* Border-box: the height set from `scrollHeight` already counts the padding. */
@@ -277,7 +284,7 @@
 }
 
 .tasks-composer-box textarea::placeholder {
-  color: #8e8e8e;
+  color: var(--fg-dim);
 }
 
 .tasks-composer-btn {
@@ -296,7 +303,7 @@
 }
 
 .tasks-composer-btn:hover:not(:disabled) {
-  background: #ffffff12;
+  background: color-mix(in srgb, var(--fg) 7%, transparent);
 }
 
 .tasks-composer-btn svg {
@@ -310,8 +317,8 @@
 }
 
 .tasks-composer-btn.send:disabled {
-  background: #676767;
-  color: #2f2f2f;
+  background: var(--send-off-bg, #676767);
+  color: var(--send-off-fg, #2f2f2f);
   cursor: default;
 }
 
@@ -348,9 +355,9 @@
 .task-schedule select,
 .task-schedule input {
   padding: 6px 8px;
-  border: 1px solid #ffffff1a;
+  border: 1px solid color-mix(in srgb, var(--fg) 10%, transparent);
   border-radius: 10px;
-  background: #212121;
+  background: var(--surface-field, #212121);
   color: var(--fg);
   font: inherit;
   color-scheme: dark;
@@ -367,7 +374,7 @@
   height: 2.1rem;
   border: 0;
   border-radius: 999px;
-  background: #ffffff12;
+  background: color-mix(in srgb, var(--fg) 7%, transparent);
   color: var(--fg-dim);
   font: inherit;
   font-size: 0.875rem;
@@ -421,7 +428,7 @@
   .tasks-round {
     width: 2.7rem;
     height: 2.7rem;
-    background: #1f1f1f;
+    background: var(--task-round);
     color: var(--fg);
   }
 
@@ -469,4 +476,17 @@
   .tasks-composer-box textarea {
     font-size: 1.0625rem;
   }
+}
+
+/* The light appearance (see theme.css): ChatGPT's day greys. */
+[data-theme="light"] .tasks-page {
+  --task-card: #f4f4f4;
+  --task-card-hover: #ececec;
+  --task-kind: #2964aa;
+  --task-prompt: #3c3c3c;
+  --task-dim: #8f8f8f;
+  --task-rule: #e3e3e3;
+  --task-dash: #d9d9d9;
+  --task-round: #f4f4f4;
+  --task-error: #fde8e8;
 }

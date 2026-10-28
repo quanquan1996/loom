@@ -13,7 +13,7 @@
   --bg: #212121;
   --bg-raised: #181818;
   --bg-card: #303030;
-  --line: #ffffff1a;
+  --line: color-mix(in srgb, var(--fg) 10%, transparent);
   --fg: #ececec;
   --fg-dim: #9b9b9b;
   /* What was neon green is ChatGPT's white: selection, the active row, the
@@ -27,6 +27,16 @@
     "Hiragino Sans GB", "Microsoft YaHei", Roboto, "Helvetica Neue", Arial, sans-serif;
   /* ChatGPT's column. In rem now: the old 100ch assumed a monospace UI. */
   --measure: 48rem;
+  /* Surfaces, so the light appearance can change them in one place. */
+  --surface-code: #171717;
+  --surface-menu: #353535;
+  --surface-modal: #2f2f2f;
+  --surface-field: #212121;
+  --composer: var(--bg-card);
+  --send-off-bg: #676767;
+  --send-off-fg: #2f2f2f;
+  --shadow: rgb(0 0 0 / 45%);
+  --scrim: rgb(0 0 0 / 60%);
 }
 
 html,
@@ -77,7 +87,7 @@ samp,
 }
 
 ::selection {
-  background: #ffffff33;
+  background: color-mix(in srgb, var(--fg) 20%, transparent);
 }
 
 /* ── Status colours ─────────────────────────────────────────────────────── */
@@ -124,19 +134,19 @@ samp,
 
 .sidebar-head .icon-btn:hover,
 .chat-header .icon-btn:hover {
-  background: #ffffff12;
+  background: color-mix(in srgb, var(--fg) 7%, transparent);
   color: var(--fg);
 }
 
 .sidebar .session:hover,
 .nav-item:hover,
 .project-row:hover {
-  background: #ffffff0d;
+  background: color-mix(in srgb, var(--fg) 5%, transparent);
 }
 
 .sidebar .session.active,
 .nav-item.current {
-  background: #ffffff17;
+  background: color-mix(in srgb, var(--fg) 9%, transparent);
 }
 
 .sidebar-foot {
@@ -170,13 +180,13 @@ samp,
 .chip.button.terminal-toggle:hover,
 .chip.button.canvas-toggle:hover {
   color: var(--fg);
-  background: #ffffff12;
+  background: color-mix(in srgb, var(--fg) 7%, transparent);
 }
 
 .chip.button.terminal-toggle.on,
 .chip.button.canvas-toggle.on {
   color: var(--fg);
-  background: #ffffff1f;
+  background: color-mix(in srgb, var(--fg) 12%, transparent);
 }
 
 .timeline {
@@ -210,24 +220,24 @@ samp,
 }
 
 code {
-  background: #ffffff1a;
+  background: color-mix(in srgb, var(--fg) 10%, transparent);
   font-size: 0.9em;
 }
 
 pre.code {
   border: 0;
   border-radius: 12px;
-  background: #171717;
+  background: var(--surface-code);
 }
 
 .tool {
-  border-color: #ffffff14;
+  border-color: color-mix(in srgb, var(--fg) 8%, transparent);
   border-radius: 12px;
   background: transparent;
 }
 
 .tool-head:hover {
-  background: #ffffff0a;
+  background: color-mix(in srgb, var(--fg) 4%, transparent);
 }
 
 .tool-name {
@@ -261,10 +271,10 @@ pre.code {
   padding: 6px 8px;
   border: 0;
   border-radius: 1.75rem;
-  background: var(--bg-card);
+  background: var(--composer);
   box-shadow:
-    0 0 0 1px #ffffff0d,
-    0 4px 20px rgb(0 0 0 / 25%);
+    0 0 0 1px color-mix(in srgb, var(--fg) 5%, transparent),
+    0 4px 20px var(--shadow);
 }
 
 .composer-box:focus-within {
@@ -280,7 +290,7 @@ pre.code {
 }
 
 .composer-btn:hover:not(:disabled) {
-  background: #ffffff12;
+  background: color-mix(in srgb, var(--fg) 7%, transparent);
 }
 
 .composer-btn.send,
@@ -291,25 +301,25 @@ pre.code {
 
 .composer-btn.send:hover:not(:disabled),
 .composer-btn.stop:hover {
-  background: #ffffffcc;
+  background: color-mix(in srgb, var(--fg) 80%, transparent);
   color: var(--bg);
 }
 
 .composer-btn.send:disabled {
-  background: #676767;
-  color: #2f2f2f;
+  background: var(--send-off-bg);
+  color: var(--send-off-fg);
   opacity: 1;
 }
 
 .command-menu {
   border: 0;
   border-radius: 1rem;
-  background: #353535;
-  box-shadow: 0 8px 28px rgb(0 0 0 / 40%);
+  background: var(--surface-menu);
+  box-shadow: 0 8px 28px var(--shadow);
 }
 
 .command-menu li.on {
-  background: #ffffff12;
+  background: color-mix(in srgb, var(--fg) 7%, transparent);
 }
 
 /* ── Menus, dialogs, buttons ────────────────────────────────────────────── */
@@ -318,8 +328,8 @@ pre.code {
 .backend-menu {
   border: 0;
   border-radius: 16px;
-  background: #353535;
-  box-shadow: 0 10px 32px rgb(0 0 0 / 45%);
+  background: var(--surface-menu);
+  box-shadow: 0 10px 32px var(--shadow);
 }
 
 .session-menu {
@@ -333,37 +343,37 @@ pre.code {
 
 .session-menu button:hover:not(:disabled),
 .backend-menu button:hover {
-  background: #ffffff12;
+  background: color-mix(in srgb, var(--fg) 7%, transparent);
 }
 
 .session-menu-sep {
-  background: #ffffff14;
+  background: color-mix(in srgb, var(--fg) 8%, transparent);
 }
 
 .modal-scrim {
-  background: rgb(0 0 0 / 60%);
+  background: var(--scrim);
 }
 
 .modal {
   border: 0;
   border-radius: 16px;
-  background: #2f2f2f;
-  box-shadow: 0 16px 48px rgb(0 0 0 / 50%);
+  background: var(--surface-modal);
+  box-shadow: 0 16px 48px var(--shadow);
 }
 
 .modal-head {
-  border-bottom-color: #ffffff14;
+  border-bottom-color: color-mix(in srgb, var(--fg) 8%, transparent);
   font-weight: 600;
 }
 
 .text-btn {
   border-radius: 999px;
-  background: #ffffff12;
+  background: color-mix(in srgb, var(--fg) 7%, transparent);
   color: var(--fg);
 }
 
 .text-btn:hover {
-  background: #ffffff21;
+  background: color-mix(in srgb, var(--fg) 13%, transparent);
   color: var(--fg);
 }
 
@@ -374,7 +384,7 @@ pre.code {
 }
 
 .text-btn.primary:hover {
-  background: #ffffffcc;
+  background: color-mix(in srgb, var(--fg) 80%, transparent);
   color: var(--bg);
 }
 
@@ -391,15 +401,15 @@ pre.code {
 .project-form textarea,
 .device-add input,
 .device-name-input {
-  border-color: #ffffff1a;
+  border-color: color-mix(in srgb, var(--fg) 10%, transparent);
   border-radius: 10px;
-  background: #212121;
+  background: var(--surface-field);
 }
 
 .project-form input:focus,
 .project-form textarea:focus {
   outline: none;
-  border-color: #ffffff40;
+  border-color: color-mix(in srgb, var(--fg) 25%, transparent);
 }
 
 /* ── Login ──────────────────────────────────────────────────────────────── */
@@ -419,7 +429,7 @@ pre.code {
 }
 
 .login-input {
-  border-color: #ffffff26;
+  border-color: color-mix(in srgb, var(--fg) 15%, transparent);
   border-radius: 999px;
   background: var(--bg-card);
   color: var(--fg);
@@ -427,7 +437,7 @@ pre.code {
 }
 
 .login-input:focus {
-  border-color: #ffffff59;
+  border-color: color-mix(in srgb, var(--fg) 35%, transparent);
 }
 
 .login-error {
@@ -584,7 +594,7 @@ pre.code,
     --fg: #ffffff;
     --fg-dim: #8e8e8e;
     --accent: #ffffff;
-    --line: #ffffff24;
+    --line: color-mix(in srgb, var(--fg) 14%, transparent);
   }
 
   .sidebar .session-list {
@@ -652,11 +662,11 @@ pre.code,
   .sidebar .session:hover,
   .nav-item:hover,
   .project-row:hover {
-    background: #ffffff12;
+    background: color-mix(in srgb, var(--fg) 7%, transparent);
   }
 
   .sidebar .session.active {
-    background: #ffffff1f;
+    background: color-mix(in srgb, var(--fg) 12%, transparent);
   }
 
   /* The drawer's foot, in the same hand as its lists, a size down. */
@@ -677,18 +687,159 @@ pre.code,
     font-size: 1.0625rem;
   }
 
-  .composer-box {
-    background: #212121;
+  :root {
+    --composer: #212121;
+    --surface-menu: #262626;
+    --surface-modal: #262626;
+  }
+}
+
+/* Tinted from the theme rather than fixed, so they suit either appearance. */
+.chat-banner {
+  background: color-mix(in srgb, var(--red) 14%, var(--bg));
+}
+
+.question {
+  background: color-mix(in srgb, var(--green) 10%, var(--bg));
+}
+
+/* ── Light: ChatGPT's day palette ─────────────────────────────────────────
+   Chosen in Settings (settings.ts sets data-theme on <html>). White page,
+   #f9f9f9 sidebar, #f4f4f4 bubbles, near-black text; every overlay above is
+   mixed from --fg, so hovers and rules turn dark with it. Wins over the
+   phone's black (above) by specificity. Terminals stay dark. */
+:root[data-theme="light"] {
+  --bg: #ffffff;
+  --bg-raised: #f9f9f9;
+  --bg-card: #f4f4f4;
+  --line: #0000001a;
+  --fg: #0d0d0d;
+  --fg-dim: #5d5d5d;
+  --accent: #0d0d0d;
+  --blue: #2964aa;
+  --red: #d03b3b;
+  --green: #10a37f;
+  --surface-code: #f9f9f9;
+  --surface-menu: #ffffff;
+  --surface-modal: #ffffff;
+  --surface-field: #ffffff;
+  --composer: #ffffff;
+  --send-off-bg: #d7d7d7;
+  --send-off-fg: #ffffff;
+  --shadow: rgb(0 0 0 / 10%);
+  --scrim: rgb(0 0 0 / 30%);
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+/* A white menu or dialog on a white page needs an edge. */
+[data-theme="light"] .session-menu,
+[data-theme="light"] .backend-menu,
+[data-theme="light"] .command-menu,
+[data-theme="light"] .modal {
+  box-shadow:
+    0 0 0 1px #0000000f,
+    0 10px 32px var(--shadow);
+}
+
+[data-theme="light"] .composer-box {
+  box-shadow:
+    0 0 0 1px #0000001a,
+    0 4px 16px rgb(0 0 0 / 6%);
+}
+
+[data-theme="light"] pre.code {
+  box-shadow: inset 0 0 0 1px #0000000f;
+}
+
+/* ── Settings ──────────────────────────────────────────────────────────── */
+
+.modal.settings-dialog {
+  width: min(30rem, 100%);
+}
+
+.settings-body {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 16px 12px;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--fg) 8%, transparent);
+}
+
+.settings-row:last-child {
+  border-bottom: 0;
+}
+
+.settings-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.settings-label {
+  font-size: 0.9375rem;
+}
+
+.settings-hint {
+  color: var(--fg-dim);
+  font-size: 0.8125rem;
+}
+
+.segmented {
+  flex: 0 0 auto;
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--fg) 8%, transparent);
+}
+
+.segmented button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--fg-dim);
+  font: inherit;
+  font-size: 0.875rem;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.segmented button.on {
+  background: var(--surface-modal);
+  color: var(--fg);
+  box-shadow: 0 1px 3px var(--shadow);
+}
+
+.segmented svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+@media (max-width: 640px) {
+  .settings-row {
+    flex-direction: column;
+    align-items: stretch;
   }
 
-  pre.code {
-    background: #171717;
-  }
-
-  .modal,
-  .session-menu,
-  .backend-menu,
-  .command-menu {
-    background: #262626;
+  .segmented button {
+    flex: 1 1 0;
+    justify-content: center;
+    padding: 9px 12px;
+    font-size: 1rem;
   }
 }

@@ -9,6 +9,8 @@ import { KeyHelp, useGlobalKey, useKeys, WhichKey, type Keymap } from "./keys"
 import { Login } from "./Login"
 import { usePush, useVisible } from "./push"
 import { ProjectDialog } from "./Projects"
+import { SettingsDialog } from "./Settings"
+import { useSettings } from "./settings"
 import { Tasks } from "./Tasks"
 import { isOpen, PROJECTS_SECTION, Sidebar, sidebarOrder } from "./Sidebar"
 import { Terminal } from "./Terminal"
@@ -76,6 +78,9 @@ function App() {
     push.endpoint ? { endpoint: push.endpoint, session: visible ? activeId : null } : null,
   )
   const narrow = useNarrow()
+  // This device's appearance and default agent; see settings.ts.
+  const [settings, changeSettings] = useSettings()
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   // The token outlives the app now (see `getToken`), so a stored one can be
   // dead. Checked once on open, and any 401 later lands here too.
@@ -505,6 +510,11 @@ function App() {
         if (projectId) reveal(projectId)
       }}
       onCollapse={() => (narrow ? setDrawerOpen(false) : setSidebarOpen(false))}
+      defaultBackend={settings.backend}
+      onOpenSettings={() => {
+        setSettingsOpen(true)
+        setDrawerOpen(false)
+      }}
       browserOpen={side === "browser"}
       onToggleBrowser={() => {
         if (narrow) setDrawerOpen(false)
@@ -701,6 +711,9 @@ function App() {
           }}
           onClose={() => setProjectDialog(null)}
         />
+      )}
+      {settingsOpen && (
+        <SettingsDialog settings={settings} onChange={changeSettings} onClose={() => setSettingsOpen(false)} />
       )}
       <WhichKey pending={pending} keymap={keymap} groups={{ "Space n": "new session" }} />
       {help && (

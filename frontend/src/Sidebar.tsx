@@ -16,7 +16,7 @@ import {
   Plus,
   Settings,
 } from "lucide-react"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import type { AgentBackend, AgentInfo, Device, Project } from "./api"
 import { RenameInput } from "./Confirm"
 import { DevicesDialog } from "./Devices"
@@ -101,6 +101,9 @@ type Props = {
   onCollapse: () => void
   browserOpen: boolean
   onToggleBrowser: () => void
+  // What "+" starts, with no menu to choose from; see Settings.
+  defaultBackend: AgentBackend
+  onOpenSettings: () => void
 }
 
 export function Sidebar({
@@ -128,6 +131,8 @@ export function Sidebar({
   onCollapse,
   browserOpen,
   onToggleBrowser,
+  defaultBackend,
+  onOpenSettings,
 }: Props) {
   // Ages are relative, so they go stale without any new data. A local clock,
   // not a poll: nothing is fetched.
@@ -201,7 +206,7 @@ export function Sidebar({
       <div className="sidebar-head">
         <span className="brand">loom</span>
         <span className="sidebar-actions">
-          <NewSessionButton onCreate={(backend) => onCreate(backend)} />
+          <NewSessionButton backend={defaultBackend} onCreate={(backend) => onCreate(backend)} />
           <button className="icon-btn" onClick={onCollapse} title="Hide sidebar">
             <PanelLeftClose />
           </button>
@@ -247,6 +252,7 @@ export function Sidebar({
                     <span className="session-label">{project.name}</span>
                     <span className="project-actions" onClick={(e) => e.stopPropagation()}>
                       <NewSessionButton
+                        backend={defaultBackend}
                         small
                         title={`New session in ${project.name}`}
                         onCreate={(backend) => onCreate(backend, project.id)}
@@ -351,6 +357,11 @@ export function Sidebar({
             {online}/{devices.length}
           </span>
         </button>
+        {/* This device's preferences: appearance, and the agent "+" starts. */}
+        <button className="devices-btn push-btn" onClick={onOpenSettings} title="Settings">
+          <Settings />
+          <span>Settings</span>
+        </button>
         {devicesOpen && (
           <DevicesDialog
             devices={devices}
@@ -401,54 +412,30 @@ function PushButton({ push }: { push: Push }) {
 }
 
 /**
- * Creating a session means choosing an engine, so there is no plain "+".
- *
- * The choice cannot be changed later — the conversation lives in that engine's
- * own store — so it is made explicitly rather than defaulted.
+ * "+": a new session on the default agent, at once. The agent is a setting
+ * (Claude Code unless changed) rather than a question asked every time; a
+ * session keeps the one it started on.
  */
 function NewSessionButton({
+  backend,
   onCreate,
   small = false,
   title = "New session",
 }: {
+  backend: AgentBackend
   onCreate: (backend: AgentBackend) => void
   // The one on a project's row, the size of the row's other buttons.
   small?: boolean
   title?: string
 }) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLSpanElement>(null)
-
-  useEffect(() => {
-    if (!open) return
-    const onAway = (e: MouseEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener("mousedown", onAway)
-    return () => document.removeEventListener("mousedown", onAway)
-  }, [open])
-
-  const choose = (backend: AgentBackend) => {
-    setOpen(false)
-    onCreate(backend)
-  }
-
   return (
-    <span className="new-session" ref={ref}>
-      <button
-        className={small ? "session-del project-new" : "icon-btn"}
-        onClick={() => setOpen((v) => !v)}
-        title={title}
-      >
-        <Plus />
-      </button>
-      {open && (
-        <div className="backend-menu">
-          <button onClick={() => choose("claude_code")}>Claude Code</button>
-          <button onClick={() => choose("codex")}>Codex</button>
-        </div>
-      )}
-    </span>
+    <button
+      className={small ? "session-del project-new" : "icon-btn"}
+      onClick={() => onCreate(backend)}
+      title={title}
+    >
+      <Plus />
+    </button>
   )
 }
 
