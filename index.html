@@ -1,0 +1,659 @@
+<!doctype html>
+<html lang="zh-CN" class="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Loom — 把 AI 编程智能体织进你的每一台设备</title>
+<meta name="description" content="Loom: a self-hosted home for Claude Code, Codex and Kiro agents. Sessions that live on the server, survive restarts, sleep to consolidate memory, and work as virtual employees.">
+<meta property="og:title" content="Loom — Weave your coding agents into every device">
+<meta property="og:description" content="Self-hosted. Phone-first. Agents that never drop a turn, sleep on their memories, and clock in as virtual employees.">
+<link rel="icon" href="favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#07070a; --bg2:#0d0d12; --card:#111118; --line:#ffffff14; --line2:#ffffff22;
+  --fg:#f4f4f6; --mute:#9a9aab; --dim:#62626f;
+  --a1:#ffb547; --a2:#ff5e8a; --a3:#8b7bff; --a4:#36d6c3;
+  --grad:linear-gradient(100deg,var(--a1),var(--a2) 45%,var(--a3));
+  --mono:"JetBrains Mono",ui-monospace,monospace;
+  --sans:Inter,"Noto Sans SC",system-ui,-apple-system,"PingFang SC",sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;background:var(--bg)}
+body{font-family:var(--sans);color:var(--fg);background:var(--bg);line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+a{color:inherit;text-decoration:none}
+html.zh .en, html.en .zh{display:none!important}
+.wrap{max-width:1180px;margin:0 auto;padding:0 24px}
+.grad{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.mono{font-family:var(--mono)}
+
+/* nav */
+nav{position:fixed;inset:0 0 auto;z-index:50;backdrop-filter:blur(16px) saturate(1.4);-webkit-backdrop-filter:blur(16px) saturate(1.4);background:#07070ab0;border-bottom:1px solid var(--line)}
+nav .wrap{display:flex;align-items:center;height:62px;gap:28px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:19px;letter-spacing:-.02em}
+.brand img{width:28px;height:28px}
+nav .links{display:flex;gap:22px;font-size:14px;color:var(--mute);margin-left:auto}
+nav .links a:hover{color:var(--fg)}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:10px 18px;border-radius:999px;font-weight:600;font-size:14px;border:1px solid var(--line2);transition:.2s}
+.btn:hover{border-color:#ffffff55;transform:translateY(-1px)}
+.btn.primary{background:var(--fg);color:#000;border-color:var(--fg)}
+.btn.primary:hover{box-shadow:0 8px 30px #ffffff30}
+.lang{cursor:pointer;font-size:13px;padding:6px 12px;border-radius:999px;border:1px solid var(--line2);color:var(--mute);background:none;font-family:inherit}
+.lang:hover{color:var(--fg)}
+
+/* hero */
+.hero{position:relative;padding:150px 0 60px;overflow:hidden}
+#threads{position:absolute;inset:0;width:100%;height:100%;opacity:.55;pointer-events:none}
+.hero::after{content:"";position:absolute;inset:auto 0 0;height:240px;background:linear-gradient(transparent,var(--bg));pointer-events:none}
+.hero .wrap{position:relative;z-index:2;text-align:center}
+.pill{display:inline-flex;align-items:center;gap:8px;padding:6px 14px 6px 8px;border-radius:999px;border:1px solid var(--line2);background:#ffffff08;font-size:13px;color:var(--mute)}
+.pill b{background:var(--grad);color:#000;padding:2px 8px;border-radius:999px;font-size:11px;letter-spacing:.04em}
+h1{font-size:clamp(40px,7.2vw,88px);line-height:1.04;letter-spacing:-.045em;font-weight:900;margin:26px auto 22px;max-width:980px}
+html.zh h1{letter-spacing:-.02em;line-height:1.12}
+html.en h1{font-size:clamp(38px,6.4vw,80px);max-width:1120px}
+.lead{font-size:clamp(16px,2vw,20px);color:var(--mute);max-width:720px;margin:0 auto}
+.cta{display:flex;gap:12px;justify-content:center;margin-top:34px;flex-wrap:wrap}
+.agents{display:flex;gap:10px;justify-content:center;margin-top:26px;flex-wrap:wrap;font-size:13px;color:var(--dim)}
+.agents span{padding:4px 12px;border:1px solid var(--line);border-radius:8px;font-family:var(--mono);color:var(--mute)}
+
+/* demo */
+.demo{position:relative;margin:70px auto 0;max-width:1100px;z-index:2}
+.win{border-radius:16px;border:1px solid var(--line2);background:#0b0b10;box-shadow:0 40px 120px -20px #000,0 0 0 1px #00000080,0 0 120px -40px #8b7bff55;overflow:hidden;text-align:left}
+.win .bar{height:38px;display:flex;align-items:center;gap:8px;padding:0 14px;border-bottom:1px solid var(--line);background:#0f0f15}
+.win .bar i{width:11px;height:11px;border-radius:50%;background:#2a2a33}
+.win .bar i:nth-child(1){background:#ff5f57}.win .bar i:nth-child(2){background:#febc2e}.win .bar i:nth-child(3){background:#28c840}
+.win .bar .url{margin:0 auto;font-size:12px;color:var(--dim);font-family:var(--mono);background:#ffffff08;padding:3px 14px;border-radius:6px}
+.app{display:grid;grid-template-columns:210px 1fr 330px;height:500px}
+.side{border-right:1px solid var(--line);padding:14px 10px;font-size:12.5px;color:var(--mute);display:flex;flex-direction:column;gap:2px;background:#0a0a0e}
+.side h6{font-size:11px;color:var(--fg);font-weight:700;margin:12px 8px 6px;letter-spacing:.02em}
+.side .row{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;white-space:nowrap;overflow:hidden}
+.side .row.on{background:#ffffff10;color:var(--fg)}
+.side .dot{width:7px;height:7px;border-radius:50%;background:#3b82f6;margin-left:auto;flex:none}
+.side .moon{margin-left:auto}
+.side .live{width:7px;height:7px;border-radius:50%;background:#28c840;box-shadow:0 0 8px #28c840;flex:none}
+.side .foot{margin-top:auto;border-top:1px solid var(--line);padding-top:8px}
+.chat{display:flex;flex-direction:column;min-width:0}
+.chat .msgs{flex:1;overflow:hidden;padding:18px 22px;display:flex;flex-direction:column;gap:10px;font-size:13.5px;justify-content:flex-end}
+.m{opacity:0;transform:translateY(8px);transition:.4s}
+.m.show{opacity:1;transform:none}
+.m.user{align-self:flex-end;background:#ffffff12;padding:9px 14px;border-radius:16px 16px 4px 16px;max-width:78%}
+.m.tool{font-family:var(--mono);font-size:11.5px;color:var(--mute);display:flex;gap:8px;align-items:center}
+.m.tool .ok{color:#28c840}
+.m.tool .ic{width:16px;height:16px;border-radius:4px;background:#ffffff10;display:grid;place-items:center;font-size:9px}
+.m.sys{align-self:center;font-size:11.5px;font-family:var(--mono);padding:5px 12px;border-radius:999px;border:1px dashed #ffb54766;color:var(--a1)}
+.m.sys.green{border-color:#28c84066;color:#5ee07a}
+.m.bot{max-width:90%}
+.compose{margin:0 16px 16px;border:1px solid var(--line2);border-radius:18px;padding:11px 14px;font-size:13px;color:var(--dim);display:flex;align-items:center;gap:10px}
+.compose .send{margin-left:auto;width:26px;height:26px;border-radius:50%;background:var(--fg);display:grid;place-items:center;color:#000;font-size:13px}
+.canvas{border-left:1px solid var(--line);background:#0e0e14;display:flex;flex-direction:column}
+.canvas .tabs{display:flex;gap:4px;padding:8px;border-bottom:1px solid var(--line);font-size:11.5px;color:var(--mute)}
+.canvas .tabs span{padding:4px 10px;border-radius:6px}
+.canvas .tabs span.on{background:#ffffff10;color:var(--fg)}
+.canvas .stage{flex:1;padding:18px;display:flex;flex-direction:column;gap:12px}
+.kpi{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.kpi div{border:1px solid var(--line);border-radius:10px;padding:10px;font-size:11px;color:var(--mute)}
+.kpi b{display:block;font-size:20px;color:var(--fg);font-weight:700}
+.chart{flex:1;border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;align-items:flex-end;gap:7px}
+.chart i{flex:1;border-radius:4px 4px 0 0;background:linear-gradient(var(--a3),#8b7bff33);height:10%;transition:height 1s cubic-bezier(.2,.8,.2,1)}
+.chart i:nth-child(3n){background:linear-gradient(var(--a2),#ff5e8a33)}
+.term{border-radius:10px;background:#000;border:1px solid var(--line);font-family:var(--mono);font-size:10.5px;padding:10px;color:#9ae6b4;line-height:1.5;height:92px;overflow:hidden}
+.term .p{color:var(--a1)}
+
+.phone{position:absolute;right:-30px;bottom:-60px;width:220px;height:440px;border-radius:38px;background:#000;border:7px solid #1c1c22;box-shadow:0 30px 80px #000,0 0 0 1px #ffffff1a;overflow:hidden;display:flex;flex-direction:column;z-index:3}
+.phone .notch{width:84px;height:22px;background:#000;border-radius:0 0 14px 14px;margin:0 auto;position:relative;z-index:2}
+.phone .ph-head{font-size:11px;text-align:center;color:var(--fg);font-weight:600;padding:6px 0 8px;border-bottom:1px solid var(--line)}
+.phone .msgs{flex:1;padding:10px;display:flex;flex-direction:column;justify-content:flex-end;gap:7px;font-size:10.5px;overflow:hidden}
+.phone .m.tool{font-size:9px}
+.phone .m.sys{font-size:9px}
+.phone .compose{margin:8px;padding:8px 10px;font-size:10px}
+.phone .compose .send{width:20px;height:20px;font-size:10px}
+.sync{position:absolute;right:170px;bottom:250px;z-index:4;font-size:12px;font-family:var(--mono);background:#111118;border:1px solid var(--line2);padding:6px 12px;border-radius:999px;color:var(--a4);display:flex;align-items:center;gap:8px;box-shadow:0 10px 30px #000}
+.sync i{width:7px;height:7px;border-radius:50%;background:var(--a4);animation:pulse 1.6s infinite}
+@keyframes pulse{50%{opacity:.3}}
+
+/* sections */
+section{padding:110px 0;position:relative}
+.eyebrow{font-family:var(--mono);font-size:12.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--a1);margin-bottom:14px}
+h2{font-size:clamp(30px,4.6vw,54px);line-height:1.1;letter-spacing:-.035em;font-weight:800;max-width:820px}
+html.zh h2{letter-spacing:-.01em;line-height:1.2}
+.sub{color:var(--mute);font-size:18px;max-width:680px;margin-top:16px}
+
+.stats{display:grid;grid-template-columns:repeat(5,1fr);border:1px solid var(--line);border-radius:20px;overflow:hidden;margin-top:30px;background:var(--bg2)}
+.stats div{padding:28px 22px;border-right:1px solid var(--line)}
+.stats div:last-child{border:0}
+.stats b{display:block;font-size:40px;font-weight:800;letter-spacing:-.04em;line-height:1}
+.stats span{font-size:13px;color:var(--mute);display:block;margin-top:10px}
+.stats b span{display:inline;font-size:inherit;color:inherit;margin:0}
+
+.bento{display:grid;grid-template-columns:repeat(6,1fr);gap:14px;margin-top:54px}
+.card{position:relative;background:var(--card);border:1px solid var(--line);border-radius:20px;padding:26px;overflow:hidden;transition:border-color .3s,transform .3s}
+.card:hover{border-color:var(--line2);transform:translateY(-3px)}
+.card::before{content:"";position:absolute;inset:0;background:radial-gradient(600px circle at var(--mx,50%) var(--my,0%),#ffffff0d,transparent 40%);opacity:0;transition:.3s;pointer-events:none}
+.card:hover::before{opacity:1}
+.card .ico{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;font-size:20px;background:#ffffff0a;border:1px solid var(--line);margin-bottom:18px}
+.card h3{font-size:19px;font-weight:700;letter-spacing:-.01em;margin-bottom:8px}
+.card p{color:var(--mute);font-size:14.5px}
+.card ul{list-style:none;margin-top:14px;display:grid;gap:7px;font-size:13.5px;color:var(--mute)}
+.card ul li::before{content:"→ ";color:var(--dim)}
+.c2{grid-column:span 2}.c3{grid-column:span 3}.c4{grid-column:span 4}.c6{grid-column:span 6}
+.tagrow{display:flex;gap:6px;flex-wrap:wrap;margin-top:16px}
+.tagrow span{font-family:var(--mono);font-size:11px;padding:3px 9px;border-radius:6px;background:#ffffff0a;color:var(--mute);border:1px solid var(--line)}
+
+/* spotlight */
+.spot{display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:center}
+.spot.rev .txt{order:2}
+.spot .txt h2{font-size:clamp(28px,3.8vw,44px)}
+.points{margin-top:26px;display:grid;gap:14px}
+.points div{display:flex;gap:14px;font-size:15px;color:var(--mute)}
+.points div b{color:var(--fg);font-weight:600}
+.points div::before{content:"";flex:none;width:6px;height:6px;border-radius:50%;margin-top:10px;background:var(--a1);box-shadow:0 0 10px var(--a1)}
+.viz{border:1px solid var(--line);border-radius:22px;background:var(--bg2);padding:28px;min-height:380px;position:relative;overflow:hidden}
+
+/* restart viz */
+.lanes{display:grid;gap:22px;margin-top:6px}
+.lane{font-family:var(--mono);font-size:12px;color:var(--mute)}
+.lane .lbl{display:flex;justify-content:space-between;margin-bottom:8px}
+.track{height:34px;border-radius:9px;background:#ffffff06;border:1px solid var(--line);position:relative;overflow:hidden}
+.seg{position:absolute;top:5px;bottom:5px;border-radius:6px;width:0;transition:width 2.4s linear}
+.seg.loom1{left:1%;background:linear-gradient(90deg,#8b7bff,#8b7bffaa)}
+.seg.gap{left:43%;background:repeating-linear-gradient(45deg,#ff5e8a55 0 6px,transparent 6px 12px);border:1px dashed #ff5e8a}
+.seg.loom2{left:58%;background:linear-gradient(90deg,#8b7bff,#8b7bffaa)}
+.seg.agent{left:1%;background:linear-gradient(90deg,var(--a1),var(--a2))}
+.ev{position:absolute;top:50%;transform:translate(-50%,-50%);font-size:10px;white-space:nowrap;padding:2px 7px;border-radius:5px;background:#000;border:1px solid var(--line2);color:var(--fg);opacity:0;transition:.4s}
+.ev.show{opacity:1}
+.restart-log{margin-top:26px;font-family:var(--mono);font-size:12px;background:#000;border:1px solid var(--line);border-radius:12px;padding:14px 16px;line-height:1.8;min-height:130px;color:var(--mute)}
+.restart-log .g{color:#5ee07a}.restart-log .y{color:var(--a1)}.restart-log .p{color:var(--a3)}
+
+/* sleep viz */
+.night{background:radial-gradient(ellipse at 70% 0%,#2a1f5a 0%,transparent 60%),radial-gradient(ellipse at 10% 100%,#0f3a44 0%,transparent 55%),#07070d}
+.stars i{position:absolute;width:2px;height:2px;border-radius:50%;background:#fff;animation:tw 3s infinite}
+@keyframes tw{50%{opacity:.2}}
+.moonbig{position:absolute;right:34px;top:28px;width:74px;height:74px;border-radius:50%;box-shadow:inset -16px -6px 0 0 #f6e7b5;filter:drop-shadow(0 0 22px #f6e7b588)}
+.dream-flow{position:relative;margin-top:110px;display:grid;gap:10px}
+.dream-flow .r{display:flex;align-items:center;gap:12px;background:#ffffff08;border:1px solid var(--line);border-radius:12px;padding:11px 14px;font-size:13px;backdrop-filter:blur(6px)}
+.dream-flow .r .t{font-family:var(--mono);font-size:11px;color:var(--dim);width:44px;flex:none}
+.dream-flow .r .badge{margin-left:auto;font-size:10.5px;font-family:var(--mono);padding:2px 8px;border-radius:5px}
+.b-keep{background:#28c84022;color:#5ee07a}.b-arch{background:#ffb54722;color:var(--a1)}.b-prop{background:#8b7bff22;color:#b3a9ff}
+
+/* employees viz */
+.emp-head{display:flex;align-items:center;gap:14px}
+.avatar{width:46px;height:46px;border-radius:14px;background:var(--grad);display:grid;place-items:center;font-size:22px}
+.emp-head b{font-size:16px}.emp-head small{display:block;color:var(--mute);font-size:12px}
+.status{margin-left:auto;font-size:11px;font-family:var(--mono);padding:4px 10px;border-radius:999px;background:#28c84018;color:#5ee07a;border:1px solid #28c84040}
+.kpis{margin-top:22px;display:grid;gap:14px}
+.kpis .k{font-size:13px}
+.kpis .k .top{display:flex;justify-content:space-between;color:var(--mute);margin-bottom:6px}
+.kpis .bar{height:7px;border-radius:9px;background:#ffffff0d;overflow:hidden}
+.kpis .bar i{display:block;height:100%;width:0;border-radius:9px;background:var(--grad);transition:width 1.6s cubic-bezier(.2,.8,.2,1)}
+.budget{margin-top:22px;display:flex;align-items:center;gap:16px;padding:14px;border-radius:14px;background:#ffffff06;border:1px solid var(--line)}
+.ring{width:58px;height:58px;flex:none}
+.budget div{font-size:13px;color:var(--mute)}.budget b{color:var(--fg);font-size:18px}
+.workcard{margin-top:16px;font-family:var(--mono);font-size:11.5px;background:#000;border:1px solid var(--line);border-radius:12px;padding:12px 14px;color:var(--mute);line-height:1.65;white-space:pre}
+.workcard .k{color:#b3a9ff}.workcard .s{color:#5ee07a}.workcard .n{color:var(--a1)}
+
+/* devices viz */
+.net{position:relative;height:330px}
+.net svg{position:absolute;inset:0;width:100%;height:100%}
+.node{position:absolute;transform:translate(-50%,-50%);text-align:center;font-size:12px;color:var(--mute)}
+.node .box{width:66px;height:66px;border-radius:18px;background:#16161f;border:1px solid var(--line2);display:grid;place-items:center;font-size:28px;margin:0 auto 8px;box-shadow:0 10px 30px #000}
+.node.srv .box{width:92px;height:92px;border-radius:26px;background:#fff;border:0;box-shadow:0 0 60px #8b7bff66}
+.node.srv .box img{width:64px}
+.flow{stroke-dasharray:5 9;animation:dash 1.2s linear infinite}
+@keyframes dash{to{stroke-dashoffset:-28}}
+
+/* self-built */
+.selfbuilt{border:1px solid var(--line);border-radius:28px;padding:56px;background:radial-gradient(800px circle at 0% 0%,#ff5e8a1a,transparent 50%),radial-gradient(800px circle at 100% 100%,#8b7bff1f,transparent 50%),var(--bg2);display:grid;grid-template-columns:1.1fr 1fr;gap:50px;align-items:center}
+.commits{font-family:var(--mono);font-size:12.5px;display:grid;gap:2px}
+.commits div{display:flex;gap:12px;padding:7px 10px;border-radius:8px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.commits div:hover{background:#ffffff08}
+.commits span{color:var(--a1);flex:none}
+
+/* arch */
+.arch{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:50px}
+.layer{border:1px solid var(--line);border-radius:18px;padding:22px;background:var(--card)}
+.layer small{font-family:var(--mono);color:var(--a4);font-size:11px;letter-spacing:.1em;text-transform:uppercase}
+.layer h4{font-size:17px;margin:8px 0 6px}
+.layer p{font-size:13.5px;color:var(--mute)}
+pre.code{margin-top:44px;background:#000;border:1px solid var(--line);border-radius:18px;padding:24px 26px;font-family:var(--mono);font-size:13.5px;line-height:1.8;color:#d4d4dc;overflow:auto}
+pre.code .c{color:var(--dim)}pre.code .p{color:var(--a1)}
+
+.final{text-align:center;padding:140px 0 120px}
+.final h2{margin:0 auto}
+footer{border-top:1px solid var(--line);padding:30px 0;color:var(--dim);font-size:13px}
+footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
+
+/* reveal */
+.rv{opacity:0;transform:translateY(28px);transition:opacity .9s cubic-bezier(.2,.8,.2,1),transform .9s cubic-bezier(.2,.8,.2,1)}
+.rv.in{opacity:1;transform:none}
+
+@media (max-width:980px){
+  .app{grid-template-columns:1fr;height:440px}.side,.canvas{display:none}
+  .phone{right:-6px;bottom:-40px;width:170px;height:340px;border-width:5px;border-radius:30px}
+  .sync{display:none}
+  .stats{grid-template-columns:repeat(2,1fr)}.stats div{border-bottom:1px solid var(--line)}
+  .bento{grid-template-columns:1fr}.c2,.c3,.c4,.c6{grid-column:auto}
+  .spot,.selfbuilt{grid-template-columns:1fr;gap:34px}.spot.rev .txt{order:0}
+  .selfbuilt{padding:30px}
+  .arch{grid-template-columns:1fr 1fr}
+  nav .links{display:none}
+}
+@media (max-width:560px){html.zh h1{font-size:8.6vw}.arch{grid-template-columns:1fr}.phone{display:none}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.rv{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a class="brand" href="#"><img src="favicon.svg" alt="">Loom</a>
+    <div class="links">
+      <a href="#features"><span class="zh">功能</span><span class="en">Features</span></a>
+      <a href="#restart"><span class="zh">重启不断线</span><span class="en">Restart‑proof</span></a>
+      <a href="#sleep"><span class="zh">睡眠</span><span class="en">Sleep</span></a>
+      <a href="#employees"><span class="zh">虚拟员工</span><span class="en">Employees</span></a>
+      <a href="#arch"><span class="zh">架构</span><span class="en">Architecture</span></a>
+    </div>
+    <button class="lang" id="lang">EN</button>
+    <a class="btn primary" href="https://github.com/quanquan1996/loom">★ GitHub</a>
+  </div>
+</nav>
+
+<header class="hero">
+  <canvas id="threads"></canvas>
+  <div class="wrap">
+    <span class="pill rv"><b>NEW</b><span class="zh">睡眠记忆整理 · 虚拟员工 · 重启不丢回合</span><span class="en">Sleep · Virtual employees · Restart‑proof turns</span></span>
+    <h1 class="rv">
+      <span class="zh">把 AI 编程智能体<br><span class="grad">织进你的每一台设备</span></span>
+      <span class="en">Weave your coding agents<br><span class="grad">into every device you own</span></span>
+    </h1>
+    <p class="lead rv">
+      <span class="zh">Loom 是一个自托管的智能体工作台。Claude Code、Codex、Kiro 跑在你的服务器上，手机、平板、电脑随时接入同一个会话 —— 关掉浏览器，它还在干活；服务器重启，它都不会停。</span>
+      <span class="en">Loom is a self‑hosted home for coding agents. Claude Code, Codex and Kiro run on your server; your phone, tablet and laptop all join the same session. Close the tab and it keeps working. Restart the server and it still doesn't stop.</span>
+    </p>
+    <div class="cta rv">
+      <a class="btn primary" href="https://github.com/quanquan1996/loom"><span class="zh">在 GitHub 上查看</span><span class="en">View on GitHub</span> →</a>
+      <a class="btn" href="#features"><span class="zh">看看它能做什么</span><span class="en">See what it does</span></a>
+    </div>
+    <div class="agents rv"><span>claude</span><span>codex</span><span>kiro‑cli</span><span>loom‑node</span><span>chromium + CDP</span></div>
+
+    <div class="demo rv">
+      <div class="win">
+        <div class="bar"><i></i><i></i><i></i><span class="url">loom.your‑server.dev</span></div>
+        <div class="app">
+          <aside class="side">
+            <div class="row on">✎ <span class="zh">新会话</span><span class="en">New session</span></div>
+            <h6><span class="zh">项目</span><span class="en">Projects</span></h6>
+            <div class="row">▾ 📁 <span class="zh">Loom 自身迭代</span><span class="en">Loom itself</span><span class="moon">🌙</span></div>
+            <div class="row on" style="padding-left:22px"><span class="zh">深色模式 + 部署</span><span class="en">Dark mode + deploy</span></div>
+            <div class="row" style="padding-left:22px"><span class="zh">宣传网页</span><span class="en">Landing page</span><span class="dot"></span></div>
+            <div class="row">▸ 📁 <span class="zh">健身数据</span><span class="en">Fitness data</span></div>
+            <h6><span class="zh">员工</span><span class="en">Employees</span></h6>
+            <div class="row">🧑‍💻 <span class="zh">小研 · 调研员</span><span class="en">Rae · researcher</span><span class="live"></span></div>
+            <div class="row">📊 <span class="zh">小数 · 分析师</span><span class="en">Dex · analyst</span></div>
+            <h6><span class="zh">最近</span><span class="en">Recents</span></h6>
+            <div class="row"><span class="zh">每日 AWS 新闻</span><span class="en">Daily AWS news</span> ⏰</div>
+            <div class="row"><span class="zh">iHerb 比价</span><span class="en">iHerb price check</span></div>
+            <div class="foot">
+              <div class="row">💻 MacBook <span class="live"></span></div>
+              <div class="row">🖥 Win‑PC <span class="live"></span></div>
+              <div class="row">🌐 Browser · ⚙︎</div>
+            </div>
+          </aside>
+          <main class="chat">
+            <div class="msgs" id="msgs"></div>
+            <div class="compose"><span class="zh">回复 Claude… 工作中也能插话</span><span class="en">Reply… you can talk while it works</span><span class="send">↑</span></div>
+          </main>
+          <aside class="canvas">
+            <div class="tabs"><span class="on">dashboard.html</span><span>📁 output</span><span>⌨ zsh</span></div>
+            <div class="stage">
+              <div class="kpi">
+                <div><span class="zh">今日回合</span><span class="en">Turns today</span><b id="k1">0</b></div>
+                <div><span class="zh">在线设备</span><span class="en">Devices online</span><b>3</b></div>
+              </div>
+              <div class="chart" id="chart"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+              <div class="term" id="term"><span class="p">~/loom ❯</span> rel/deploy.sh</div>
+            </div>
+          </aside>
+        </div>
+      </div>
+      <div class="sync"><i></i><span class="zh">同一会话 · 实时同步</span><span class="en">same session · live</span></div>
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="ph-head"><span class="zh">深色模式 + 部署</span><span class="en">Dark mode + deploy</span></div>
+        <div class="msgs" id="pmsgs"></div>
+        <div class="compose"><span class="zh">回复…</span><span class="en">Reply…</span><span class="send">↑</span></div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<section style="padding-top:120px">
+  <div class="wrap">
+    <div class="stats rv">
+      <div><b class="grad">3</b><span class="zh">智能体后端：Claude Code / Codex / Kiro</span><span class="en">agent backends: Claude Code, Codex, Kiro</span></div>
+      <div><b><span class="count" data-to="2">0</span>s</b><span class="zh">常驻进程，回复起步约 2 秒（冷启动约 10 秒）</span><span class="en">first token with a warm process (10s cold)</span></div>
+      <div><b>0</b><span class="zh">服务器重启时丢掉的回合</span><span class="en">turns lost when Loom restarts</span></div>
+      <div><b><span class="count" data-to="5">0</span>+</b><span class="zh">设备类型：Mac / Windows / Linux / WSL / 手机</span><span class="en">device kinds: Mac, Windows, Linux, WSL, phone</span></div>
+      <div><b><span class="count" data-to="25">0</span>k</b><span class="zh">行代码，3 个月，大部分由 Loom 里的智能体写成</span><span class="en">lines in 3 months, mostly written by agents inside Loom</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="features" style="padding-top:40px">
+  <div class="wrap">
+    <div class="eyebrow rv">Features</div>
+    <h2 class="rv"><span class="zh">智能体想要的一切，<span class="grad">都织在一起</span>。</span><span class="en">Everything an agent needs, <span class="grad">woven together</span>.</span></h2>
+    <p class="sub rv"><span class="zh">聊天、终端、画布、定时任务、你自己的电脑、一个已登录的浏览器 —— 一个页面，所有设备。</span><span class="en">Chat, terminals, a canvas, schedules, your own computers, a logged‑in browser. One page, every device.</span></p>
+
+    <div class="bento">
+      <div class="card c4 rv">
+        <div class="ico">💬</div>
+        <h3><span class="zh">会话活在服务器上</span><span class="en">Sessions live on the server</span></h3>
+        <p><span class="zh">在电脑上开始一个任务，在地铁上用手机看它完成。断线重连只补发错过的部分；智能体干活时发的消息会直接并入当前回合，不用等。</span><span class="en">Start a turn on the laptop, watch it finish on the phone. A reconnecting tab replays only what it missed, and a message sent mid‑turn joins the running turn.</span></p>
+        <div class="tagrow"><span>GenServer / session</span><span>Phoenix Channels</span><span>/compact</span><span>/reload</span><span>attachments</span></div>
+      </div>
+      <div class="card c2 rv">
+        <div class="ico">⌨️</div>
+        <h3><span class="zh">真正的终端</span><span class="en">Real terminals</span></h3>
+        <p><span class="zh">PTY Shell 和聊天并排，可开多个。关掉标签页也不会断，两台设备可以共用一个 Shell；tmux / nvim 的复制能直达浏览器剪贴板。</span><span class="en">PTY shells beside the chat. They outlive the tab, two devices can share one, and OSC 52 copies from tmux/nvim reach your clipboard.</span></p>
+      </div>
+      <div class="card c2 rv">
+        <div class="ico">🎨</div>
+        <h3><span class="zh">画布</span><span class="en">Canvas</span></h3>
+        <p><span class="zh">智能体写进 <code class="mono">output/</code> 的网页、图表、仪表盘会马上出现在右侧，运行在沙箱里。图片、音视频、Markdown、CSV 都有内置预览。</span><span class="en">Pages, charts and dashboards an agent writes to <code class="mono">output/</code> appear beside the chat, sandboxed. Built‑in viewers for media, Markdown and CSV.</span></p>
+      </div>
+      <div class="card c2 rv">
+        <div class="ico">🎞</div>
+        <h3><span class="zh">一句话出幻灯片</span><span class="en">Slides in one ask</span></h3>
+        <p><span class="zh">reveal.js + 代码高亮 + KaTeX 公式，资源由 Loom 自己提供，离线也能放映，一键导出 PDF。</span><span class="en">reveal.js with highlighting and KaTeX, served by Loom itself so it works offline, with a one‑click PDF.</span></p>
+      </div>
+      <div class="card c2 rv">
+        <div class="ico">⏰</div>
+        <h3><span class="zh">用大白话定时</span><span class="en">Schedules in plain words</span></h3>
+        <p><span class="zh">"每个工作日早上 10 点帮我查一下……" —— 智能体会自己建定时任务，按你的本地时间触发，在任务页里统一管理。</span><span class="en">"Every weekday at 10:00, check…" — the agent creates the job itself, on your wall clock, listed on the Tasks page.</span></p>
+      </div>
+      <div class="card c3 rv">
+        <div class="ico">🖥</div>
+        <h3><span class="zh">loom‑node：操作你自己的电脑</span><span class="en">loom‑node: your own machines</span></h3>
+        <p><span class="zh">一行命令装到 Mac、Windows、Linux 或 WSL 上，任意会话里的智能体都能以你的身份在那台机器上执行命令、读写文件。只往外连，不开端口，躲在家用路由器后面也能用。</span><span class="en">One line installs it on a Mac, Windows PC, Linux box or WSL; agents in any session can then run commands and move files there as you. Outbound only, so it works behind NAT.</span></p>
+        <div class="tagrow"><span>curl … | sh</span><span>irm … | iex</span><span>launchd / systemd</span><span>per‑device token</span></div>
+      </div>
+      <div class="card c3 rv">
+        <div class="ico">🌐</div>
+        <h3><span class="zh">已登录的浏览器</span><span class="en">A logged‑in browser</span></h3>
+        <p><span class="zh">服务器上常驻一个 Chromium，智能体通过 CDP 操作它，看到的页面和你自己登录后的桌面 Chrome 一样。遇到验证码时，你可以用手机形状的窗口接管一下，处理完再交回给它。</span><span class="en">A Chromium that stays up on the host, driven over CDP, so agents see the pages a logged‑in desktop Chrome would. Hit a captcha? Take it over in a phone‑shaped window, then hand it back.</span></p>
+        <div class="tagrow"><span>CDP :9222</span><span>noVNC</span><span>YouTube · X · Reddit</span></div>
+      </div>
+      <div class="card c2 rv">
+        <div class="ico">📱</div>
+        <h3><span class="zh">手机优先的 PWA</span><span class="en">Phone‑first PWA</span></h3>
+        <p><span class="zh">可以装到主屏幕，回合结束时推送到锁屏，多台设备同步未读状态。网络差时没发出去的消息会标红色"!"，点一下就能重发，不会重复发送。</span><span class="en">Installable, with lock‑screen pushes when a turn ends, unread state synced across devices, and a red "!" to resend a message a weak network dropped, without sending it twice.</span></p>
+      </div>
+      <div class="card c2 rv">
+        <div class="ico">📁</div>
+        <h3><span class="zh">项目与记忆</span><span class="en">Projects & memory</span></h3>
+        <p><span class="zh">把会话归入项目，同一项目的会话共用工作区和记忆；可以置顶、移动、折叠。新会话会自动归档到它所属的项目。</span><span class="en">Group sessions into projects that share a workspace and memory. Pin, move, fold; a new session files itself into the right project.</span></p>
+      </div>
+      <div class="card c2 rv">
+        <div class="ico">⌘</div>
+        <h3><span class="zh">Vim 键位</span><span class="en">Vim keys</span></h3>
+        <p><span class="zh"><code class="mono">i</code> 输入，<code class="mono">j/k</code> 滚动，空格作为 Leader 键切换面板，<code class="mono">?</code> 查看全部快捷键。还能调字号、深浅色主题和思考强度。</span><span class="en"><code class="mono">i</code> to type, <code class="mono">j/k</code> to scroll, Space as leader for panes, <code class="mono">?</code> for the list. Plus text size, themes and a thinking slider.</span></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="restart">
+  <div class="wrap spot">
+    <div class="txt">
+      <div class="eyebrow rv">Restart‑proof</div>
+      <h2 class="rv"><span class="zh">服务器在重启，<br><span class="grad">智能体照常干活。</span></span><span class="en">Loom restarts.<br><span class="grad">The agent never notices.</span></span></h2>
+      <p class="sub rv"><span class="zh">Loom 会先放开 CLI 的 stdio，让 Claude Code / Kiro 独立跑完这一回合；新版本起来后从文件恢复状态，按原来的 PID 重新接管。所以在一次对话里修改 Loom、部署 Loom，都很安全。</span><span class="en">Loom lets go of the CLI's stdio, the Claude Code / Kiro process runs on alone, and the new release restores state from disk and adopts it, same PID. Editing and deploying Loom from inside a Loom turn is safe.</span></p>
+      <div class="points rv">
+        <div><span><b>FIFO stdin + <span class="zh">追加写的 stdout</span><span class="en">append‑only stdout</span></b> — <span class="zh">进程运行在 setsid 下，不跟着 Loom 一起退出</span><span class="en">under setsid, it outlives the node</span></span></div>
+        <div><span><b>checkpoint/1</b> — <span class="zh">每批事件后保存解码状态和文件偏移</span><span class="en">decoder state + file offset after every batch</span></span></div>
+        <div><span><b>KillMode=process</b> — <span class="zh">systemd 只杀 Loom 自身，崩溃了也能接回来</span><span class="en">systemd kills only Loom; survives crashes too</span></span></div>
+      </div>
+    </div>
+    <div class="viz rv" id="rviz">
+      <div class="lanes">
+        <div class="lane"><div class="lbl"><span>loom (beam.smp)</span><span id="rstate">running</span></div>
+          <div class="track"><div class="seg loom1"></div><div class="seg gap"></div><div class="seg loom2"></div><span class="ev" id="ev1" style="left:43%">SIGTERM</span><span class="ev" id="ev2" style="left:58%">adopt()</span></div></div>
+        <div class="lane"><div class="lbl"><span>claude -p · pid 48213</span><span style="color:#5ee07a">● uninterrupted</span></div>
+          <div class="track"><div class="seg agent"></div></div></div>
+      </div>
+      <div class="restart-log" id="rlog"></div>
+    </div>
+  </div>
+</section>
+
+<section id="sleep">
+  <div class="wrap spot rev">
+    <div class="txt">
+      <div class="eyebrow rv">Sleep</div>
+      <h2 class="rv"><span class="zh">它会睡觉，<br><span class="grad">睡醒后更懂你。</span></span><span class="en">It sleeps,<br><span class="grad">and wakes up knowing you better.</span></span></h2>
+      <p class="sub rv"><span class="zh">灵感来自大脑睡眠时的记忆巩固。每天凌晨，Loom 会把白天的对话重放一遍：你纠正过的、说过"记住这个"的，权重最高；然后整理项目记忆，写一份晨报给你。</span><span class="en">Inspired by how brains consolidate memory in sleep. Each night Loom replays the day's sessions, weighs your corrections and "remember this" highest, tidies the project's memory, and leaves you a morning report.</span></p>
+      <div class="points rv">
+        <div><span><b><span class="zh">只提议，不越权</span><span class="en">Proposes, never oversteps</span></b> — <span class="zh">技能、CLAUDE.md 等记忆目录以外的改动，都等你点头才做</span><span class="en">anything outside memory (skills, CLAUDE.md) waits for your yes</span></span></div>
+        <div><span><b><span class="zh">归档而不删除</span><span class="en">Archive, don't delete</span></b> — <span class="zh">每条记忆都带来源，旧的移进 archive/</span><span class="en">every line cites its source; old ones go to archive/</span></span></div>
+        <div><span><b><span class="zh">一键撤销</span><span class="en">One‑click undo</span></b> — <span class="zh">记忆目录本身是个 git 仓库，睡前会先提交一次</span><span class="en">the memory dir is a git repo, committed before each sleep</span></span></div>
+      </div>
+    </div>
+    <div class="viz night rv">
+      <div class="stars" id="stars"></div>
+      <div class="moonbig"></div>
+      <div style="font-family:var(--mono);font-size:12px;color:#b3a9ff;position:relative">03:00–06:00 · Asia/Shanghai</div>
+      <div class="dream-flow">
+        <div class="r"><span class="t">03:12</span><span class="zh">重放 14 个会话、212 条消息</span><span class="en">Replayed 14 sessions, 212 messages</span></div>
+        <div class="r"><span class="t">03:15</span><span class="zh">"最终回复必须用中文"</span><span class="en">"Final reply must be in Chinese"</span><span class="badge b-keep">+ feedback</span></div>
+        <div class="r"><span class="t">03:16</span><span class="zh">部署注意事项：pnpm 不在 PATH 里</span><span class="en">Deploy gotcha: pnpm not on PATH</span><span class="badge b-keep">+ project</span></div>
+        <div class="r"><span class="t">03:18</span><span class="zh">过时的端口说明</span><span class="en">Stale note about a port</span><span class="badge b-arch">→ archive</span></div>
+        <div class="r"><span class="t">03:20</span><span class="zh">建议：新增一个 "deploy" 技能</span><span class="en">Proposal: a new "deploy" skill</span><span class="badge b-prop">? ask</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="employees">
+  <div class="wrap spot">
+    <div class="txt">
+      <div class="eyebrow rv">Virtual employees</div>
+      <h2 class="rv"><span class="zh">招一个 AI 员工，<br><span class="grad">给它 KPI 和预算。</span></span><span class="en">Hire an AI employee.<br><span class="grad">Give it KPIs and a budget.</span></span></h2>
+      <p class="sub rv"><span class="zh">只要 Loom 开着，它就一直在干活：靠心跳定时醒来，推进你给的 KPI，每天写日报、每周写周报，需要你的时候才推送提醒。</span><span class="en">It works whenever Loom is up: a heartbeat wakes it, it pushes your KPIs forward, writes daily and weekly reports, and pings you only when it needs you.</span></p>
+      <div class="points rv">
+        <div><span><b><span class="zh">靠心跳，不靠死循环</span><span class="en">A heartbeat, not a loop</span></b> — <span class="zh">每次醒来只跑一个回合，结尾附一张"工作卡"，写明下次什么时候醒</span><span class="en">one turn per wake‑up, ending in a work card that says when to wake next</span></span></div>
+        <div><span><b><span class="zh">硬性预算</span><span class="en">Hard budget</span></b> — <span class="zh">按每回合的真实花费累计，当天额度用完就停，并通知你一次</span><span class="en">counts real per‑turn cost; spent means stop, and one notification</span></span></div>
+        <div><span><b><span class="zh">任选模型</span><span class="en">Any backend</span></b> — <span class="zh">Claude Code（Opus）、Kiro 或 Codex</span><span class="en">Claude Code on Opus, Kiro, or Codex</span></span></div>
+      </div>
+    </div>
+    <div class="viz rv" id="eviz">
+      <div class="emp-head"><div class="avatar">🧑‍💻</div><div><b><span class="zh">小研</span><span class="en">Rae</span></b><small><span class="zh">市场调研员 · Claude Opus</span><span class="en">Market researcher · Claude Opus</span></small></div><span class="status">● working</span></div>
+      <div class="kpis">
+        <div class="k"><div class="top"><span class="zh">每周 3 篇竞品分析</span><span class="en">3 competitor reports / week</span><span>2 / 3</span></div><div class="bar"><i data-w="66"></i></div></div>
+        <div class="k"><div class="top"><span class="zh">跟踪 20 个开源项目</span><span class="en">Track 20 OSS projects</span><span>17 / 20</span></div><div class="bar"><i data-w="85"></i></div></div>
+        <div class="k"><div class="top"><span class="zh">周报准时交付</span><span class="en">Weekly report on time</span><span>review</span></div><div class="bar"><i data-w="100"></i></div></div>
+      </div>
+      <div class="budget">
+        <svg class="ring" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.5" fill="none" stroke="#ffffff12" stroke-width="4"/><circle id="ring" cx="18" cy="18" r="15.5" fill="none" stroke="url(#rg)" stroke-width="4" stroke-linecap="round" stroke-dasharray="0 100" transform="rotate(-90 18 18)" style="transition:stroke-dasharray 1.6s"/><defs><linearGradient id="rg"><stop offset="0" stop-color="#ffb547"/><stop offset="1" stop-color="#8b7bff"/></linearGradient></defs></svg>
+        <div><b>$18.40</b> / $50 <span class="zh">今日预算</span><span class="en">today</span><br><span class="zh">下次醒来 14:30 · 工作时间 09–22</span><span class="en">next wake 14:30 · hours 09–22</span></div>
+      </div>
+<div class="workcard">```employee-card
+{ <span class="k">"next"</span>: <span class="s">"sleep"</span>, <span class="k">"wake_at"</span>: <span class="s">"2026-10-29 14:30"</span>,
+  <span class="k">"kpis"</span>: [{ <span class="k">"id"</span>: <span class="s">"k_oss"</span>, <span class="k">"progress"</span>: <span class="n">85</span>, <span class="k">"status"</span>: <span class="s">"doing"</span> }],
+  <span class="k">"report"</span>: { <span class="k">"level"</span>: <span class="s">"important"</span>,
+    <span class="k">"text"</span>: <span class="s">"Found 2 new repos worth a look"</span> } }
+```</div>
+    </div>
+  </div>
+</section>
+
+<section id="devices">
+  <div class="wrap spot rev">
+    <div class="txt">
+      <div class="eyebrow rv">loom‑node</div>
+      <h2 class="rv"><span class="zh">服务器不是你的电脑，<br><span class="grad">但你的电脑可以接进来。</span></span><span class="en">The server isn't your computer.<br><span class="grad">Your computers can join it.</span></span></h2>
+      <p class="sub rv"><span class="zh">让智能体从你的笔记本里取一份文档，在服务器上处理完，再放回原处。设备连接状态在侧边栏里实时显示。</span><span class="en">Have an agent fetch a document from your laptop, work on it on the server, and put the result back. Devices show live in the sidebar.</span></p>
+      <div class="points rv">
+        <div><span><b><span class="zh">只向外连接</span><span class="en">Outbound only</span></b> — <span class="zh">设备本地不监听任何端口</span><span class="en">nothing listens on the device</span></span></div>
+        <div><span><b><span class="zh">每台设备一个令牌</span><span class="en">One token per device</span></b> — <span class="zh">服务器只存哈希，删除设备即吊销</span><span class="en">stored only as a hash; removing the device revokes it</span></span></div>
+        <div><span><b><span class="zh">设备本地留日志</span><span class="en">Logged on the device</span></b> — <span class="zh">命令有超时限制，执行过的每条命令都有记录</span><span class="en">time‑limited commands, every one recorded</span></span></div>
+      </div>
+    </div>
+    <div class="viz rv">
+      <div class="net">
+        <svg viewBox="0 0 500 330" preserveAspectRatio="none">
+          <defs><linearGradient id="lg" x1="0" x2="1"><stop offset="0" stop-color="#ffb547"/><stop offset="1" stop-color="#8b7bff"/></linearGradient></defs>
+          <g stroke="url(#lg)" stroke-width="2" fill="none">
+            <path class="flow" d="M90 70 Q180 90 250 165"/>
+            <path class="flow" d="M410 70 Q320 90 250 165"/>
+            <path class="flow" d="M90 270 Q180 250 250 165"/>
+            <path class="flow" d="M410 270 Q320 250 250 165"/>
+          </g>
+        </svg>
+        <div class="node" style="left:18%;top:21%"><div class="box"></div>MacBook</div>
+        <div class="node" style="left:82%;top:21%"><div class="box">🪟</div>Windows</div>
+        <div class="node" style="left:18%;top:82%"><div class="box">🐧</div>Linux / WSL</div>
+        <div class="node" style="left:82%;top:82%"><div class="box">📱</div>iPhone</div>
+        <div class="node srv" style="left:50%;top:50%"><div class="box"><img src="favicon.svg" alt=""></div><b style="color:var(--fg)">Loom</b></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="selfbuilt rv">
+      <div>
+        <div class="eyebrow">Built inside itself</div>
+        <h2 style="font-size:clamp(28px,3.6vw,42px)"><span class="zh">Loom 是在 Loom 里<br><span class="grad">由智能体写出来的。</span></span><span class="en">Loom is built<br><span class="grad">by agents, inside Loom.</span></span></h2>
+        <p class="sub"><span class="zh">提需求、写代码、跑测试、部署、重启，再接回自己的回合，整个过程都在 Loom 的会话里完成。睡眠、虚拟员工、重启不断线、红色"!"重发，都是在手机上一句话提出来，当天就上线的。<b style="color:var(--fg)">这个页面也是。</b></span><span class="en">Ask, code, test, deploy, restart, and adopt its own turn back — all from a Loom session. Sleep, virtual employees, restart‑proof turns and the red‑"!" resend each went from one sentence on a phone to production the same day. <b style="color:var(--fg)">So did this page.</b></span></p>
+      </div>
+      <div class="commits">
+        <div><span>0e12c21</span>Text size in Settings, a shaded sidebar foot, and an unread mark</div>
+        <div><span>9534f2b</span>Messages that do not get through stay, with a red "!" to resend them</div>
+        <div><span>8fe773b</span>Agent turns that carry on through a restart, and are taken back after it</div>
+        <div><span>28c2e7e</span>Sleep, virtual employees, and Kiro CLI as a third backend</div>
+        <div><span>48e678a</span>Browser: a window of the phone's shape, and a stream of just that</div>
+        <div><span>e999446</span>loom-node: native Windows devices</div>
+        <div><span>5021a07</span>Tasks page, after ChatGPT's</div>
+        <div><span>f6fab97</span>Phone theme measured from ChatGPT's iOS app</div>
+        <div><span>14a228b</span>Sessions can be pinned, and moved into or out of a project</div>
+        <div style="color:var(--dim)"><span style="color:var(--dim)">…</span>111 commits since 2026‑07‑29</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="arch">
+  <div class="wrap">
+    <div class="eyebrow rv">Architecture</div>
+    <h2 class="rv"><span class="zh">一个会话，一个 GenServer。<br><span class="grad">简单，所以可靠。</span></span><span class="en">One session, one GenServer.<br><span class="grad">Simple, so it holds.</span></span></h2>
+    <p class="sub rv"><span class="zh">Loom 自己不调用任何模型 API，真正干活的是 claude / codex / kiro CLI。Loom 负责让它们一直在线、可以从任何地方接入、状态都落在磁盘上。</span><span class="en">Loom makes no model requests of its own; the claude / codex / kiro CLIs do the work. Loom keeps them alive, reachable from anywhere, and on disk.</span></p>
+    <div class="arch">
+      <div class="layer rv"><small>Backend</small><h4>Elixir / Phoenix</h4><p><span class="zh">OTP 监督树；每个会话、每个 PTY 各对应一个进程，通过 Channels 推流。</span><span class="en">OTP supervision; a process per session and per PTY, streamed over Channels.</span></p></div>
+      <div class="layer rv"><small>Frontend</small><h4>React + Vite</h4><p><span class="zh">xterm.js、沙箱画布、PWA、Web Push，并针对手机做了专门打磨。</span><span class="en">xterm.js, a sandboxed canvas, PWA, Web Push, tuned for phones.</span></p></div>
+      <div class="layer rv"><small>Agents</small><h4>claude · codex · kiro</h4><p><span class="zh">stream-json、app-server、ACP 三种协议，都是实测后接入的。</span><span class="en">stream‑json, app‑server and ACP — protocols as measured.</span></p></div>
+      <div class="layer rv"><small>Devices</small><h4>loom‑node (Go)</h4><p><span class="zh">单个二进制文件，原生支持 macOS / Linux / Windows，通过 Phoenix socket 向外连接。</span><span class="en">One binary, native on macOS / Linux / Windows, dialing out over a Phoenix socket.</span></p></div>
+    </div>
+<pre class="code rv"><span class="c"># <span class="zh">本地跑起来</span><span class="en">run it locally</span></span>
+<span class="p">❯</span> git clone https://github.com/quanquan1996/loom && cd loom
+<span class="p">❯</span> mix setup && (cd frontend && pnpm install)
+<span class="p">❯</span> mix phx.server            <span class="c"># backend  :4000</span>
+<span class="p">❯</span> cd frontend && pnpm dev   <span class="c"># frontend :5173  →  password: loom</span></pre>
+  </div>
+</section>
+
+<section class="final">
+  <div class="wrap">
+    <h2 class="rv"><span class="zh">让你的智能体<br><span class="grad">二十四小时在线。</span></span><span class="en">Keep your agents<br><span class="grad">on, all day, everywhere.</span></span></h2>
+    <div class="cta rv"><a class="btn primary" href="https://github.com/quanquan1996/loom">★ Star on GitHub</a><a class="btn" href="https://github.com/quanquan1996/loom/blob/main/docs/architecture.md"><span class="zh">阅读架构文档</span><span class="en">Read the architecture</span></a></div>
+  </div>
+</section>
+
+<footer><div class="wrap"><span>Loom · MIT License</span><span><span class="zh">此页面由 Loom 中的 Claude 设计并编写</span><span class="en">Designed and written by Claude, inside Loom</span></span></div></footer>
+
+<script>
+// language
+const html=document.documentElement, lb=document.getElementById('lang');
+function setLang(l){html.className=l;html.lang=l==='zh'?'zh-CN':'en';lb.textContent=l==='zh'?'EN':'中文';localStorage.loomLang=l}
+setLang(new URLSearchParams(location.search).get('lang')||localStorage.loomLang||(navigator.language.startsWith('zh')?'zh':'en'));
+lb.onclick=()=>{setLang(html.className==='zh'?'en':'zh');runDemo(true)};
+
+// woven threads background
+(()=>{const c=document.getElementById('threads'),x=c.getContext('2d');let w,h,t=0;
+const cols=['#ffb547','#ff5e8a','#8b7bff','#36d6c3'];
+function rs(){w=c.width=c.offsetWidth*devicePixelRatio;h=c.height=c.offsetHeight*devicePixelRatio}
+rs();addEventListener('resize',rs);
+(function f(){x.clearRect(0,0,w,h);t+=.004;
+ for(let i=0;i<26;i++){x.beginPath();const y0=h*(i/26);x.strokeStyle=cols[i%4]+'40';x.lineWidth=devicePixelRatio;
+  for(let px=0;px<=w;px+=w/80){const y=y0+Math.sin(px/w*6+t*3+i)*30*devicePixelRatio+Math.sin(px/w*13-t*2+i*.7)*12*devicePixelRatio;px?x.lineTo(px,y):x.moveTo(px,y)}x.stroke()}
+ for(let i=0;i<18;i++){x.beginPath();const x0=w*(i/18);x.strokeStyle='#ffffff10';
+  for(let py=0;py<=h;py+=h/60){const xx=x0+Math.sin(py/h*5+t*2+i)*24*devicePixelRatio;py?x.lineTo(xx,py):x.moveTo(xx,py)}x.stroke()}
+ requestAnimationFrame(f)})();})();
+
+// hero demo
+const L=()=>html.className;
+const script=[
+ ['user',{zh:'给设置页加个深色模式，测完直接部署',en:'Add dark mode to Settings, test it, then deploy'}],
+ ['tool','Read frontend/src/theme.css'],
+ ['tool','Edit Settings.tsx · theme.css · +86 −12'],
+ ['tool','Bash pnpm build && mix test','✓ all green'],
+ ['tool','Bash rel/deploy.sh'],
+ ['sys',{zh:'⟳ Loom 正在重启…',en:'⟳ Loom restarting…'}],
+ ['sys',{zh:'✓ 已接回本回合 · pid 48213 未变',en:'✓ turn adopted · pid 48213 unchanged'},'green'],
+ ['bot',{zh:'已上线 ✓ 深色模式在 设置 → 外观 里。手机上下拉刷新就能看到。',en:'Live ✓ Dark mode is under Settings → Appearance. Pull to refresh on your phone.'}],
+];
+let demoTimer=[];
+function el(kind,c,extra){const d=document.createElement('div');d.className='m '+kind+(extra==='green'?' green':'');
+ if(kind==='tool'){d.innerHTML=`<span class="ic">⚙</span><span>${c}</span>${extra?`<span class="ok">${extra}</span>`:'<span class="ok">✓</span>'}`}
+ else d.textContent=typeof c==='string'?c:c[L()];return d}
+function runDemo(reset){demoTimer.forEach(clearTimeout);demoTimer=[];
+ const a=document.getElementById('msgs'),p=document.getElementById('pmsgs'),term=document.getElementById('term'),k1=document.getElementById('k1'),bars=[...document.querySelectorAll('#chart i')];
+ a.innerHTML='';p.innerHTML='';term.innerHTML='<span class="p">~/loom ❯</span> _';bars.forEach(b=>b.style.height='8%');k1.textContent='0';
+ const tl=['<span class="p">~/loom ❯</span> rel/deploy.sh','▸ building release loom.next…','▸ staged · requesting restart','▸ waiting for codex turns: 0','<span style="color:#5ee07a">▸ restarted · 1 turn adopted</span>'];
+ let t=600;
+ script.forEach((s,i)=>{demoTimer.push(setTimeout(()=>{
+   [a,p].forEach(box=>{const d=el(s[0],s[1],s[2]);box.appendChild(d);requestAnimationFrame(()=>requestAnimationFrame(()=>d.classList.add('show')));while(box.children.length>7)box.firstChild.remove()});
+   k1.textContent=String(12+i*3);
+   if(i>=4){term.innerHTML=tl.slice(0,Math.min(tl.length,i-2)).join('<br>')}
+   if(i===2||i===7)bars.forEach(b=>b.style.height=(25+Math.random()*70)+'%');
+ },t));t+=s[0]==='user'?1300:s[0]==='sys'?1500:950});
+ demoTimer.push(setTimeout(()=>runDemo(),t+4200));
+}
+runDemo();
+
+// reveal + counters + section anims
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(!e.isIntersecting)return;const t=e.target;t.classList.add('in');io.unobserve(t);
+  t.querySelectorAll('.count').forEach(cn=>{const to=+cn.dataset.to;let v=0;const st=setInterval(()=>{v++;cn.textContent=v;if(v>=to)clearInterval(st)},60)});
+  if(t.id==='rviz')restartAnim();
+  if(t.id==='eviz'){t.querySelectorAll('.bar i').forEach(b=>b.style.width=b.dataset.w+'%');document.getElementById('ring').setAttribute('stroke-dasharray','37 100')}
+}),{threshold:.18});
+document.querySelectorAll('.rv').forEach((e,i)=>{e.style.transitionDelay=(i%4)*70+'ms';io.observe(e)});
+
+function restartAnim(){const v=document.getElementById('rviz'),log=document.getElementById('rlog'),st=document.getElementById('rstate');
+ const set=(s,w,ms)=>{v.querySelector(s).style.transitionDuration=ms+'ms';v.querySelector(s).style.width=w};
+ const lines=[
+  [0,'<span class="p">[11:46:02]</span> turn started · claude -p (pid 48213)'],
+  [2200,'<span class="y">[11:46:09]</span> deploy: release staged → Restarter.request()'],
+  [2600,'<span class="y">[11:46:09]</span> detach: stdio released, agent keeps writing proc/out'],
+  [4000,'<span class="p">[11:46:13]</span> loom up · Proc.adopt → pid 48213 alive, offset 18 244'],
+  [4500,'<span class="g">[11:46:13]</span> replayed 37 events · turn resumes streaming'],
+  [7600,'<span class="g">[11:46:41]</span> turn_done · 0 events lost'],
+ ];
+ log.innerHTML='';
+ set('.seg.agent','97%',7600);set('.seg.loom1','42%',2400);
+ setTimeout(()=>{document.getElementById('ev1').classList.add('show');st.textContent='restarting';st.style.color='#ff5e8a';set('.seg.gap','15%',1500)},2400);
+ setTimeout(()=>{document.getElementById('ev2').classList.add('show');st.textContent='running';st.style.color='';set('.seg.loom2','40%',3600)},4000);
+ lines.forEach(([ms,l])=>setTimeout(()=>{log.innerHTML+=l+'<br>'},ms));
+}
+
+// stars
+const sb=document.getElementById('stars');for(let i=0;i<60;i++){const s=document.createElement('i');s.style.left=Math.random()*100+'%';s.style.top=Math.random()*55+'%';s.style.animationDelay=Math.random()*3+'s';s.style.opacity=.3+Math.random()*.7;sb.appendChild(s)}
+
+// card spotlight
+document.querySelectorAll('.card').forEach(c=>c.addEventListener('pointermove',e=>{const r=c.getBoundingClientRect();c.style.setProperty('--mx',e.clientX-r.left+'px');c.style.setProperty('--my',e.clientY-r.top+'px')}));
+</script>
+</body>
+</html>
