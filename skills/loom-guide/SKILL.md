@@ -18,13 +18,16 @@ Then read the file that fits the question, rather than answering from memory:
 - `docs/architecture.md` — how each part works: sessions, channels, devices
   (loom-node), the browser, cron, files.
 - `docs/deploy.md` — installing, the systemd unit, `rel/deploy.sh`, restarts.
-- `docs/backends.md` — the Claude Code and Codex backends.
+- `docs/backends.md` — the Claude Code, Codex and Kiro backends.
 - `docs/keys.md` — API keys and credentials.
 
 If the docs don't settle it, read the code: `lib/` (Elixir server),
 `frontend/src/` (UI), `node/` (loom-node). Say which you checked.
 
-Restarting Loom ends every session, this one included. Don't do it unasked.
-Ask Loom to restart once sessions are idle with
+Don't restart Loom unasked. Restart it with
 `_build/prod/rel/loom/bin/loom rpc 'Loom.Restarter.request()'`, which is how
-`rel/deploy.sh` does it.
+`rel/deploy.sh` does it — never `systemctl restart`. Claude Code and Kiro turns,
+this one included, keep running through the restart and are taken back by the
+new node (docs/architecture.md §2.3), so the request waits only for Codex turns.
+To check something after the restart, add a temporary `Loom.Cron` job aimed at
+your own session to wake you, and delete it when done.

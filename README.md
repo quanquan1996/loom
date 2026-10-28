@@ -25,7 +25,9 @@ back later on another device, and the turn has kept running.
   and after sending.
 - **Slash commands**: `/compact`, `/reload` (pick up new Claude Code / Codex
   config without restarting Loom), `/cron`, with a menu in the composer.
-- Sessions survive Loom restarts and are restored from disk.
+- Sessions survive Loom restarts and are restored from disk. A Claude Code or
+  Kiro turn under way keeps running while Loom is down, even after a crash, and
+  is picked up again where it was.
 
 ### Terminals
 
@@ -103,7 +105,8 @@ site once or get past a captcha. The `browser` skill tells agents how.
 - **Vim-style keys** on desktop: `i` to type, `j`/`k` to scroll, Space as the
   leader for the panes, `?` for the list. See [docs/keys.md](docs/keys.md).
 - Deploy Loom from inside Loom: `rel/deploy.sh` stages a new release, and Loom
-  restarts into it once every session is idle, so no turn is cut off.
+  restarts into it at once. Claude Code and Kiro turns carry on through the
+  restart; only a Codex turn is waited for, so no turn is cut off.
 
 ## Docs
 
