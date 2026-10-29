@@ -13,9 +13,12 @@ defmodule Loom.Agent.Draft do
   whether it got here; on opening a session it pushes a copy that did not, and
   otherwise takes this one. No clocks are compared, so a phone whose clock is
   off cannot win or lose by it — the last write to arrive wins.
+
+  Each write is announced on the session's topic, so a device that has the
+  session open sees it sent or changed elsewhere without reopening it.
   """
 
-  alias Loom.Agent.Store
+  alias Loom.Agent.{Session, Store}
 
   @draft_file "draft.json"
 
@@ -36,17 +39,21 @@ defmodule Loom.Agent.Draft do
 
   @doc "Replace the draft. An empty one removes the file."
   def write(id, text) when is_binary(text) do
-    if String.trim(text) == "" do
-      File.rm(path(id))
-      %{text: "", updated_at: nil}
-    else
-      draft = %{text: text, updated_at: System.system_time(:millisecond)}
-      File.mkdir_p!(Store.session_dir(id))
-      tmp = path(id) <> ".tmp"
-      File.write!(tmp, Jason.encode_to_iodata!(draft))
-      File.rename!(tmp, path(id))
-      draft
-    end
+    draft =
+      if String.trim(text) == "" do
+        File.rm(path(id))
+        %{text: "", updated_at: nil}
+      else
+        draft = %{text: text, updated_at: System.system_time(:millisecond)}
+        File.mkdir_p!(Store.session_dir(id))
+        tmp = path(id) <> ".tmp"
+        File.write!(tmp, Jason.encode_to_iodata!(draft))
+        File.rename!(tmp, path(id))
+        draft
+      end
+
+    Phoenix.PubSub.broadcast(Loom.PubSub, Session.topic(id), {:agent_draft, id, draft})
+    draft
   end
 
   defp path(id), do: Path.join(Store.session_dir(id), @draft_file)

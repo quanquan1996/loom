@@ -118,7 +118,7 @@ export function Chat({
   onSeen,
   reading = true,
 }: Props) {
-  const { transcript, joinError, submit, resend, discard, interrupt, dropQueued, rename } = useAgent(
+  const { transcript, joinError, submit, resend, discard, interrupt, dropQueued, rename, draft: remoteDraft } = useAgent(
     session.id,
     (event) => {
       if (event.kind === "output_files") {
@@ -154,7 +154,7 @@ export function Chat({
   // it) would pull it back down just after `gg` or `k` scrolled it up.
   const items = useMemo(() => foldFinished(buildTimeline(transcript), busy), [transcript, busy])
   const replies = useMemo(() => (busy ? null : currentReplies(items)), [items, busy])
-  const [draft, setDraft] = useDraft(session.id)
+  const [draft, setDraft] = useDraft(session.id, remoteDraft)
   const narrow = useNarrow()
 
   // Stable, because a context change re-renders every message that links a

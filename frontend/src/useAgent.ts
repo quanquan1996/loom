@@ -89,6 +89,9 @@ type Agent = {
   interrupt: () => void
   dropQueued: (index: number) => void
   rename: (title: string) => void
+  // The composer's draft as last written from any device, while this one has
+  // the session open; a fresh object each time. See `useDraft`.
+  draft: { id: string; text: string } | null
 }
 
 /**
@@ -114,6 +117,7 @@ export function useAgent(
     sessionId ? withUnsent(cache.get(sessionId) ?? emptyTranscript, sessionId) : emptyTranscript,
   )
   const [joinError, setJoinError] = useState<string | null>(null)
+  const [draft, setDraft] = useState<{ id: string; text: string } | null>(null)
   const channelRef = useRef<Channel | null>(null)
   // Read inside the params closure on rejoin, so it must not be state.
   const lastSeqRef = useRef(0)
@@ -127,6 +131,7 @@ export function useAgent(
     const cached = sessionId ? cache.get(sessionId) : undefined
     setTranscript(sessionId ? withUnsent(cached ?? emptyTranscript, sessionId) : emptyTranscript)
     setJoinError(null)
+    setDraft(null)
     lastSeqRef.current = cached?.lastSeq ?? 0
     if (!sessionId) return
 
@@ -159,6 +164,10 @@ export function useAgent(
     channel.on("delta", (delta: AgentDelta) => {
       if (!current()) return
       setTranscript((t) => applyDelta(t, delta))
+    })
+
+    channel.on("draft", ({ text }: { text: string }) => {
+      if (current()) setDraft({ id: sessionId, text })
     })
 
     channel
@@ -293,5 +302,5 @@ export function useAgent(
     channelRef.current?.push("rename", { title })
   }, [])
 
-  return { transcript, joinError, submit, resend, discard, interrupt, dropQueued, rename }
+  return { transcript, joinError, submit, resend, discard, interrupt, dropQueued, rename, draft }
 }

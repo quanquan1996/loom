@@ -8,7 +8,8 @@ import { getDraft, putDraft } from "./api"
  * whether it reached the server. The server's copy is what another device, or
  * this one after a reload, opens the session with. On opening, a copy that
  * never got through is pushed; otherwise the server's is taken, unless typing
- * here has begun since. See `Loom.Agent.Draft`.
+ * here has begun since. While it is open, each write from anywhere arrives as
+ * `remote` and is taken on the same terms. See `Loom.Agent.Draft`.
  */
 const KEY = (id: string) => `loom_draft_${id}`
 
@@ -35,7 +36,7 @@ function saveLocal(id: string, local: Local) {
   }
 }
 
-export function useDraft(id: string): [string, (text: string) => void] {
+export function useDraft(id: string, remote: { id: string; text: string } | null): [string, (text: string) => void] {
   const [text, setText] = useState(() => loadLocal(id)?.text ?? "")
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -89,6 +90,18 @@ export function useDraft(id: string): [string, (text: string) => void] {
       if (timer.current && local) push(local.text, true)
     }
   }, [id, pull, push])
+
+  // Written somewhere — sent or cleared on another device, typed there, or
+  // this device's own write coming back. Typing here that has not reached the
+  // server yet is newer than any of them, and its own write follows.
+  useEffect(() => {
+    // Until the switch to another session settles, the last one's.
+    if (remote?.id !== id) return
+    const local = loadLocal(id)
+    if (timer.current || (local && !local.synced)) return
+    saveLocal(id, { text: remote.text, synced: true })
+    setText(remote.text)
+  }, [id, remote])
 
   const update = useCallback(
     (value: string) => {

@@ -50,6 +50,17 @@ defmodule LoomWeb.AgentDraftControllerTest do
     refute File.exists?(Path.join(Store.session_dir(id), "draft.json"))
   end
 
+  test "each write is announced to whoever has the session open", %{conn: conn, id: id} do
+    Phoenix.PubSub.subscribe(Loom.PubSub, Loom.Agent.Session.topic(id))
+
+    conn |> put("/api/agents/#{id}/draft", %{text: "on the phone"}) |> json_response(200)
+    assert_receive {:agent_draft, ^id, %{text: "on the phone"}}
+
+    # Sent there: the desktop's composer empties too.
+    conn |> put("/api/agents/#{id}/draft", %{text: ""}) |> json_response(200)
+    assert_receive {:agent_draft, ^id, %{text: ""}}
+  end
+
   test "an unknown session is not a path", %{conn: conn} do
     assert conn |> get("/api/agents/..%2F..%2Fetc/draft") |> json_response(404)
     assert conn |> put("/api/agents/a_nope/draft", %{text: "x"}) |> json_response(404)

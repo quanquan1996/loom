@@ -101,6 +101,12 @@ defmodule LoomWeb.AgentChannel do
     {:noreply, socket}
   end
 
+  # The composer's draft, written from some device; see `Loom.Agent.Draft`.
+  def handle_info({:agent_draft, _id, draft}, socket) do
+    push(socket, "draft", draft)
+    {:noreply, socket}
+  end
+
   defp normalize_seq(seq) when is_integer(seq) and seq >= 0, do: seq
   defp normalize_seq(_), do: 0
 
