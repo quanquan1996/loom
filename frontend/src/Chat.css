@@ -994,79 +994,13 @@ pre.code {
   cursor: default;
 }
 
-.reply-mark {
-  display: none;
-}
-
-/* A desktop has room to spare, so the card is only as wide as its longest
-   reply: ChatGPT's list, a round mark ahead of each line and a hairline
-   between them, Send only once something is picked. */
+/* A desktop has room to spare: the card is only as wide as its longest reply,
+   not the whole column. */
 @media (min-width: 641px) {
   .replies {
     width: fit-content;
+    min-width: 18rem;
     max-width: 100%;
-    gap: 0;
-    padding: 6px 22px;
-    border-radius: 1.25rem;
-  }
-
-  .reply {
-    gap: 14px;
-    padding: 13px 0;
-    border: 0;
-    border-radius: 0;
-    font-size: 0.95rem;
-  }
-
-  .reply + .reply {
-    border-top: 1px solid var(--line);
-  }
-
-  .reply:hover,
-  .reply.on {
-    background: transparent;
-  }
-
-  .reply-mark {
-    display: grid;
-    place-items: center;
-    flex: 0 0 auto;
-    width: 20px;
-    height: 20px;
-    border: 1.5px solid color-mix(in srgb, var(--fg) 35%, transparent);
-    border-radius: 50%;
-  }
-
-  .reply:hover .reply-mark {
-    border-color: color-mix(in srgb, var(--fg) 60%, transparent);
-  }
-
-  .reply.on .reply-mark {
-    border-color: var(--fg);
-    background: var(--fg);
-    color: var(--bg);
-  }
-
-  .reply .reply-mark svg {
-    width: 12px;
-    height: 12px;
-    stroke-width: 3;
-  }
-
-  .reply-tick {
-    display: none;
-  }
-
-  .replies-send {
-    align-self: flex-end;
-    width: auto;
-    margin: 4px 0 10px;
-    padding: 7px 18px;
-    font-size: 0.875rem;
-  }
-
-  .replies-send:disabled {
-    display: none;
   }
 }
 
