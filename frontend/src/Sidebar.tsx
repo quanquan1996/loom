@@ -25,7 +25,7 @@ import { RenameInput } from "./Confirm"
 import { DevicesDialog } from "./Devices"
 import { SessionMenu } from "./SessionMenu"
 import { MoonButton, scopeOf } from "./Sleep"
-import { backendShort } from "./format"
+import { BackendIcon } from "./BackendIcon"
 import type { Push } from "./push"
 import { lastActive } from "./useLobby"
 
@@ -206,7 +206,7 @@ export function Sidebar({
       </span>
       {/* Which engine is running it is not a detail: the two behave
           differently and the binding is permanent. */}
-      <span className={"session-backend " + s.backend}>{backendShort(s.backend)}</span>
+      <BackendIcon backend={s.backend} />
       {/* Outside its project, which one it is in; under it, that goes without saying. */}
       {!nested && projectName(s) && (
         <span className="session-project" title={`in ${projectName(s)}`}>

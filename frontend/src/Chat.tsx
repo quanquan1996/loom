@@ -32,7 +32,8 @@ import { createPortal } from "react-dom"
 import { EffortButton } from "./Effort"
 import { buildTimeline, currentReplies, foldFinished, isBusy, type CronJob, type TimelineItem } from "./agent"
 import { itemForAttachment, itemForOutput, itemForPath, type CanvasItem } from "./canvasItems"
-import { backendShort, formatBytes } from "./format"
+import { BackendIcon } from "./BackendIcon"
+import { formatBytes } from "./format"
 import { isComposing } from "./ime"
 import { Markdown, OutputLink } from "./markdown"
 import { useNarrow } from "./useNarrow"
@@ -891,9 +892,7 @@ function Title({
       {/* Which engine runs it: permanent, and the two behave differently
           enough that it belongs by the name. The sidebar's badge, so the
           header is one line. */}
-      <span className={"session-backend " + backend} title={backendLabel}>
-        {backendShort(backend)}
-      </span>
+      <BackendIcon backend={backend} title={backendLabel} />
       {editing ? (
         <input
           className="chat-name-input"

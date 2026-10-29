@@ -913,17 +913,17 @@
   color: var(--bg);
 }
 
-/* Which engine, per row. Short because the sidebar is narrow and the colour
-   carries most of it. */
+/* Which engine, per row: its maker's mark as a line icon (BackendIcon). */
 .session-backend {
   flex: 0 0 auto;
-  padding: 1px 4px;
-  border-radius: 3px;
-  background: var(--line);
+  display: inline-flex;
+  align-items: center;
   color: var(--fg-dim);
-  font-size: 0.692rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+}
+
+.session-backend svg {
+  width: 1rem;
+  height: 1rem;
 }
 
 .session-backend.claude_code {
@@ -1612,10 +1612,12 @@
 }
 
 .sidebar .session .session-backend {
-  padding: 0;
-  background: none;
-  font-size: 0.65rem;
   opacity: 0.8;
+}
+
+.sidebar .session .session-backend svg {
+  width: 0.85rem;
+  height: 0.85rem;
 }
 
 .project-sessions .session {
