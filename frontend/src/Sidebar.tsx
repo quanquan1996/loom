@@ -20,7 +20,7 @@ import {
 } from "lucide-react"
 import { useEffect, useState } from "react"
 import type { AgentBackend, AgentInfo, Device, Employee, Project } from "./api"
-import { Avatar, hasNews, short, STATUS } from "./Employees"
+import { Avatar, BudgetRing, hasNews, short, STATUS, StatusIcon } from "./Employees"
 import { RenameInput } from "./Confirm"
 import { DevicesDialog } from "./Devices"
 import { SessionMenu } from "./SessionMenu"
@@ -353,19 +353,13 @@ export function Sidebar({
                   key={e.id}
                   className={"emp-row" + (e.id === activeEmployeeId ? " active" : "")}
                   onClick={() => onOpenEmployee(e.id)}
-                  title={e.role ? `${e.name} — ${e.role}` : e.name}
+                  title={`${e.role ? `${e.name} — ${e.role}` : e.name}\n${status.label} · ${short(e, e.spent_today)} of ${short(e, e.cap_today)}${e.budget_unit === "turns" ? " turns" : ""}`}
                 >
-                  <Avatar employee={e} />
-                  <span className="emp-row-text">
-                    <span className="emp-row-name">{e.name}</span>
-                    <span className={"emp-row-sub " + status.tone}>
-                      <span className="emp-status-dot" />
-                      {status.label} · {short(e, e.spent_today)}/{Math.round(e.cap_today)}
-                      {e.budget_unit === "turns" && " turns"}
-                    </span>
-                  </span>
+                  <Avatar employee={e} size="sm" />
+                  <span className="emp-row-name">{e.name}</span>
                   {news && <span className="emp-row-news" title="New updates" />}
-                  <span className={"session-backend " + e.backend}>{backendShort(e.backend)}</span>
+                  <StatusIcon status={e.status} />
+                  <BudgetRing employee={e} />
                 </div>
               )
             })}

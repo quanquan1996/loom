@@ -4,6 +4,7 @@ import {
   ChevronLeft,
   FileText,
   ListChecks,
+  Moon,
   MessageCircle,
   PanelLeftOpen,
   Pause,
@@ -11,6 +12,7 @@ import {
   Plus,
   Settings as SettingsIcon,
   Siren,
+  Zap,
   Undo2,
   Wallet,
   X,
@@ -79,6 +81,33 @@ export function Avatar({ employee, size = "md" }: { employee: Pick<Employee, "na
     <span className={"emp-avatar " + size} style={{ background: `hsl(${hue} 45% 42%)` }}>
       {[...employee.name.trim()][0] ?? "?"}
     </span>
+  )
+}
+
+/** Where it stands, as one small icon: the sidebar's row has no room for words. */
+const STATUS_ICON: Record<Employee["status"], typeof Moon> = {
+  working: Zap,
+  sleeping: Moon,
+  paused: Pause,
+  approval: Wallet,
+  blocked: Siren,
+}
+
+export function StatusIcon({ status }: { status: Employee["status"] }) {
+  const Icon = STATUS_ICON[status]
+  return <Icon className={"emp-status-icon " + STATUS[status].tone} aria-label={STATUS[status].label} />
+}
+
+/** Today's spend against today's budget, as a ring that fills clockwise. */
+export function BudgetRing({ employee: e }: { employee: Pick<Employee, "spent_today" | "cap_today"> }) {
+  const r = 7
+  const c = 2 * Math.PI * r
+  const part = e.cap_today > 0 ? Math.min(1, e.spent_today / e.cap_today) : 0
+  return (
+    <svg className={"emp-ring" + (part >= 1 ? " full" : "")} viewBox="0 0 18 18" aria-hidden>
+      <circle cx="9" cy="9" r={r} className="emp-ring-track" />
+      {part > 0 && <circle cx="9" cy="9" r={r} className="emp-ring-fill" strokeDasharray={`${part * c} ${c}`} />}
+    </svg>
   )
 }
 
