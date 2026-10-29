@@ -12,7 +12,7 @@ import { ProjectDialog } from "./Projects"
 import { SettingsDialog } from "./Settings"
 import { useSettings } from "./settings"
 import { Tasks } from "./Tasks"
-import { isOpen, PROJECTS_SECTION, Sidebar, sidebarOrder } from "./Sidebar"
+import { focused, isOpen, PROJECTS_SECTION, Sidebar, sidebarOrder } from "./Sidebar"
 import { isDream, scopeOf, Sleep, type SleepTab } from "./Sleep"
 import { EmployeePage, HireDialog, isEmployeeSession, type EmployeeTab } from "./Employees"
 import { Terminal } from "./Terminal"
@@ -242,6 +242,12 @@ function App() {
       else next.add(key)
       return next
     })
+  // On a phone, the sidebar opens on the conversations: each time the drawer
+  // comes out, and each time the app comes back from the background (or is
+  // opened), whatever was unfolded last time.
+  useEffect(() => {
+    if (narrow && (drawerOpen || visible)) setToggled(focused)
+  }, [narrow, drawerOpen, visible])
   // A project something just happened in: unfolded, and Projects with it.
   const reveal = (projectId: string) =>
     setToggled((t) => {

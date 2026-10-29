@@ -1035,6 +1035,58 @@ pre.code,
   background: color-mix(in srgb, var(--fg) 6%, transparent);
 }
 
+/* Settings and the fold share a row; folded, the row dissolves into the foot's. */
+.foot-last {
+  display: flex;
+}
+
+.foot-last > .devices-btn:first-child {
+  flex: 1 1 auto;
+}
+
+.foot-fold {
+  justify-content: center;
+}
+
+/* Beside Settings, a tint would mark half a row. */
+.sidebar-foot:not(.folded) .foot-fold:hover {
+  background: transparent;
+  color: var(--fg);
+}
+
+.foot-fold svg {
+  width: 16px;
+  height: 16px;
+}
+
+.sidebar-foot.folded {
+  flex-direction: row;
+  align-items: center;
+  padding-left: 6px;
+  padding-right: 6px;
+}
+
+.sidebar-foot.folded .foot-last {
+  display: contents;
+}
+
+.sidebar-foot.folded .devices-btn {
+  flex: 1 1 0;
+  justify-content: center;
+  padding: 10px 0;
+  border-radius: 10px;
+}
+
+.sidebar-foot.folded .devices-btn > span {
+  display: none;
+}
+
+.sidebar-foot.folded .push-btn svg,
+.sidebar-foot.folded .foot-fold svg {
+  width: 18px;
+  height: 18px;
+}
+
 /* In the drawer the foot runs on under the home indicator. */
 .drawer .sidebar {
   padding-bottom: 0;

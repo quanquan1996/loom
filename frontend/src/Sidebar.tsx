@@ -1,7 +1,9 @@
 import {
   Bell,
   BellOff,
+  ChevronDown,
   ChevronRight,
+  ChevronUp,
   Clock,
   Folder,
   FolderOpen,
@@ -37,10 +39,29 @@ export const PROJECTS_SECTION = "section:projects"
 export const SESSIONS_SECTION = "section:sessions"
 export const PINNED_SECTION = "section:pinned"
 export const EMPLOYEES_SECTION = "section:employees"
+// The foot's switches: a list, or folded to a row of their icons.
+export const FOOT_SECTION = "section:foot"
 
-const OPEN_AT_FIRST = [SESSIONS_SECTION, PINNED_SECTION, EMPLOYEES_SECTION]
+const OPEN_AT_FIRST = [SESSIONS_SECTION, PINNED_SECTION, EMPLOYEES_SECTION, FOOT_SECTION]
 export const isOpen = (toggled: Set<string>, key: string) =>
   OPEN_AT_FIRST.includes(key) ? !toggled.has(key) : toggled.has(key)
+
+/**
+ * The sidebar as a phone opens it, to keep to the conversations: Recents
+ * open, Projects, Employees and the foot folded. Pinned is left as it was —
+ * pinning is already a choice to keep it in view.
+ */
+export function focused(toggled: Set<string>): Set<string> {
+  const next = new Set(toggled)
+  const want = (key: string, open: boolean) => {
+    if (isOpen(next, key) === open) return
+    if (next.has(key)) next.delete(key)
+    else next.add(key)
+  }
+  want(SESSIONS_SECTION, true)
+  for (const key of [PROJECTS_SECTION, EMPLOYEES_SECTION, FOOT_SECTION]) want(key, false)
+  return next
+}
 
 /**
  * The sidebar's lists, which overlap on purpose: each project (most recently
@@ -393,7 +414,8 @@ export function Sidebar({
         />
       )}
 
-      <div className="sidebar-foot">
+      {/* Folded, a row of the same buttons as icons: still one tap each. */}
+      <div className={"sidebar-foot" + (open(FOOT_SECTION) ? "" : " folded")}>
         {vim && (
           <button
             className={"devices-btn push-btn" + (vim.on ? " on" : "")}
@@ -444,11 +466,22 @@ export function Sidebar({
           what=" — sessions outside any project"
           onOpen={() => onOpenDream("home")}
         />
-        {/* This device's preferences: appearance, and the agent "+" starts. */}
-        <button className="devices-btn push-btn" onClick={onOpenSettings} title="Settings">
-          <Settings />
-          <span>Settings</span>
-        </button>
+        {/* This device's preferences: appearance, and the agent "+" starts.
+            The fold at the end of its row, where the row is empty. */}
+        <div className="foot-last">
+          <button className="devices-btn push-btn" onClick={onOpenSettings} title="Settings">
+            <Settings />
+            <span>Settings</span>
+          </button>
+          <button
+            className="devices-btn foot-fold"
+            onClick={() => onToggle(FOOT_SECTION)}
+            aria-expanded={open(FOOT_SECTION)}
+            title={open(FOOT_SECTION) ? "Fold to icons" : "Unfold"}
+          >
+            {open(FOOT_SECTION) ? <ChevronDown /> : <ChevronUp />}
+          </button>
+        </div>
         {devicesOpen && (
           <DevicesDialog
             devices={devices}
