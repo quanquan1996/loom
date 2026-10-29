@@ -237,6 +237,16 @@ export function updateAgent(
   return apiCall(`/api/agents/${id}`, { method: "PATCH", body: JSON.stringify(attrs) })
 }
 
+/** A session's unsent composer text, on the server; "" when there is none. */
+export function getDraft(id: string): Promise<{ text: string }> {
+  return apiCall(`/api/agents/${id}/draft`, { method: "GET" })
+}
+
+/** Replace it; "" clears it. `keepalive` lets it outlive the page going away. */
+export function putDraft(id: string, text: string, keepalive = false): Promise<{ text: string }> {
+  return apiCall(`/api/agents/${id}/draft`, { method: "PUT", body: JSON.stringify({ text }), keepalive })
+}
+
 // Permanent: the server discards the session's history too, otherwise it would
 // reappear at the next boot when Bootstrap restores everything on disk.
 export async function deleteAgent(id: string): Promise<void> {

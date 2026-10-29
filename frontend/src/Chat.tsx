@@ -37,6 +37,7 @@ import { isComposing } from "./ime"
 import { Markdown, OutputLink } from "./markdown"
 import { useNarrow } from "./useNarrow"
 import { useAgent } from "./useAgent"
+import { useDraft } from "./useDraft"
 import {
   useAttachments,
   useFileDrop,
@@ -144,7 +145,7 @@ export function Chat({
   // it) would pull it back down just after `gg` or `k` scrolled it up.
   const items = useMemo(() => foldFinished(buildTimeline(transcript), busy), [transcript, busy])
   const replies = useMemo(() => (busy ? null : currentReplies(items)), [items, busy])
-  const [draft, setDraft] = useState("")
+  const [draft, setDraft] = useDraft(session.id)
   const narrow = useNarrow()
 
   // Stable, because a context change re-renders every message that links a
