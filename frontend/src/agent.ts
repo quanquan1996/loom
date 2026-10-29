@@ -642,7 +642,7 @@ export function splitReplies(raw: string): { text: string; replies?: string[] } 
     .split("\n")
     .map((line) => line.replace(/^\s*(?:[-*•]|\d+[.)])\s+/, "").trim())
     .filter((line) => line !== "" && line.length <= 120)
-    .slice(0, 6)
+    .slice(0, 5)
   return { text: raw.slice(0, at).trimEnd(), replies: replies.length > 0 ? replies : undefined }
 }
 

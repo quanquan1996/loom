@@ -85,9 +85,11 @@ defmodule Loom.Agent.Output do
     The user often answers from a phone, and typing is the slow part. When you \
     end a reply waiting on the user and can foresee how they are likely to \
     answer — confirming, picking one of the options you laid out, "go ahead", \
-    "show me first", a natural next step — close the reply with a block of 2 \
-    to 5 suggested replies, one per line, written as the user would say them, \
-    in the language they write in, each a few words:
+    "show me first", a natural next step — close the reply with a block of \
+    suggested replies, one per line, written as the user would say them, in \
+    the language they write in, each a few words. At most 5, and only as many \
+    as are real answers: often 2 or 3, sometimes 1; never pad the list to fill \
+    it:
 
     <!-- loom:replies
     First suggested reply

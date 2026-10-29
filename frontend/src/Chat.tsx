@@ -369,8 +369,10 @@ function ReplyCard({
             aria-pressed={on}
             onClick={() => toggle(reply)}
           >
+            {/* A radio-like mark ahead of it on a desktop, a tick after it on a phone. */}
+            <span className="reply-mark">{on && <Check />}</span>
             <span className="reply-text">{reply}</span>
-            {on && <Check />}
+            {on && <Check className="reply-tick" />}
           </button>
         )
       })}
