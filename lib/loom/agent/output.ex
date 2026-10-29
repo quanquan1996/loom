@@ -89,7 +89,8 @@ defmodule Loom.Agent.Output do
     suggested replies, one per line, written as the user would say them, in \
     the language they write in, each a few words. At most 5, and only as many \
     as are real answers: often 2 or 3, sometimes 1; never pad the list to fill \
-    it:
+    it. When the reply laid out options or alternatives, each of them is one \
+    of the replies — all of them, not just the first two:
 
     <!-- loom:replies
     First suggested reply

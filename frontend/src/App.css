@@ -167,6 +167,17 @@
   color: var(--fg-dim);
   font-size: 0.846rem;
   font-variant-numeric: tabular-nums;
+  /* Shown only when the pointer is on the row: a column of ages down every
+     row made the list read as noise, and the title wants the room. A touch
+     screen has no hover, so there it is not shown at all. */
+  display: none;
+}
+
+@media (hover: hover) {
+  .session:hover .session-when,
+  .session.menu-open .session-when {
+    display: inline;
+  }
 }
 
 .session-del {
