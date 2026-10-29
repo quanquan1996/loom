@@ -360,6 +360,7 @@ export function Sidebar({
                   {news && <span className="emp-row-news" title="New updates" />}
                   <StatusIcon status={e.status} />
                   <BudgetRing employee={e} />
+                  <BackendIcon backend={e.backend} />
                 </div>
               )
             })}
