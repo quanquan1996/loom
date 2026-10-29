@@ -1479,67 +1479,6 @@ function Composer({
     el.style.height = Math.min(content, line * MAX_LINES) + padding + "px"
   }, [text, multiline])
 
-  // The box is clear glass; only where there is text is the conversation
-  // behind it frosted, one rounded patch per line. A copy of the text, laid
-  // out as the textarea lays it out, says where the lines are — CSS cannot
-  // blur behind the lines of a textarea, nor of an inline element, one by one.
-  const placeholder = busy
-    ? "Steer the agent mid-turn…"
-    : interrupted
-      ? "Stopped — type to continue"
-      : "Message the agent…"
-  const inkRef = useRef<HTMLDivElement>(null)
-  const [patches, setPatches] = useState<{ x: number; y: number; w: number; h: number }[]>([])
-  useLayoutEffect(() => {
-    const area = ref.current
-    const ink = inkRef.current
-    const copy = ink?.firstElementChild as HTMLElement | null
-    if (!area || !ink || !copy) return
-    const measure = () => {
-      const style = getComputedStyle(area)
-      for (const prop of [
-        "font",
-        "letterSpacing",
-        "lineHeight",
-        "paddingTop",
-        "paddingRight",
-        "paddingBottom",
-        "paddingLeft",
-        "tabSize",
-      ] as const) {
-        copy.style[prop] = style[prop]
-      }
-      copy.style.width = area.clientWidth + "px"
-      ink.style.height = area.offsetHeight + "px"
-      const node = copy.firstChild
-      if (!node || node.textContent?.trim() === "") return setPatches([])
-      const range = document.createRange()
-      range.selectNodeContents(node)
-      const origin = copy.getBoundingClientRect()
-      // One per line: a line can come back as several boxes.
-      const lines = new Map<number, { x: number; y: number; w: number; h: number }>()
-      for (const r of Array.from(range.getClientRects())) {
-        if (r.width < 1) continue
-        const y = Math.round(r.top - origin.top)
-        const line = lines.get(y)
-        if (!line) lines.set(y, { x: r.left - origin.left, y, w: r.width, h: r.height })
-        else {
-          const right = Math.max(line.x + line.w, r.right - origin.left)
-          line.x = Math.min(line.x, r.left - origin.left)
-          line.w = right - line.x
-        }
-      }
-      // No wider than the box: a long placeholder is cut off, not wrapped.
-      const right = area.clientWidth - parseFloat(style.paddingRight)
-      setPatches([...lines.values()].map((l) => ({ ...l, w: Math.min(l.w, right - l.x) })))
-      ink.scrollTop = area.scrollTop
-    }
-    measure()
-    const observer = new ResizeObserver(measure)
-    observer.observe(area)
-    return () => observer.disconnect()
-  }, [text, multiline, placeholder])
-
   // An attachment on its own is a message: dragging in a screenshot and
   // pressing send, with nothing typed, is a normal way to ask about it.
   const sendable =
@@ -1608,24 +1547,18 @@ function Composer({
           {tools}
         </div>
 
-        <div className="composer-ink" ref={inkRef} aria-hidden>
-          {/* The placeholder is text over the glass too. One line of it. */}
-          <div className={"composer-ink-text" + (text === "" ? " placeholder" : "")}>
-            {text || placeholder}
-          </div>
-          {patches.map((p, i) => (
-            <i key={i} style={{ left: p.x, top: p.y, width: p.w, height: p.h }} />
-          ))}
-        </div>
         <textarea
           ref={ref}
           className="composer-input"
-          onScroll={(e) => {
-            if (inkRef.current) inkRef.current.scrollTop = e.currentTarget.scrollTop
-          }}
           value={text}
           rows={1}
-          placeholder={placeholder}
+          placeholder={
+            busy
+              ? "Steer the agent mid-turn…"
+              : interrupted
+                ? "Stopped — type to continue"
+                : "Message the agent…"
+          }
           onChange={(e) => {
             setText(e.target.value)
             setPick(0)
