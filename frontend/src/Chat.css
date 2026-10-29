@@ -25,11 +25,14 @@
   content: "";
   position: absolute;
   z-index: -1;
-  inset: 0 0 -12px;
-  background: linear-gradient(
-    color-mix(in srgb, var(--bg) 80%, transparent) 40%,
-    color-mix(in srgb, var(--bg) 0%, transparent)
-  );
+  inset: 0 0 -16px;
+  /* Very clear frosted glass: mostly blur, a breath of the page's colour,
+     fading out at its lower edge rather than ending on a line. */
+  background: color-mix(in srgb, var(--bg) 22%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(1.8);
+  backdrop-filter: blur(18px) saturate(1.8);
+  -webkit-mask-image: linear-gradient(#000 70%, transparent);
+  mask-image: linear-gradient(#000 70%, transparent);
   pointer-events: none;
 }
 
