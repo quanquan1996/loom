@@ -296,7 +296,7 @@ pre.code {
   border-radius: 1.75rem;
   /* Glass: while the box is empty the conversation shows through sharp but
      shaded, so the buttons and the placeholder read over it… */
-  background: color-mix(in srgb, var(--bg) 58%, transparent);
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
   transition:
