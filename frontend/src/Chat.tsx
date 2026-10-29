@@ -859,10 +859,13 @@ function Title({
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(title)
 
-  // A name too long for the header scrolls through, back and forth, instead of
-  // being cut off — on a phone that is most names.
+  // On a phone, a name too long for the header scrolls through, back and
+  // forth, instead of being cut off — there that is most names. A wide window
+  // shows most of it already, and a long slide across it is only noise.
+  const narrow = useNarrow()
   const nameRef = useRef<HTMLSpanElement>(null)
-  const [shift, setShift] = useState(0)
+  const [overflow, setShift] = useState(0)
+  const shift = narrow ? overflow : 0
   useLayoutEffect(() => {
     const el = nameRef.current
     if (!el) return
@@ -875,7 +878,7 @@ function Title({
     const observer = new ResizeObserver(measure)
     observer.observe(el)
     return () => observer.disconnect()
-  }, [title, editing])
+  }, [title, editing, narrow])
 
   const commit = () => {
     const value = draft.trim()

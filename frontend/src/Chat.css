@@ -27,7 +27,7 @@
   z-index: -1;
   inset: 0 0 -12px;
   background: linear-gradient(
-    color-mix(in srgb, var(--bg) 55%, transparent),
+    color-mix(in srgb, var(--bg) 80%, transparent) 40%,
     color-mix(in srgb, var(--bg) 0%, transparent)
   );
   pointer-events: none;
