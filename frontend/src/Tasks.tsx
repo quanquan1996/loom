@@ -1,4 +1,4 @@
-import { ArrowUp, Loader2, MessageSquare, PanelLeftOpen, Pause, Play, Plus, X } from "lucide-react"
+import { ArrowUp, Loader2, MessageSquare, PanelLeft, Pause, Play, Plus, X } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { createTask, deleteTask, listTasks, runTask, updateTask, type Task } from "./api"
@@ -55,7 +55,7 @@ export function Tasks({
       <header className="tasks-head">
         {showSidebarButton ? (
           <button className="tasks-round" onClick={onToggleSidebar} title="Show sidebar">
-            <PanelLeftOpen />
+            <PanelLeft />
           </button>
         ) : (
           <span className="tasks-round-spacer" />

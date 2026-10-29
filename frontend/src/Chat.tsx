@@ -8,7 +8,7 @@ import {
   Clock as ClockIcon,
   Ellipsis,
   Moon,
-  PanelLeftOpen,
+  PanelLeft,
   Plus,
   Square,
   SquareTerminal,
@@ -231,7 +231,7 @@ export function Chat({
             onClick={onToggleSidebar}
             title="Show sidebar"
           >
-            {narrow ? <TwoLines /> : <PanelLeftOpen />}
+            {narrow ? <TwoLines /> : <PanelLeft />}
           </button>
         )}
 

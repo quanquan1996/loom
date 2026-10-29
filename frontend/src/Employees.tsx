@@ -8,7 +8,7 @@ import {
   ListChecks,
   LoaderCircle,
   MessageCircle,
-  PanelLeftOpen,
+  PanelLeft,
   Pause,
   Play,
   Plus,
@@ -188,7 +188,7 @@ export function EmployeePage({
       <header className="chat-header">
         {!chat.sidebarOpen && (
           <button className="icon-btn" onClick={chat.onToggleSidebar} title="Show sidebar">
-            <PanelLeftOpen />
+            <PanelLeft />
           </button>
         )}
         <span className="chat-name emp-title">

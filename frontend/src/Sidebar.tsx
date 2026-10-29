@@ -13,7 +13,7 @@ import {
   KeyboardOff,
   MonitorSmartphone,
   MoreHorizontal,
-  PanelLeftClose,
+  PanelLeft,
   Pin,
   Plus,
   Search,
@@ -255,20 +255,26 @@ export function Sidebar({
       <div className="sidebar-head">
         <span className="brand">loom</span>
         <span className="sidebar-actions">
-          {!narrow && <NewSessionButton backend={defaultBackend} onCreate={(backend) => onCreate(backend)} />}
           <button className="icon-btn search-btn" onClick={() => setSearching(true)} title="Search chats">
             <Search />
           </button>
           {/* A phone's drawer is put away by a swipe or a tap beside it. */}
           {!narrow && (
             <button className="icon-btn" onClick={onCollapse} title="Hide sidebar">
-              <PanelLeftClose />
+              <PanelLeft />
             </button>
           )}
         </span>
       </div>
 
       <div className="session-list">
+        {/* ChatGPT's first row on a desktop. A phone has its floating pill. */}
+        {!narrow && (
+          <div className="nav-item nav-new" role="button" onClick={() => onCreate(defaultBackend)}>
+            <SquarePen className="nav-icon" />
+            <span className="nav-label">New chat</span>
+          </div>
+        )}
         {/* A top-level entry, like the sidebar's others: folded until asked. */}
         <div
           className={"nav-item" + (open(PROJECTS_SECTION) ? " open" : "")}

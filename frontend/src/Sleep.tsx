@@ -1,4 +1,4 @@
-import { Moon, PanelLeftOpen, Undo2 } from "lucide-react"
+import { Moon, PanelLeft, Undo2 } from "lucide-react"
 import { useEffect, useState, type ComponentProps } from "react"
 import { Chat } from "./Chat"
 import { Confirm } from "./Confirm"
@@ -113,7 +113,7 @@ export function Sleep({
       <header className="chat-header">
         {!chat.sidebarOpen && (
           <button className="icon-btn" onClick={chat.onToggleSidebar} title="Show sidebar">
-            <PanelLeftOpen />
+            <PanelLeft />
           </button>
         )}
         <span className="chat-name sleep-name">

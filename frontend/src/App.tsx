@@ -248,6 +248,11 @@ function App() {
   useEffect(() => {
     if (narrow && (drawerOpen || visible)) setToggled(focused)
   }, [narrow, drawerOpen, visible])
+  // A desktop the same way, once, when the page is (re)loaded.
+  const narrowAtLoad = useRef(narrow)
+  useEffect(() => {
+    if (!narrowAtLoad.current) setToggled(focused)
+  }, [])
   // A project something just happened in: unfolded, and Projects with it.
   const reveal = (projectId: string) =>
     setToggled((t) => {
