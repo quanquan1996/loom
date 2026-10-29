@@ -64,6 +64,9 @@ defmodule Loom.Agent.Store do
   @doc "Directory holding one session's header, logs, and session memory."
   def session_dir(id), do: Path.join(data_dir(), id)
 
+  @doc "A session's transcript log, for reading it some other way than `read_events/2`."
+  def events_path(id), do: Path.join(session_dir(id), @events_file)
+
   @doc """
   Directory holding the files a user attached to this session.
 

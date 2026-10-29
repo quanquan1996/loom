@@ -28,6 +28,7 @@ defmodule LoomWeb.Router do
     delete "/sessions/:id", SessionController, :delete
 
     get "/agents", AgentSessionController, :index
+    get "/search", SearchController, :index
     post "/agents", AgentSessionController, :create
     patch "/agents/:id", AgentSessionController, :update
     delete "/agents/:id", AgentSessionController, :delete

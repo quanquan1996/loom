@@ -16,6 +16,7 @@ import {
   PanelLeftClose,
   Pin,
   Plus,
+  Search,
   Settings,
   SquarePen,
   UserPlus,
@@ -32,6 +33,7 @@ import { MoonButton, scopeOf } from "./Sleep"
 import type { Push } from "./push"
 import { lastActive } from "./useLobby"
 import { useNarrow } from "./useNarrow"
+import { SearchSheet } from "./Search"
 
 /**
  * Which parts of the sidebar are not as they start, by key: `toggled` in App.
@@ -186,6 +188,7 @@ export function Sidebar({
   // On a phone the foot is not a list but a button that unfolds it upwards,
   // beside a "New chat" one: ChatGPT's two at the bottom of its drawer.
   const narrow = useNarrow()
+  const [searching, setSearching] = useState(false)
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 30_000)
     return () => clearInterval(timer)
@@ -253,9 +256,15 @@ export function Sidebar({
         <span className="brand">loom</span>
         <span className="sidebar-actions">
           {!narrow && <NewSessionButton backend={defaultBackend} onCreate={(backend) => onCreate(backend)} />}
-          <button className="icon-btn" onClick={onCollapse} title="Hide sidebar">
-            <PanelLeftClose />
+          <button className="icon-btn search-btn" onClick={() => setSearching(true)} title="Search chats">
+            <Search />
           </button>
+          {/* A phone's drawer is put away by a swipe or a tap beside it. */}
+          {!narrow && (
+            <button className="icon-btn" onClick={onCollapse} title="Hide sidebar">
+              <PanelLeftClose />
+            </button>
+          )}
         </span>
       </div>
 
@@ -510,6 +519,7 @@ export function Sidebar({
           </button>
         </div>
       )}
+      {searching && <SearchSheet sessions={sessions} onSelect={onSelect} onClose={() => setSearching(false)} />}
       {devicesOpen && (
         <DevicesDialog devices={devices} onUpsert={onUpsertDevice} onClose={() => setDevicesOpen(false)} />
       )}

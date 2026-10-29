@@ -529,6 +529,15 @@ async function apiCall<T>(url: string, init: RequestInit): Promise<T> {
   return body
 }
 
+/** Sessions whose conversation mentions `q`, newest match first; see `Loom.Agent.Search`. */
+export type SearchHit = { id: string; seq: number; at: number; snippet: string }
+export async function searchSessions(q: string, signal?: AbortSignal): Promise<SearchHit[]> {
+  const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`, { headers: authHeaders(), signal })
+  if (res.status === 401) throw unauthorized()
+  if (!res.ok) throw new Error(`search failed: ${res.status}`)
+  return (await res.json()).results
+}
+
 /** Register a device: it comes back with its one-time install code. */
 export function createDevice(name: string): Promise<{ node: Device; code: string }> {
   return apiCall("/api/devices", { method: "POST", body: JSON.stringify({ name }) })
