@@ -25,12 +25,11 @@
   content: "";
   position: absolute;
   z-index: -1;
-  inset: 0 0 -20px;
-  background: linear-gradient(var(--bg) 35%, color-mix(in srgb, var(--bg) 0%, transparent));
-  -webkit-backdrop-filter: blur(6px);
-  backdrop-filter: blur(6px);
-  -webkit-mask-image: linear-gradient(#000 55%, transparent);
-  mask-image: linear-gradient(#000 55%, transparent);
+  inset: 0 0 -12px;
+  background: linear-gradient(
+    color-mix(in srgb, var(--bg) 55%, transparent),
+    color-mix(in srgb, var(--bg) 0%, transparent)
+  );
   pointer-events: none;
 }
 
@@ -847,6 +846,49 @@ pre.code {
      it sets includes the padding. */
   box-sizing: border-box;
   overflow-y: auto;
+}
+
+/* Behind the textarea, in the same cell: frosted patches, one per line of
+   text (Chat.tsx). The copy of the text is only there to be measured. */
+.composer-ink {
+  grid-area: input;
+  align-self: end;
+  position: relative;
+  overflow: hidden;
+  contain: size;
+  pointer-events: none;
+}
+
+.composer-ink-text {
+  position: absolute;
+  top: 0;
+  left: 0;
+  box-sizing: border-box;
+  visibility: hidden;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
+.composer-ink-text.placeholder {
+  white-space: pre;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.composer-ink i {
+  position: absolute;
+  box-sizing: content-box;
+  margin: -3px -8px;
+  padding: 3px 8px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--composer) 55%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(1.6);
+  backdrop-filter: blur(14px) saturate(1.6);
+}
+
+.composer-input {
+  position: relative;
+  z-index: 1;
 }
 
 .composer-box.multiline .composer-input {

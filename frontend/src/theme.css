@@ -294,26 +294,12 @@ pre.code {
   padding: 6px 8px;
   border: 0;
   border-radius: 1.75rem;
-  /* Glass: the conversation scrolls on underneath. Light while empty… */
-  background: color-mix(in srgb, var(--composer) 45%, transparent);
-  -webkit-backdrop-filter: blur(8px) saturate(1.5);
-  backdrop-filter: blur(8px) saturate(1.5);
-  transition:
-    background-color 0.2s,
-    backdrop-filter 0.2s,
-    -webkit-backdrop-filter 0.2s;
+  /* Clear glass: the conversation scrolls on underneath, and only where
+     there is text is it frosted (`.composer-ink`). */
+  background: color-mix(in srgb, var(--composer) 10%, transparent);
   box-shadow:
     inset 0 0.5px 0 color-mix(in srgb, #fff 16%, transparent),
-    0 0 0 0.5px color-mix(in srgb, var(--fg) 10%, transparent),
-    0 8px 28px var(--shadow);
-}
-
-/* …and frosted once there is text in it, so what is typed stays legible over
-   whatever passes behind. */
-.composer-box:has(.composer-input:not(:placeholder-shown)) {
-  background: color-mix(in srgb, var(--composer) 82%, transparent);
-  -webkit-backdrop-filter: blur(24px) saturate(1.6);
-  backdrop-filter: blur(24px) saturate(1.6);
+    0 0 0 0.5px color-mix(in srgb, var(--fg) 14%, transparent);
 }
 
 /* ChatGPT's round buttons in a phone's header, in iOS's glass: see-through,
@@ -332,6 +318,23 @@ pre.code {
   box-shadow: inset 0 0.5px 0 color-mix(in srgb, #fff 22%, transparent),
     inset 0 0 0 0.5px color-mix(in srgb, var(--fg) 10%, transparent);
   color: var(--fg);
+}
+
+/* On a phone the name is a glass capsule between them. */
+@media (max-width: 640px) {
+  .chat-header .chat-title {
+    align-self: center;
+    height: 2.5rem;
+    box-sizing: border-box;
+    padding: 0 14px 0 6px;
+    border-radius: 999px;
+    /* It holds text, so it is frosted like the composer's lines. */
+    background: color-mix(in srgb, var(--composer) 55%, transparent);
+    -webkit-backdrop-filter: blur(16px) saturate(1.6);
+    backdrop-filter: blur(16px) saturate(1.6);
+    box-shadow: inset 0 0.5px 0 color-mix(in srgb, #fff 22%, transparent),
+      inset 0 0 0 0.5px color-mix(in srgb, var(--fg) 10%, transparent);
+  }
 }
 
 .pane-menu {
@@ -849,9 +852,7 @@ pre.code,
 }
 
 [data-theme="light"] .composer-box {
-  box-shadow:
-    0 0 0 1px #0000001a,
-    0 4px 16px rgb(0 0 0 / 6%);
+  box-shadow: 0 0 0 0.5px #00000026;
 }
 
 [data-theme="light"] pre.code {
@@ -1063,4 +1064,13 @@ pre.code,
   .sidebar .brand {
     font-size: 1.875rem;
   }
+}
+
+/* The composer's own buttons are content over clear glass too: each gets the
+   frosted patch the lines of text get. */
+.composer-btn.attach,
+.composer-btn.effort-btn {
+  background: color-mix(in srgb, var(--composer) 55%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(1.6);
+  backdrop-filter: blur(14px) saturate(1.6);
 }
