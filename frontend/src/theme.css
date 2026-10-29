@@ -294,20 +294,20 @@ pre.code {
   padding: 6px 8px;
   border: 0;
   border-radius: 1.75rem;
-  /* Glass: the conversation scrolls on underneath, still readable through
-     it while the box is empty… */
+  /* Glass: while the box is empty the conversation shows through unblurred,
+     and the rim alone draws it… */
   background: color-mix(in srgb, var(--composer) 6%, transparent);
-  -webkit-backdrop-filter: blur(2px) saturate(1.3);
-  backdrop-filter: blur(2px) saturate(1.3);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
   transition:
     background-color 0.2s,
     backdrop-filter 0.2s,
     -webkit-backdrop-filter 0.2s;
   /* The edge is what makes it a thing on the page: a clear rim, brighter
      along the top where the light catches it. */
-  border: 1px solid color-mix(in srgb, var(--fg) 20%, transparent);
+  border: 1px solid color-mix(in srgb, var(--fg) 26%, transparent);
   box-shadow:
-    inset 0 1px 0 color-mix(in srgb, #fff 14%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #fff 18%, transparent),
     0 8px 28px var(--shadow);
 }
 
