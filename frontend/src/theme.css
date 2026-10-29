@@ -294,9 +294,9 @@ pre.code {
   padding: 6px 8px;
   border: 0;
   border-radius: 1.75rem;
-  /* Glass: while the box is empty the conversation shows through unblurred,
-     and the rim alone draws it… */
-  background: color-mix(in srgb, var(--composer) 6%, transparent);
+  /* Glass: while the box is empty the conversation shows through sharp but
+     shaded, so the buttons and the placeholder read over it… */
+  background: color-mix(in srgb, var(--bg) 58%, transparent);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
   transition:
