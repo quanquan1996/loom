@@ -17,8 +17,10 @@ import {
   Pin,
   Plus,
   Settings,
+  SquarePen,
   UserPlus,
   Users,
+  X,
 } from "lucide-react"
 import { useEffect, useState } from "react"
 import type { AgentBackend, AgentInfo, Device, Employee, Project } from "./api"
@@ -29,6 +31,7 @@ import { SessionMenu } from "./SessionMenu"
 import { MoonButton, scopeOf } from "./Sleep"
 import type { Push } from "./push"
 import { lastActive } from "./useLobby"
+import { useNarrow } from "./useNarrow"
 
 /**
  * Which parts of the sidebar are not as they start, by key: `toggled` in App.
@@ -180,6 +183,9 @@ export function Sidebar({
   // Ages are relative, so they go stale without any new data. A local clock,
   // not a poll: nothing is fetched.
   const [, setNow] = useState(0)
+  // On a phone the foot is not a list but a button that unfolds it upwards,
+  // beside a "New chat" one: ChatGPT's two at the bottom of its drawer.
+  const narrow = useNarrow()
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 30_000)
     return () => clearInterval(timer)
@@ -246,7 +252,7 @@ export function Sidebar({
       <div className="sidebar-head">
         <span className="brand">loom</span>
         <span className="sidebar-actions">
-          <NewSessionButton backend={defaultBackend} onCreate={(backend) => onCreate(backend)} />
+          {!narrow && <NewSessionButton backend={defaultBackend} onCreate={(backend) => onCreate(backend)} />}
           <button className="icon-btn" onClick={onCollapse} title="Hide sidebar">
             <PanelLeftClose />
           </button>
@@ -414,8 +420,13 @@ export function Sidebar({
         />
       )}
 
-      {/* Folded, a row of the same buttons as icons: still one tap each. */}
-      <div className={"sidebar-foot" + (open(FOOT_SECTION) ? "" : " folded")}>
+      {/* Folded, a row of the same buttons as icons: still one tap each. On a
+          phone, unfolded is a column over the dimmed list; picking one folds it. */}
+      {narrow && open(FOOT_SECTION) && <div className="dial-scrim" onClick={() => onToggle(FOOT_SECTION)} />}
+      <div
+        className={"sidebar-foot" + (narrow ? " dial" : "") + (open(FOOT_SECTION) ? "" : " folded")}
+        onClick={narrow ? (e) => (e.target as Element).closest("button") && onToggle(FOOT_SECTION) : undefined}
+      >
         {vim && (
           <button
             className={"devices-btn push-btn" + (vim.on ? " on" : "")}
@@ -482,14 +493,26 @@ export function Sidebar({
             {open(FOOT_SECTION) ? <ChevronDown /> : <ChevronUp />}
           </button>
         </div>
-        {devicesOpen && (
-          <DevicesDialog
-            devices={devices}
-            onUpsert={onUpsertDevice}
-            onClose={() => setDevicesOpen(false)}
-          />
-        )}
       </div>
+      {narrow && (
+        <div className="sidebar-float">
+          <button className="new-chat" onClick={() => onCreate(defaultBackend)}>
+            <SquarePen />
+            New chat
+          </button>
+          <button
+            className="dial-btn"
+            onClick={() => onToggle(FOOT_SECTION)}
+            aria-expanded={open(FOOT_SECTION)}
+            title={open(FOOT_SECTION) ? "Close" : "Notifications, Browser, Devices, Dream, Settings"}
+          >
+            {open(FOOT_SECTION) ? <X /> : <ChevronUp />}
+          </button>
+        </div>
+      )}
+      {devicesOpen && (
+        <DevicesDialog devices={devices} onUpsert={onUpsertDevice} onClose={() => setDevicesOpen(false)} />
+      )}
     </aside>
   )
 }

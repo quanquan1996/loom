@@ -1128,3 +1128,137 @@ pre.code,
     font-size: 1.875rem;
   }
 }
+
+/* ── A phone's drawer foot: "New chat" and a button that unfolds the rest ──
+   Both float over the end of the list, ChatGPT's two; the rest rises above
+   the button as a column of glass circles, the list dimmed behind it. */
+.sidebar {
+  position: relative;
+}
+
+.drawer .sidebar .session-list {
+  padding-bottom: calc(88px + env(safe-area-inset-bottom));
+}
+
+.sidebar-float {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: max(16px, env(safe-area-inset-bottom));
+  z-index: 3;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  pointer-events: none;
+}
+
+.sidebar-float > button {
+  pointer-events: auto;
+}
+
+.new-chat {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 3rem;
+  padding: 0 20px 0 16px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--fg);
+  color: var(--bg);
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.new-chat svg {
+  width: 20px;
+  height: 20px;
+}
+
+.dial-btn,
+.sidebar-foot.dial .devices-btn svg {
+  background: color-mix(in srgb, var(--composer) 72%, transparent);
+  -webkit-backdrop-filter: blur(16px) saturate(1.6);
+  backdrop-filter: blur(16px) saturate(1.6);
+  border: 1px solid color-mix(in srgb, var(--fg) 24%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 14%, transparent);
+  border-radius: 50%;
+}
+
+.dial-btn {
+  display: grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  padding: 0;
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.dial-btn svg {
+  width: 22px;
+  height: 22px;
+}
+
+.dial-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: color-mix(in srgb, var(--bg-raised) 92%, transparent);
+}
+
+.sidebar-foot.dial {
+  position: absolute;
+  /* Centred over the button, which is a little wider than its circles. */
+  right: calc(16px + 0.125rem);
+  bottom: calc(max(16px, env(safe-area-inset-bottom)) + 3rem + 14px);
+  z-index: 3;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  padding: 0;
+}
+
+.sidebar-foot.dial.folded {
+  display: none;
+}
+
+.sidebar-foot.dial .foot-last {
+  display: contents;
+}
+
+.sidebar-foot.dial .foot-fold {
+  display: none;
+}
+
+.sidebar-foot.dial .devices-btn {
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 0;
+  background: transparent;
+  color: var(--fg);
+}
+
+.sidebar-foot.dial .devices-btn > span {
+  order: 1;
+}
+
+.sidebar-foot.dial .devices-btn .devices-count:empty {
+  display: none;
+}
+
+.sidebar-foot.dial .devices-btn .devices-count {
+  order: 2;
+  margin-left: 0;
+  color: var(--fg-dim);
+}
+
+.sidebar-foot.dial .devices-btn svg {
+  order: 3;
+  box-sizing: border-box;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0.75rem;
+}
