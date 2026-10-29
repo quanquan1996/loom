@@ -296,9 +296,9 @@ pre.code {
   border-radius: 1.75rem;
   /* Glass: the conversation scrolls on underneath, still readable through
      it while the box is empty… */
-  background: color-mix(in srgb, var(--composer) 18%, transparent);
-  -webkit-backdrop-filter: blur(4px) saturate(1.4);
-  backdrop-filter: blur(4px) saturate(1.4);
+  background: color-mix(in srgb, var(--composer) 6%, transparent);
+  -webkit-backdrop-filter: blur(2px) saturate(1.3);
+  backdrop-filter: blur(2px) saturate(1.3);
   transition:
     background-color 0.2s,
     backdrop-filter 0.2s,
@@ -313,9 +313,9 @@ pre.code {
 
 /* …and frosted once there is text in it, so what is typed stays legible. */
 .composer-box:has(.composer-input:not(:placeholder-shown)) {
-  background: color-mix(in srgb, var(--composer) 45%, transparent);
-  -webkit-backdrop-filter: blur(14px) saturate(1.6);
-  backdrop-filter: blur(14px) saturate(1.6);
+  background: color-mix(in srgb, var(--composer) 18%, transparent);
+  -webkit-backdrop-filter: blur(4px) saturate(1.4);
+  backdrop-filter: blur(4px) saturate(1.4);
 }
 
 /* ChatGPT's round buttons in a phone's header, in iOS's glass: see-through,
