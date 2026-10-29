@@ -3,7 +3,7 @@
 // from its logo). Stroked in currentColor like the lucide icons around it.
 
 const CLAUDE =
-  "M12.25 10.22L13.32 2.59M13.25 10.71L17.56 6.25M13.77 11.69L21.36 10.35M13.62 12.79L18.74 15.29M12.85 13.59L16.23 19.95M11.75 13.78L10.82 20.42M10.75 13.29L5.4 18.83M10.23 12.31L4.61 13.3M10.38 11.21L3.91 8.05M11.15 10.41L8.24 4.94"
+  "M12 12L12 2.5M12 12L15.5 5.94M12 12L20.23 7.25M12 12L19 12M12 12L20.23 16.75M12 12L15.5 18.06M12 12L12 21.5M12 12L8.5 18.06M12 12L3.77 16.75M12 12L5 12M12 12L3.77 7.25M12 12L8.5 5.94"
 
 const OPENAI = [
   "M11.217 19.384a3.501 3.501 0 0 0 6.783 -1.217v-5.167l-6 -3.35",
@@ -26,11 +26,11 @@ export function BackendIcon({ backend, title }: { backend: string; title?: strin
   else if (backend === "codex") body = OPENAI.map((d) => <path key={d} d={d} />)
   else if (backend === "kiro")
     body = (
-      // The logo runs past its 24 box; shrink it to sit with the other two.
-      <g transform="translate(12 12) scale(0.84) translate(-12 -11.6)">
+      // The logo runs past its 24 box; shrink it to sit with the other two,
+      // and thicken the line back so it reads as heavy as they do.
+      <g transform="translate(12 12) scale(0.84) translate(-12 -11.6)" strokeWidth="2.4">
         <path d={KIRO} />
-        <ellipse cx="13" cy="8.6" rx="1" ry="1.45" fill="currentColor" stroke="none" />
-        <ellipse cx="17" cy="8.6" rx="1" ry="1.45" fill="currentColor" stroke="none" />
+        <path d="M13 7.6v2M17 7.6v2" />
       </g>
     )
   else return <span className={"session-backend " + backend}>{backend}</span>
