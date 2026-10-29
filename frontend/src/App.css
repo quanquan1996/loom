@@ -1389,6 +1389,46 @@
   white-space: nowrap;
 }
 
+/* Where the session is, in "Project ›": dim, at the right, scrolling when long. */
+.session-menu-project {
+  flex: 1 1 auto;
+  min-width: 0;
+  /* Room for a usual name; a longer one scrolls rather than widen the menu. */
+  width: 9rem;
+  contain: inline-size;
+  margin-left: 12px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-align: right;
+  color: var(--fg-dim);
+}
+
+.session-menu-project.marquee {
+  text-align: left;
+}
+
+.session-menu-project-run {
+  display: inline-block;
+}
+
+.session-menu-project.marquee .session-menu-project-run {
+  animation: chat-name-marquee var(--marquee-s, 8s) ease-in-out infinite alternate;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .session-menu-project {
+    text-overflow: ellipsis;
+  }
+  .session-menu-project.marquee .session-menu-project-run {
+    display: inline;
+    animation: none;
+  }
+}
+
+.session-menu-project + .session-menu-more {
+  margin-left: 4px;
+}
+
 .session-menu-back {
   color: var(--fg-dim) !important;
 }
@@ -1626,17 +1666,6 @@
 
 .project-sessions .session .session-label {
   font-size: 0.95rem;
-}
-
-.session-project {
-  flex: 0 0 auto;
-  display: inline-flex;
-  color: var(--fg-dim);
-}
-
-.session-project svg {
-  width: 0.8rem;
-  height: 0.8rem;
 }
 
 @media (hover: none) {

@@ -188,6 +188,8 @@ export function Sidebar({
         (unread(s) ? " unread" : "")
       }
       onClick={() => onSelect(s.id)}
+      // Outside its project, which one it is in: on hover here, and in its menu.
+      title={!nested && projectName(s) ? `in ${projectName(s)}` : undefined}
     >
       <span className={"dot " + s.status} title={s.status} />
       {s.id === renamingId ? (
@@ -207,12 +209,6 @@ export function Sidebar({
       {/* Which engine is running it is not a detail: the two behave
           differently and the binding is permanent. */}
       <BackendIcon backend={s.backend} />
-      {/* Outside its project, which one it is in; under it, that goes without saying. */}
-      {!nested && projectName(s) && (
-        <span className="session-project" title={`in ${projectName(s)}`}>
-          <Folder />
-        </span>
-      )}
       {nested && s.pinned && <Pin className="session-pin" />}
       <button
         className="session-del session-more"

@@ -1,5 +1,5 @@
 import { Check, ChevronLeft, ChevronRight, Folder, FolderInput, FolderMinus, Pencil, Pin, PinOff, Trash2 } from "lucide-react"
-import { useEffect, useLayoutEffect, useRef, useState } from "react"
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react"
 import { createPortal } from "react-dom"
 import type { AgentInfo, Project } from "./api"
 
@@ -110,7 +110,16 @@ export function SessionMenu({
             disabled={busy}
             title={busy ? "Wait for the turn to end" : undefined}
           >
-            <FolderInput /> Move to project <ChevronRight className="session-menu-more" />
+            {current ? (
+              <>
+                <Folder /> Project <Scrolling text={current.name} />
+              </>
+            ) : (
+              <>
+                <FolderInput /> Move to project
+              </>
+            )}
+            <ChevronRight className="session-menu-more" />
           </button>
           <div className="session-menu-sep" />
           <button
@@ -158,5 +167,25 @@ export function SessionMenu({
       {error && <div className="session-menu-note failed">{error}</div>}
     </div>,
     document.body,
+  )
+}
+
+/** A name in the row's leftover room: when too long, it scrolls to its end and back, as the chat header's does. */
+function Scrolling({ text }: { text: string }) {
+  const ref = useRef<HTMLSpanElement>(null)
+  const [shift, setShift] = useState(0)
+  useLayoutEffect(() => {
+    const el = ref.current
+    const run = el?.firstElementChild as HTMLElement | null
+    if (el && run) setShift(Math.max(0, Math.ceil(run.offsetWidth - el.clientWidth)))
+  }, [text])
+  return (
+    <span
+      ref={ref}
+      className={"session-menu-project" + (shift > 0 ? " marquee" : "")}
+      style={shift > 0 ? ({ "--shift": `-${shift}px`, "--marquee-s": `${4 + shift / 30}s` } as CSSProperties) : undefined}
+    >
+      <span className="session-menu-project-run">{text}</span>
+    </span>
   )
 }
