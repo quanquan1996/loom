@@ -722,17 +722,24 @@
   color: var(--fg-dim);
 }
 
-.emp-status-icon.green {
-  color: var(--green);
-  animation: emp-pulse 1.6s ease-in-out infinite;
+.emp-status-icon.loud {
+  color: var(--fg);
 }
 
-.emp-status-icon.amber {
-  color: var(--emp-amber);
+.emp-status-icon.working {
+  animation: emp-spin 1.6s linear infinite;
 }
 
-.emp-status-icon.red {
-  color: var(--red);
+@keyframes emp-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .emp-status-icon.working {
+    animation: none;
+  }
 }
 
 .emp-ring {

@@ -1,10 +1,12 @@
 import {
   AlarmClock,
   Check,
+  CircleAlert,
   ChevronLeft,
   FileText,
+  Hourglass,
   ListChecks,
-  Moon,
+  LoaderCircle,
   MessageCircle,
   PanelLeftOpen,
   Pause,
@@ -12,12 +14,11 @@ import {
   Plus,
   Settings as SettingsIcon,
   Siren,
-  Zap,
   Undo2,
   Wallet,
   X,
 } from "lucide-react"
-import { useEffect, useState, type ComponentProps, type ReactNode } from "react"
+import { useEffect, useState, type ComponentProps, type ComponentType, type ReactNode } from "react"
 import { createPortal } from "react-dom"
 import { Chat } from "./Chat"
 import { Confirm } from "./Confirm"
@@ -79,18 +80,50 @@ export function Avatar({ employee, size = "md" }: { employee: Pick<Employee, "na
   return <span className={"emp-avatar " + size}>{[...employee.name.trim()][0] ?? "?"}</span>
 }
 
-/** Where it stands, as one small icon: the sidebar's row has no room for words. */
-const STATUS_ICON: Record<Employee["status"], typeof Moon> = {
-  working: Zap,
-  sleeping: Moon,
+/**
+ * Where it stands, as one small icon: the sidebar's row has no room for words.
+ * One colour, in line like the rest of the sidebar; what wants you is bright,
+ * what is quiet is dim. Not a moon for sleeping — that is Dream's.
+ */
+const STATUS_ICON: Record<Employee["status"], ComponentType<{ className?: string; "aria-label"?: string }>> = {
+  working: LoaderCircle,
+  sleeping: Zzz,
   paused: Pause,
-  approval: Wallet,
-  blocked: Siren,
+  approval: Hourglass,
+  blocked: CircleAlert,
 }
+
+const LOUD: Employee["status"][] = ["working", "approval", "blocked"]
 
 export function StatusIcon({ status }: { status: Employee["status"] }) {
   const Icon = STATUS_ICON[status]
-  return <Icon className={"emp-status-icon " + STATUS[status].tone} aria-label={STATUS[status].label} />
+  return (
+    <Icon
+      className={"emp-status-icon " + status + (LOUD.includes(status) ? " loud" : "")}
+      aria-label={STATUS[status].label}
+    />
+  )
+}
+
+// Three z's rising, drawn in the same line as lucide's icons.
+function Zzz({ className, ...rest }: { className?: string; "aria-label"?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      role="img"
+      {...rest}
+    >
+      <path d="M13 3h7l-7 8h7" />
+      <path d="M6.5 11h4.5l-4.5 5h4.5" />
+      <path d="M2.5 17.5h3l-3 3.5h3" />
+    </svg>
+  )
 }
 
 /** Today's spend against today's budget, as a ring that fills clockwise. */
