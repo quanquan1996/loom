@@ -103,12 +103,6 @@ samp,
   color: var(--green);
 }
 
-.session-backend.claude_code,
-.session-backend.codex,
-.session-backend.kiro {
-  color: var(--fg-dim);
-}
-
 /* ── Sidebar ────────────────────────────────────────────────────────────── */
 
 .sidebar {

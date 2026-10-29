@@ -913,7 +913,8 @@
   color: var(--bg);
 }
 
-/* Which engine, per row: its maker's mark as a line icon (BackendIcon). */
+/* Which engine, per row: its maker's mark (BackendIcon), in the maker's colour
+   where it has one — OpenAI's is black and white, so Codex stays gray. */
 .session-backend {
   flex: 0 0 auto;
   display: inline-flex;
@@ -927,15 +928,11 @@
 }
 
 .session-backend.claude_code {
-  color: var(--accent);
-}
-
-.session-backend.codex {
-  color: var(--blue);
+  color: #d97757;
 }
 
 .session-backend.kiro {
-  color: #a78bfa;
+  color: #9b6bff;
 }
 
 .session-queued {
@@ -1649,10 +1646,6 @@
 
 .sidebar .session .session-when {
   font-size: 0.75rem;
-}
-
-.sidebar .session .session-backend {
-  opacity: 0.8;
 }
 
 .sidebar .session .session-backend svg {
