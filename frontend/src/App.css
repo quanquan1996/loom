@@ -913,7 +913,7 @@
   color: var(--bg);
 }
 
-/* Which engine, per row: its maker's mark (BackendIcon), in the maker's colour
+/* Which engine, by the chat's title: its maker's mark (BackendIcon), in the maker's colour
    where it has one — OpenAI's is black and white, so Codex stays gray. */
 .session-backend {
   flex: 0 0 auto;
@@ -1646,11 +1646,6 @@
 
 .sidebar .session .session-when {
   font-size: 0.75rem;
-}
-
-.sidebar .session .session-backend svg {
-  width: 0.85rem;
-  height: 0.85rem;
 }
 
 .project-sessions .session {

@@ -25,7 +25,6 @@ import { RenameInput } from "./Confirm"
 import { DevicesDialog } from "./Devices"
 import { SessionMenu } from "./SessionMenu"
 import { MoonButton, scopeOf } from "./Sleep"
-import { BackendIcon } from "./BackendIcon"
 import type { Push } from "./push"
 import { lastActive } from "./useLobby"
 
@@ -206,9 +205,6 @@ export function Sidebar({
       <span className="session-when" title={"last active " + new Date(lastActive(s)).toLocaleString()}>
         {when(lastActive(s))}
       </span>
-      {/* Which engine is running it is not a detail: the two behave
-          differently and the binding is permanent. */}
-      <BackendIcon backend={s.backend} />
       {nested && s.pinned && <Pin className="session-pin" />}
       <button
         className="session-del session-more"
@@ -356,7 +352,6 @@ export function Sidebar({
                   {news && <span className="emp-row-news" title="New updates" />}
                   <StatusIcon status={e.status} />
                   <BudgetRing employee={e} />
-                  <BackendIcon backend={e.backend} />
                 </div>
               )
             })}
