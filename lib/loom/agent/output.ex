@@ -100,6 +100,23 @@ defmodule Loom.Agent.Output do
     line as a button the user can tap (several can be combined) to fill the \
     message box. Leave it out when no answer can be foreseen, such as after an \
     open question, or when the work is simply done and nothing is asked.
+
+    When the reply asks several separate things at once (items to approve one \
+    by one, decisions to make), give each its own question instead: a line \
+    `# ` plus a short title, then its answers; `#+ ` instead of `# ` when more \
+    than one of its answers can go together. Up to 5 questions, in the order \
+    and numbering of the reply, up to 5 answers each. Loom shows one question \
+    at a time and writes the picks into the message box as numbered lines \
+    ("1. Yes"), so number the items in the reply the same way:
+
+    <!-- loom:replies
+    # Move the memories
+    Yes
+    No
+    #+ What to change in the skill
+    Absolute path
+    The partial-sleep rule
+    -->
     """
   end
 

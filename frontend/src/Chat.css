@@ -994,6 +994,63 @@ pre.code {
   cursor: default;
 }
 
+/* Several questions: a page each, side by side in a scroller that snaps. As
+   tall as its tallest page, so turning one never moves what is below. */
+.questions-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 8px 0;
+  color: var(--fg-dim);
+  font-family: var(--ui);
+  font-size: 0.85rem;
+}
+
+.questions-back {
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.questions-back:disabled {
+  visibility: hidden;
+}
+
+.questions-count {
+  margin-left: auto;
+}
+
+.questions-pages {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+
+.questions-pages::-webkit-scrollbar {
+  display: none;
+}
+
+.qpage {
+  flex: 0 0 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+
+.qpage-title {
+  padding: 0 8px 2px;
+  font-family: var(--ui);
+  font-weight: 600;
+}
+
 /* A desktop has room to spare: the card is only as wide as its longest reply,
    not the whole column. */
 @media (min-width: 641px) {
@@ -1001,6 +1058,12 @@ pre.code {
     width: fit-content;
     min-width: 18rem;
     max-width: 100%;
+  }
+
+  /* Pages are as wide as the card, so the card cannot take its width from
+     them. */
+  .replies.questions {
+    width: min(100%, 34rem);
   }
 }
 

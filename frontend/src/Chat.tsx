@@ -30,7 +30,15 @@ import {
 } from "react"
 import { createPortal } from "react-dom"
 import { EffortButton } from "./Effort"
-import { buildTimeline, currentReplies, foldFinished, isBusy, type CronJob, type TimelineItem } from "./agent"
+import {
+  buildTimeline,
+  currentReplies,
+  foldFinished,
+  isBusy,
+  type CronJob,
+  type Question,
+  type TimelineItem,
+} from "./agent"
 import { itemForAttachment, itemForOutput, itemForPath, type CanvasItem } from "./canvasItems"
 import { BackendIcon } from "./BackendIcon"
 import { formatBytes } from "./format"
@@ -289,9 +297,16 @@ export function Chat({
             after={
               replies && {
                 key: replies.key,
-                node: (
+                node: replies.questions ? (
+                  <QuestionCard
+                    questions={replies.questions}
+                    text={draft}
+                    setText={setDraft}
+                    onSend={() => send(draft.trim())}
+                  />
+                ) : (
                   <ReplyCard
-                    replies={replies.replies}
+                    replies={replies.replies ?? []}
                     text={draft}
                     setText={setDraft}
                     onSend={() => send(draft.trim())}
@@ -379,6 +394,149 @@ function ReplyCard({
       </button>
     </div>
   )
+}
+
+/**
+ * Several things asked at once, one page each, the next a swipe or a Next
+ * away: Claude Code's questions. What is picked is written into the message
+ * box as numbered lines, one per question — `2. this、that` — which is also
+ * where the card reads it back from, so a draft brought back by a reload
+ * shows the same picks. Whatever else is typed stays below them.
+ *
+ * The pages are a scroller that snaps, rather than a transform: a finger
+ * moves it natively, and the drawer's swipe leaves a touch alone while it
+ * would scroll something (`useSwipe`).
+ */
+function QuestionCard({
+  questions,
+  text,
+  setText,
+  onSend,
+}: {
+  questions: Question[]
+  text: string
+  setText: (text: string) => void
+  onSend: () => void
+}) {
+  const [page, setPage] = useState(0)
+  const pagesRef = useRef<HTMLDivElement>(null)
+  const sep = questions.some((q) => /[\u3000-\u9fff]/.test(q.title + q.options.join(""))) ? "、" : ", "
+  const { picks, rest } = readAnswers(text, questions, sep)
+  const last = questions.length - 1
+
+  const go = (to: number) => {
+    const el = pagesRef.current
+    if (!el) return
+    el.scrollTo({ left: to * el.clientWidth, behavior: "smooth" })
+  }
+
+  const write = (next: string[][]) => {
+    const numbered = next.flatMap((p, i) => (p.length > 0 ? [`${i + 1}. ${p.join(sep)}`] : []))
+    setText([...numbered, ...rest].join("\n"))
+  }
+
+  const pick = (qi: number, option: string) => {
+    const q = questions[qi]
+    const had = picks[qi].includes(option)
+    const mine = q.multi
+      ? had
+        ? picks[qi].filter((o) => o !== option)
+        : q.options.filter((o) => o === option || picks[qi].includes(o))
+      : had
+        ? []
+        : [option]
+    write(picks.map((p, i) => (i === qi ? mine : p)))
+    // One answer and that is the question done: on to the next.
+    if (!q.multi && !had && qi < last) setTimeout(() => go(qi + 1), 180)
+  }
+
+  const answered = picks.some((p) => p.length > 0)
+
+  return (
+    <div className="replies questions" role="group" aria-label="Questions">
+      <div className="questions-head">
+        <button
+          type="button"
+          className="questions-back"
+          onClick={() => go(page - 1)}
+          disabled={page === 0}
+          aria-label="Previous question"
+        >
+          ‹ Back
+        </button>
+        <span className="questions-count">
+          {page + 1}/{questions.length}
+          {questions[page]?.multi && " · Pick any"}
+        </span>
+      </div>
+      <div
+        className="questions-pages"
+        ref={pagesRef}
+        onScroll={(e) => {
+          const el = e.currentTarget
+          setPage(Math.round(el.scrollLeft / Math.max(1, el.clientWidth)))
+        }}
+      >
+        {questions.map((q, qi) => (
+          <div key={qi} className="qpage" inert={qi !== page} aria-hidden={qi !== page}>
+            <div className="qpage-title">{q.title}</div>
+            {q.options.map((option) => {
+              const on = picks[qi].includes(option)
+              return (
+                <button
+                  key={option}
+                  type="button"
+                  className={"reply" + (on ? " on" : "")}
+                  aria-pressed={on}
+                  onClick={() => pick(qi, option)}
+                >
+                  <span className="reply-text">{option}</span>
+                  {on && <Check />}
+                </button>
+              )
+            })}
+          </div>
+        ))}
+      </div>
+      {page < last ? (
+        <button type="button" className="replies-send next" onClick={() => go(page + 1)}>
+          Next
+        </button>
+      ) : (
+        <button type="button" className="replies-send" disabled={!answered} onClick={onSend}>
+          Send
+        </button>
+      )}
+    </div>
+  )
+}
+
+/**
+ * The picks in the message box, per question, and the lines that are not
+ * picks. A line counts as one only if it is a question's number and nothing
+ * but that question's answers, so a numbered list typed by hand is left be.
+ */
+function readAnswers(
+  text: string,
+  questions: Question[],
+  sep: string,
+): { picks: string[][]; rest: string[] } {
+  const picks: string[][] = questions.map(() => [])
+  const rest: string[] = []
+  for (const line of text.split("\n")) {
+    const m = line.trim().match(/^(\d+)\.\s+(.*)$/)
+    const qi = m ? Number(m[1]) - 1 : -1
+    const q = questions[qi]
+    // Written in the question's order, so matched whole rather than split:
+    // an answer may have the separator in it.
+    const said = m ? m[2].trim() : ""
+    const found = q ? q.options.filter((o) => said.includes(o)) : []
+    const mine = q?.options.includes(said) ? [said] : found.join(sep) === said ? found : []
+    if (q && picks[qi].length === 0 && mine.length > 0) picks[qi] = mine
+    else rest.push(line)
+  }
+  while (rest.length > 0 && rest[0].trim() === "") rest.shift()
+  return { picks, rest }
 }
 
 /**

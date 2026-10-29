@@ -351,8 +351,16 @@ export type TimelineItem =
       clientMsgId?: string
     }
   // `replies`: what the agent expects might be said next, offered above the
-  // composer — see `splitReplies`.
-  | { key: string; kind: "assistant"; text: string; streaming: boolean; replies?: string[] }
+  // composer; `questions`, the same for several things asked at once — see
+  // `splitReplies`.
+  | {
+      key: string
+      kind: "assistant"
+      text: string
+      streaming: boolean
+      replies?: string[]
+      questions?: Question[]
+    }
   | { key: string; kind: "thinking"; text: string; streaming: boolean }
   | {
       key: string
@@ -621,14 +629,26 @@ export function buildTimeline(t: Transcript): TimelineItem[] {
 const REPLIES_MARK = "<!-- loom:replies"
 
 /**
+ * One of several things asked at once: its answers, and whether more than one
+ * of them can go together.
+ */
+export type Question = { title: string; multi: boolean; options: string[] }
+
+// No more than a card can hold: questions in one block, answers to each.
+const MAX_REPLIES = 5
+
+/**
  * Take the suggested replies off the end of a reply.
  *
  * The agent is asked (`Loom.Agent.Output`) to close a reply whose answer it can
  * foresee with an HTML comment listing a few, one per line. Markdown here shows
  * `html` tokens as literal text, so the block comes off before rendering — and
  * mid-stream too, along with a mark still being typed, so it never flashes up.
+ *
+ * Several things asked at once come as questions: a `# title` line (`#+` when
+ * more than one answer can go together) ahead of each one's answers.
  */
-export function splitReplies(raw: string): { text: string; replies?: string[] } {
+export function splitReplies(raw: string): { text: string; replies?: string[]; questions?: Question[] } {
   const at = raw.lastIndexOf(REPLIES_MARK)
   if (at < 0) {
     // A mark half-way through arriving: `<!-- loo`.
@@ -637,26 +657,51 @@ export function splitReplies(raw: string): { text: string; replies?: string[] } 
     }
     return { text: raw }
   }
-  const body = raw.slice(at + REPLIES_MARK.length).split("-->")[0]
-  const replies = body
+  const text = raw.slice(0, at).trimEnd()
+  const lines = raw
+    .slice(at + REPLIES_MARK.length)
+    .split("-->")[0]
     .split("\n")
-    .map((line) => line.replace(/^\s*(?:[-*•]|\d+[.)])\s+/, "").trim())
-    .filter((line) => line !== "" && line.length <= 120)
-    .slice(0, 5)
-  return { text: raw.slice(0, at).trimEnd(), replies: replies.length > 0 ? replies : undefined }
+    .map((line) => line.trim())
+    .filter((line) => line !== "")
+  const answer = (line: string) => line.replace(/^(?:[-*•]|\d+[.)])\s+/, "").trim()
+  const fits = (line: string) => line !== "" && line.length <= 120
+
+  if (lines.some((line) => line.startsWith("#"))) {
+    const questions: Question[] = []
+    for (const line of lines) {
+      const head = line.match(/^#(\+?)\s*(.*)$/)
+      if (head) {
+        // Its number is the card's to show.
+        const title = head[2].replace(/^\d+[.)、]\s*/, "").trim()
+        questions.push({ title, multi: head[1] === "+", options: [] })
+      } else {
+        const q = questions[questions.length - 1]
+        const option = answer(line)
+        if (q && fits(option) && !q.options.includes(option) && q.options.length < MAX_REPLIES) q.options.push(option)
+      }
+    }
+    const asked = questions.filter((q) => q.options.length > 0).slice(0, MAX_REPLIES)
+    return { text, questions: asked.length > 0 ? asked : undefined }
+  }
+
+  const replies = lines.map(answer).filter(fits).slice(0, MAX_REPLIES)
+  return { text, replies: replies.length > 0 ? replies : undefined }
 }
+
+export type Offered = { key: string; replies?: string[]; questions?: Question[] }
 
 /**
  * The replies to offer now, and the reply they follow: the newest reply's,
  * while the turn that wrote it is the last thing in the conversation. Anything
  * said since — a message, a new turn — and they no longer apply.
  */
-export function currentReplies(items: TimelineItem[]): { key: string; replies: string[] } | null {
+export function currentReplies(items: TimelineItem[]): Offered | null {
   for (let i = items.length - 1; i >= 0; i--) {
     const item = items[i]
     if (item.kind === "turn" || item.kind === "outputs") continue
-    return item.kind === "assistant" && !item.streaming && item.replies
-      ? { key: item.key, replies: item.replies }
+    return item.kind === "assistant" && !item.streaming && (item.replies || item.questions)
+      ? { key: item.key, replies: item.replies, questions: item.questions }
       : null
   }
   return null
