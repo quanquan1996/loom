@@ -16,8 +16,9 @@
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  color: #fff;
-  font-weight: 600;
+  background: color-mix(in srgb, var(--fg) 14%, transparent);
+  color: var(--fg);
+  font-weight: 500;
   line-height: 1;
   user-select: none;
 }

@@ -74,14 +74,9 @@ export const STATUS: Record<Employee["status"], { label: string; tone: string }>
   blocked: { label: "Needs you", tone: "red" },
 }
 
-/** A round initial, its colour from the name, ChatGPT's GPT avatars. */
+/** A round initial on a neutral disc, the same for everyone, like the rest of the sidebar. */
 export function Avatar({ employee, size = "md" }: { employee: Pick<Employee, "name" | "id">; size?: "sm" | "md" | "lg" }) {
-  const hue = [...employee.id].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 0)
-  return (
-    <span className={"emp-avatar " + size} style={{ background: `hsl(${hue} 45% 42%)` }}>
-      {[...employee.name.trim()][0] ?? "?"}
-    </span>
-  )
+  return <span className={"emp-avatar " + size}>{[...employee.name.trim()][0] ?? "?"}</span>
 }
 
 /** Where it stands, as one small icon: the sidebar's row has no room for words. */
