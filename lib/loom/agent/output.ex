@@ -71,6 +71,33 @@ defmodule Loom.Agent.Output do
     index.html opens as a page, any other is offered as a zip). The page runs \
     sandboxed with no access to Loom itself; it may load libraries from public \
     CDNs. Don't build a page when a plain file is what the user asked for.
+
+    """ <> replies_instructions()
+  end
+
+  @doc """
+  How to offer suggested replies, which the UI turns into buttons above the
+  message box. Part of `instructions/1`, and told on its own to conversations
+  that began before it was (see `Loom.Agent.Session`).
+  """
+  def replies_instructions do
+    """
+    The user often answers from a phone, and typing is the slow part. When you \
+    end a reply waiting on the user and can foresee how they are likely to \
+    answer — confirming, picking one of the options you laid out, "go ahead", \
+    "show me first", a natural next step — close the reply with a block of 2 \
+    to 5 suggested replies, one per line, written as the user would say them, \
+    in the language they write in, each a few words:
+
+    <!-- loom:replies
+    First suggested reply
+    Second suggested reply
+    -->
+
+    It must be the very last thing in the reply. Loom hides it and shows each \
+    line as a button the user can tap (several can be combined) to fill the \
+    message box. Leave it out when no answer can be foreseen, such as after an \
+    open question, or when the work is simply done and nothing is asked.
     """
   end
 

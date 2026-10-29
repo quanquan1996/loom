@@ -366,7 +366,7 @@ defmodule Loom.Agent.Session do
           seen_seq: if(is_integer(meta[:seen_seq]), do: meta[:seen_seq], else: 0),
           reply_seq: reply_seq(meta, transcript),
           effort: if(meta[:effort] in Backend.efforts(backend), do: meta[:effort]),
-          notice: if(is_binary(meta[:notice]), do: meta[:notice]),
+          notice: restored_notice(meta),
           title: meta[:title],
           created_at: meta[:created_at],
           last_active_at: last_active(transcript) || meta[:created_at],
@@ -1242,6 +1242,8 @@ defmodule Loom.Agent.Session do
       reply_seq: state.reply_seq,
       effort: state.effort,
       notice: state.notice,
+      # Pending in `notice` until sent, which counts as told.
+      replies_told: true,
       title: state.title,
       created_at: state.created_at,
       status: state.status,
@@ -1286,6 +1288,24 @@ defmodule Loom.Agent.Session do
     "[Note from Loom, not written by the user: the project's details have changed. " <>
       "They now read as follows, and replace what you were told before.]\n\n" <>
       Loom.Projects.instructions(project)
+  end
+
+  # A conversation that began before suggested replies existed was never told
+  # about them, and its system prompt cannot be changed (see above). Told once,
+  # ahead of its next message; `replies_told` keeps it to once. One with no
+  # turns yet will be told by its system prompt.
+  defp restored_notice(meta) do
+    notice = if is_binary(meta[:notice]), do: meta[:notice]
+
+    if meta[:replies_told] == true or (meta[:turns] || 0) == 0 do
+      notice
+    else
+      replies =
+        "[Note from Loom, not written by the user: something new applies from now on.]\n\n" <>
+          Output.replies_instructions()
+
+      if notice, do: notice <> "\n\n" <> replies, else: replies
+    end
   end
 
   defp with_notice(nil, text), do: text

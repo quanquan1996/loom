@@ -58,6 +58,14 @@ defmodule Loom.PushTest do
     end
   end
 
+  test "the suggested replies are not part of the body", %{server: server, pid: pid} do
+    :ok = Push.subscribe(subscription(1), "https://loom.example", [], server)
+
+    turn_ended(pid, "a_1", {:ok, "Deploy now?\n\n<!-- loom:replies\nYes\nNot yet\n-->"})
+
+    assert_receive {:delivered, _, %{"notification" => %{"body" => "Deploy now?"}}, _}
+  end
+
   test "an error says so, and a long reply is cut", %{server: server, pid: pid} do
     :ok = Push.subscribe(subscription(1), "https://loom.example", [], server)
 

@@ -792,6 +792,60 @@ pre.code {
   color: var(--fg);
 }
 
+/* Suggested replies above the box, as ChatGPT offers them: one row of pills
+   that scrolls sideways, picked ones filled in. */
+.replies {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  /* Bleed to the composer's edges so a pill scrolls out under them. */
+  padding-inline: 2px;
+}
+
+.replies::-webkit-scrollbar {
+  display: none;
+}
+
+.reply {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 80%;
+  padding: 7px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  font-family: var(--ui);
+  font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.reply svg {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+}
+
+@media (hover: hover) {
+  .reply:hover {
+    background: var(--bg-card);
+  }
+}
+
+.reply.on {
+  border-color: transparent;
+  background: var(--fg);
+  color: var(--bg);
+}
+
 .tray {
   display: flex;
   flex-wrap: wrap;

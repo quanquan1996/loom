@@ -187,6 +187,8 @@ defmodule Loom.Push do
   # Markdown read as plain text: a notification shows a line or two.
   defp snippet(text) do
     text
+    # The suggested replies the UI shows as buttons; see `Loom.Agent.Output`.
+    |> String.replace(~r/<!--\s*loom:replies.*\z/s, "")
     |> String.replace(~r/```[^\n]*\n?/, "")
     |> String.replace(~r/[*_`#>|]+/, "")
     |> String.replace(~r/\[([^\]]*)\]\([^)]*\)/, "\\1")

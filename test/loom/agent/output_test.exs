@@ -160,5 +160,6 @@ defmodule Loom.Agent.OutputTest do
     assert text =~ dir
     assert text =~ "(output/"
     assert text =~ "#{dir}/<name>/index.html"
+    assert text =~ "<!-- loom:replies"
   end
 end

@@ -350,7 +350,9 @@ export type TimelineItem =
       failed?: string
       clientMsgId?: string
     }
-  | { key: string; kind: "assistant"; text: string; streaming: boolean }
+  // `replies`: what the agent expects might be said next, offered above the
+  // composer — see `splitReplies`.
+  | { key: string; kind: "assistant"; text: string; streaming: boolean; replies?: string[] }
   | { key: string; kind: "thinking"; text: string; streaming: boolean }
   | {
       key: string
@@ -418,7 +420,7 @@ export function buildTimeline(t: Transcript): TimelineItem[] {
         items.push({
           key,
           kind: "assistant",
-          text: String(p.text ?? ""),
+          ...splitReplies(String(p.text ?? "")),
           streaming: false,
         })
         break
@@ -594,7 +596,7 @@ export function buildTimeline(t: Transcript): TimelineItem[] {
       items.push({
         key: `s${block.blockId}`,
         kind: block.kind === "thinking" ? "thinking" : "assistant",
-        text: block.text,
+        text: block.kind === "thinking" ? block.text : splitReplies(block.text).text,
         streaming: true,
       })
     }
@@ -614,6 +616,48 @@ export function buildTimeline(t: Transcript): TimelineItem[] {
   }
 
   return items
+}
+
+const REPLIES_MARK = "<!-- loom:replies"
+
+/**
+ * Take the suggested replies off the end of a reply.
+ *
+ * The agent is asked (`Loom.Agent.Output`) to close a reply whose answer it can
+ * foresee with an HTML comment listing a few, one per line. Markdown here shows
+ * `html` tokens as literal text, so the block comes off before rendering — and
+ * mid-stream too, along with a mark still being typed, so it never flashes up.
+ */
+export function splitReplies(raw: string): { text: string; replies?: string[] } {
+  const at = raw.lastIndexOf(REPLIES_MARK)
+  if (at < 0) {
+    // A mark half-way through arriving: `<!-- loo`.
+    for (let n = Math.min(REPLIES_MARK.length - 1, raw.length); n >= 2; n--) {
+      if (raw.endsWith(REPLIES_MARK.slice(0, n))) return { text: raw.slice(0, -n).trimEnd() }
+    }
+    return { text: raw }
+  }
+  const body = raw.slice(at + REPLIES_MARK.length).split("-->")[0]
+  const replies = body
+    .split("\n")
+    .map((line) => line.replace(/^\s*(?:[-*•]|\d+[.)])\s+/, "").trim())
+    .filter((line) => line !== "" && line.length <= 120)
+    .slice(0, 6)
+  return { text: raw.slice(0, at).trimEnd(), replies: replies.length > 0 ? replies : undefined }
+}
+
+/**
+ * The replies to offer now: the newest reply's, while the turn that wrote it is
+ * the last thing in the conversation. Anything said since — a message, a new
+ * turn — and they no longer apply.
+ */
+export function currentReplies(items: TimelineItem[]): string[] {
+  for (let i = items.length - 1; i >= 0; i--) {
+    const item = items[i]
+    if (item.kind === "turn" || item.kind === "outputs") continue
+    return item.kind === "assistant" && !item.streaming ? (item.replies ?? []) : []
+  }
+  return []
 }
 
 /**

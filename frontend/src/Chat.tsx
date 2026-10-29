@@ -27,7 +27,7 @@ import {
 } from "react"
 import { createPortal } from "react-dom"
 import { EffortButton } from "./Effort"
-import { buildTimeline, foldFinished, isBusy, type CronJob, type TimelineItem } from "./agent"
+import { buildTimeline, currentReplies, foldFinished, isBusy, type CronJob, type TimelineItem } from "./agent"
 import { itemForAttachment, itemForOutput, itemForPath, type CanvasItem } from "./canvasItems"
 import { backendShort, formatBytes } from "./format"
 import { isComposing } from "./ime"
@@ -139,6 +139,7 @@ export function Chat({
   // items change, so a fresh array on every render (the app's keys re-render
   // it) would pull it back down just after `gg` or `k` scrolled it up.
   const items = useMemo(() => foldFinished(buildTimeline(transcript), busy), [transcript, busy])
+  const replies = useMemo(() => currentReplies(items), [items])
 
   // Stable, because a context change re-renders every message that links a
   // file — memoised or not — and this would otherwise change with each delta.
@@ -271,6 +272,7 @@ export function Chat({
           onSubmit={send}
           onInterrupt={interrupt}
           tools={<EffortButton session={session} />}
+          replies={busy ? [] : replies}
         />
       </OpenCanvas.Provider>
     </div>
@@ -1190,6 +1192,7 @@ function Composer({
   onSubmit,
   onInterrupt,
   tools,
+  replies,
 }: {
   busy: boolean
   interrupted: boolean
@@ -1198,6 +1201,8 @@ function Composer({
   onInterrupt: () => void
   // Beside +: the thinking level.
   tools?: ReactNode
+  // Suggested replies, offered above the box; see `splitReplies`.
+  replies: string[]
 }) {
   const [text, setText] = useState("")
   const ref = useRef<HTMLTextAreaElement>(null)
@@ -1268,8 +1273,42 @@ function Composer({
     setText("")
   }
 
+  // A suggestion is picked while it is a line of the text: picking adds it as
+  // one, picking again takes that line out. So several can be picked, and
+  // whatever is typed around them stays.
+  const lines = text.split("\n").map((l) => l.trim())
+  const toggleReply = (reply: string) => {
+    if (lines.includes(reply)) {
+      setText(text.split("\n").filter((l) => l.trim() !== reply).join("\n").trim())
+    } else {
+      setText(text.trim() === "" ? reply : text.trimEnd() + "\n" + reply)
+    }
+    setDismissed(null)
+  }
+
   return (
     <div className="composer">
+      {replies.length > 0 && (
+        <div className="replies" role="group" aria-label="Suggested replies">
+          {replies.map((reply) => {
+            const on = lines.includes(reply)
+            return (
+              <button
+                key={reply}
+                type="button"
+                className={"reply" + (on ? " on" : "")}
+                aria-pressed={on}
+                // mousedown, not click: on a phone the keyboard stays where it was.
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => toggleReply(reply)}
+              >
+                {on && <Check />}
+                {reply}
+              </button>
+            )
+          })}
+        </div>
+      )}
       {attachments.items.length > 0 && (
         <div className="tray">
           {attachments.items.map((item) => (
