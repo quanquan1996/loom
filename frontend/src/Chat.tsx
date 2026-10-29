@@ -6,6 +6,7 @@ import {
   ChevronDown,
   ChevronRight,
   Clock as ClockIcon,
+  Ellipsis,
   Moon,
   PanelLeftOpen,
   Plus,
@@ -15,6 +16,7 @@ import {
 } from "lucide-react"
 import {
   createContext,
+  Fragment,
   memo,
   useCallback,
   useContext,
@@ -23,6 +25,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type ReactNode,
 } from "react"
 import { createPortal } from "react-dom"
@@ -32,6 +35,7 @@ import { itemForAttachment, itemForOutput, itemForPath, type CanvasItem } from "
 import { backendShort, formatBytes } from "./format"
 import { isComposing } from "./ime"
 import { Markdown, OutputLink } from "./markdown"
+import { useNarrow } from "./useNarrow"
 import { useAgent } from "./useAgent"
 import {
   useAttachments,
@@ -139,7 +143,9 @@ export function Chat({
   // items change, so a fresh array on every render (the app's keys re-render
   // it) would pull it back down just after `gg` or `k` scrolled it up.
   const items = useMemo(() => foldFinished(buildTimeline(transcript), busy), [transcript, busy])
-  const replies = useMemo(() => currentReplies(items), [items])
+  const replies = useMemo(() => (busy ? null : currentReplies(items)), [items, busy])
+  const [draft, setDraft] = useState("")
+  const narrow = useNarrow()
 
   // Stable, because a context change re-renders every message that links a
   // file — memoised or not — and this would otherwise change with each delta.
@@ -166,11 +172,40 @@ export function Chat({
   const send = (text: string) => {
     submit(text, attachments.ready)
     attachments.clear()
+    setDraft("")
   }
+
+  // The composer floats over the end of the conversation, which has to leave
+  // room for it — however tall it has grown.
+  // So does the header over its start. A reader at the end stays there as
+  // the composer grows.
+  const chatRef = useRef<HTMLDivElement>(null)
+  const dockRef = useRef<HTMLDivElement>(null)
+  const topRef = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    const dock = dockRef.current
+    const top = topRef.current
+    const chat = chatRef.current
+    if (!dock || !top || !chat) return
+    const set = () => {
+      const timeline = chat.querySelector<HTMLElement>(".timeline")
+      const atEnd =
+        timeline && timeline.scrollHeight - timeline.scrollTop - timeline.clientHeight < 80
+      chat.style.setProperty("--dock-h", dock.offsetHeight + "px")
+      chat.style.setProperty("--top-h", top.offsetHeight + "px")
+      if (timeline && atEnd) timeline.scrollTop = timeline.scrollHeight
+    }
+    set()
+    const observer = new ResizeObserver(set)
+    observer.observe(dock)
+    observer.observe(top)
+    return () => observer.disconnect()
+  }, [])
   const unsent = useMemo(() => ({ resend, discard }), [resend, discard])
 
   return (
     <div
+      ref={chatRef}
       className={"chat" + (drop.dragging ? " dragging" : "")}
       {...drop.handlers}
     >
@@ -178,14 +213,15 @@ export function Chat({
         <div className="drop-note">drop to attach to this conversation</div>
       )}
 
+      <div className="chat-top" ref={topRef}>
       <header className="chat-header">
         {!sidebarOpen && (
           <button
-            className="icon-btn"
+            className={"icon-btn" + (narrow ? " glass" : "")}
             onClick={onToggleSidebar}
             title="Show sidebar"
           >
-            <PanelLeftOpen />
+            {narrow ? <TwoLines /> : <PanelLeftOpen />}
           </button>
         )}
 
@@ -198,25 +234,16 @@ export function Chat({
         {tabs}
 
         <div className="chat-meta">
-          <StatusPill
-            status={transcript.status}
-            queued={transcript.queue.length}
-          />
-          {transcript.contextTokens > 0 && (
-            <span
-              className={"chip" + contextPressure(transcript)}
-              title="How big the conversation is now, against the model's window"
-            >
-              {formatTokens(transcript.contextTokens)}
-              {/* The window is fixed per model; on a phone the header has no
-                  room for a number that never changes. */}
-              {transcript.contextWindow ? (
-                <span className="wide-only">
-                  {` / ${formatTokens(transcript.contextWindow)}`}
-                </span>
-              ) : null}
-            </span>
-          )}
+          {narrow ? (
+            <PaneMenu
+              terminalOpen={terminalOpen}
+              terminalCount={terminalCount}
+              onToggleTerminal={onToggleTerminal}
+              canvasOpen={canvasOpen}
+              onToggleCanvas={onToggleCanvas}
+            />
+          ) : (
+            <>
           <button
             className={"chip button terminal-toggle" + (terminalOpen ? " on" : "")}
             onClick={onToggleTerminal}
@@ -236,11 +263,14 @@ export function Chat({
           >
             <AppWindow />
           </button>
+            </>
+          )}
         </div>
       </header>
       {subhead}
 
       {joinError && <div className="chat-banner">{joinError}</div>}
+      </div>
 
       {/* `output/…` links in a reply become downloads from this session, and
           attachments, sent or about to be, open in the canvas. */}
@@ -253,10 +283,25 @@ export function Chat({
             truncatedBefore={transcript.truncatedBefore}
             onAnswer={submit}
             onAtEnd={setAtEnd}
+            tail={<Working status={transcript.status} queued={transcript.queue.length} />}
+            after={
+              replies && {
+                key: replies.key,
+                node: (
+                  <ReplyCard
+                    replies={replies.replies}
+                    text={draft}
+                    setText={setDraft}
+                    onSend={() => send(draft.trim())}
+                  />
+                ),
+              }
+            }
           />
         </OutputLink.Provider>
         </Unsent.Provider>
 
+        <div className="dock" ref={dockRef}>
         {transcript.queue.length > 0 && (
           <QueuePanel
             messages={transcript.queue}
@@ -272,10 +317,136 @@ export function Chat({
           onSubmit={send}
           onInterrupt={interrupt}
           tools={<EffortButton session={session} />}
-          replies={busy ? [] : replies}
+          text={draft}
+          setText={setDraft}
         />
+        </div>
       </OpenCanvas.Provider>
     </div>
+  )
+}
+
+/**
+ * The replies the agent foresaw, under the reply that offered them, as ChatGPT
+ * lays out its choices: one per row, any number picked, then sent.
+ *
+ * A reply is picked while it is a line of the message being written: picking
+ * adds it as one, picking again takes that line out. So the message box shows
+ * what will go, and whatever is typed around the picks stays.
+ */
+function ReplyCard({
+  replies,
+  text,
+  setText,
+  onSend,
+}: {
+  replies: string[]
+  text: string
+  setText: (text: string) => void
+  onSend: () => void
+}) {
+  const lines = text.split("\n").map((l) => l.trim())
+  const toggle = (reply: string) => {
+    if (lines.includes(reply)) {
+      setText(text.split("\n").filter((l) => l.trim() !== reply).join("\n").trim())
+    } else {
+      setText(text.trim() === "" ? reply : text.trimEnd() + "\n" + reply)
+    }
+  }
+  const picked = replies.some((r) => lines.includes(r))
+
+  return (
+    <div className="replies" role="group" aria-label="Suggested replies">
+      {replies.map((reply) => {
+        const on = lines.includes(reply)
+        return (
+          <button
+            key={reply}
+            type="button"
+            className={"reply" + (on ? " on" : "")}
+            aria-pressed={on}
+            onClick={() => toggle(reply)}
+          >
+            <span className="reply-text">{reply}</span>
+            {on && <Check />}
+          </button>
+        )
+      })}
+      <button type="button" className="replies-send" disabled={!picked} onClick={onSend}>
+        Send
+      </button>
+    </div>
+  )
+}
+
+/**
+ * The terminals and the canvas on a phone, folded into one `…`: the header has
+ * room for the title or for four buttons, not both.
+ */
+function PaneMenu({
+  terminalOpen,
+  terminalCount,
+  onToggleTerminal,
+  canvasOpen,
+  onToggleCanvas,
+}: {
+  terminalOpen: boolean
+  terminalCount: number
+  onToggleTerminal: () => void
+  canvasOpen: boolean
+  onToggleCanvas: () => void
+}) {
+  const [at, setAt] = useState<{ top: number; right: number } | null>(null)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!at) return
+    const away = (e: PointerEvent) => {
+      if (ref.current?.contains(e.target as Node)) return
+      if ((e.target as Element | null)?.closest?.(".pane-more")) return
+      setAt(null)
+    }
+    document.addEventListener("pointerdown", away)
+    return () => document.removeEventListener("pointerdown", away)
+  }, [at])
+
+  const pick = (action: () => void) => {
+    setAt(null)
+    action()
+  }
+
+  return (
+    <>
+      <button
+        className={"chip button pane-more" + (terminalOpen || canvasOpen ? " on" : "")}
+        title="Terminals and canvas"
+        aria-haspopup="menu"
+        aria-expanded={at !== null}
+        onClick={(e) => {
+          if (at) return setAt(null)
+          const r = e.currentTarget.getBoundingClientRect()
+          setAt({ top: r.bottom + 4, right: window.innerWidth - r.right })
+        }}
+      >
+        <Ellipsis />
+        {terminalCount > 0 && <span className="count">{terminalCount}</span>}
+      </button>
+      {at &&
+        createPortal(
+          <div className="session-menu pane-menu" role="menu" ref={ref} style={at}>
+            <button role="menuitem" onClick={() => pick(onToggleTerminal)}>
+              <SquareTerminal />
+              {terminalOpen ? "Hide terminals" : "Terminals"}
+              {terminalCount > 0 && <span className="pane-menu-count">{terminalCount}</span>}
+            </button>
+            <button role="menuitem" onClick={() => pick(onToggleCanvas)}>
+              <AppWindow />
+              {canvasOpen ? "Hide canvas" : "Canvas"}
+            </button>
+          </div>,
+          document.body,
+        )}
+    </>
   )
 }
 
@@ -305,12 +476,18 @@ function Timeline({
   truncatedBefore,
   onAnswer,
   onAtEnd,
+  after,
+  tail,
 }: {
   items: TimelineItem[]
   sessionId: string
   truncatedBefore: number | null
   onAnswer: (text: string) => void
   onAtEnd: (atEnd: boolean) => void
+  // Shown just below the item with this key: the suggested replies.
+  after?: { key: string; node: ReactNode } | null
+  // After everything: whether the agent is at work.
+  tail?: ReactNode
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const pinnedRef = useRef(true)
@@ -419,8 +596,12 @@ function Timeline({
           )}
 
           {visible.map((item) => (
-            <Item key={item.key} item={item} sessionId={sessionId} onAnswer={onAnswer} />
+            <Fragment key={item.key}>
+              <Item item={item} sessionId={sessionId} onAnswer={onAnswer} />
+              {after?.key === item.key && after.node}
+            </Fragment>
           ))}
+          {tail}
         </div>
       </div>
 
@@ -677,6 +858,24 @@ function Title({
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(title)
 
+  // A name too long for the header scrolls through, back and forth, instead of
+  // being cut off — on a phone that is most names.
+  const nameRef = useRef<HTMLSpanElement>(null)
+  const [shift, setShift] = useState(0)
+  useLayoutEffect(() => {
+    const el = nameRef.current
+    if (!el) return
+    // The run's own width, which its transform does not change.
+    const measure = () => {
+      const run = el.firstElementChild as HTMLElement | null
+      setShift(run ? Math.max(0, Math.ceil(run.offsetWidth - el.clientWidth)) : 0)
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [title, editing])
+
   const commit = () => {
     const value = draft.trim()
     if (value !== "" && value !== title) onRename(value)
@@ -709,14 +908,23 @@ function Title({
         />
       ) : (
         <span
-          className="chat-name"
+          ref={nameRef}
+          className={"chat-name" + (shift > 0 ? " marquee" : "")}
           title="Double-click to rename"
+          style={
+            shift > 0
+              ? ({
+                  "--shift": `-${shift}px`,
+                  "--marquee-s": `${4 + shift / 30}s`,
+                } as CSSProperties)
+              : undefined
+          }
           onDoubleClick={() => {
             setDraft(title)
             setEditing(true)
           }}
         >
-          {title}
+          <span className="chat-name-run">{title}</span>
         </span>
       )}
     </div>
@@ -1149,23 +1357,31 @@ function Clock({ at }: { at: number }) {
   )
 }
 
-function StatusPill({ status, queued }: { status: string; queued: number }) {
-  // `starting` is the backend booting — seconds for a cold Claude Code
-  // process. Saying so beats looking hung.
-  const label = STATUS_LABELS[status] ?? status
+/**
+ * The agent at work, at the end of the conversation where the work will show
+ * up — the header has no room for it on a phone. Nothing while idle; a stop
+ * is already a notice in the transcript.
+ */
+function Working({ status, queued }: { status: string; queued: number }) {
+  if (status !== "starting" && status !== "running") return null
   return (
-    <span className={"chip status " + status}>
-      {label}
+    <div className={"working " + status} role="status">
+      <span className="working-dot" />
+      {/* `starting` is the backend booting — seconds for a cold Claude Code
+          process. Saying so beats looking hung. */}
+      {status === "starting" ? "Starting…" : "Working…"}
       {queued > 0 ? ` · ${queued} queued` : ""}
-    </span>
+    </div>
   )
 }
 
-const STATUS_LABELS: Record<string, string> = {
-  idle: "idle",
-  starting: "starting…",
-  running: "working",
-  interrupted: "stopped",
+// ChatGPT's sidebar button on a phone: two lines, the lower one shorter.
+function TwoLines() {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+      <path d="M4 9h16M4 15h10" />
+    </svg>
+  )
 }
 
 // ── Composer ───────────────────────────────────────────────────────────────
@@ -1192,7 +1408,8 @@ function Composer({
   onSubmit,
   onInterrupt,
   tools,
-  replies,
+  text,
+  setText,
 }: {
   busy: boolean
   interrupted: boolean
@@ -1201,10 +1418,10 @@ function Composer({
   onInterrupt: () => void
   // Beside +: the thinking level.
   tools?: ReactNode
-  // Suggested replies, offered above the box; see `splitReplies`.
-  replies: string[]
+  // Held by the chat, so the suggested replies can fill it in.
+  text: string
+  setText: (text: string) => void
 }) {
-  const [text, setText] = useState("")
   const ref = useRef<HTMLTextAreaElement>(null)
   const picker = useRef<HTMLInputElement>(null)
   // True between compositionstart and compositionend. Needed in addition to
@@ -1273,42 +1490,8 @@ function Composer({
     setText("")
   }
 
-  // A suggestion is picked while it is a line of the text: picking adds it as
-  // one, picking again takes that line out. So several can be picked, and
-  // whatever is typed around them stays.
-  const lines = text.split("\n").map((l) => l.trim())
-  const toggleReply = (reply: string) => {
-    if (lines.includes(reply)) {
-      setText(text.split("\n").filter((l) => l.trim() !== reply).join("\n").trim())
-    } else {
-      setText(text.trim() === "" ? reply : text.trimEnd() + "\n" + reply)
-    }
-    setDismissed(null)
-  }
-
   return (
     <div className="composer">
-      {replies.length > 0 && (
-        <div className="replies" role="group" aria-label="Suggested replies">
-          {replies.map((reply) => {
-            const on = lines.includes(reply)
-            return (
-              <button
-                key={reply}
-                type="button"
-                className={"reply" + (on ? " on" : "")}
-                aria-pressed={on}
-                // mousedown, not click: on a phone the keyboard stays where it was.
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => toggleReply(reply)}
-              >
-                {on && <Check />}
-                {reply}
-              </button>
-            )
-          })}
-        </div>
-      )}
       {attachments.items.length > 0 && (
         <div className="tray">
           {attachments.items.map((item) => (
@@ -1614,14 +1797,4 @@ function formatTokens(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1)}M`
   if (n >= 1000) return `${Math.round(n / 1000)}K`
   return String(n)
-}
-
-// The backends compact themselves, so this is information rather than a
-// warning — but seeing it climb is how you know a compaction is coming.
-function contextPressure(t: { contextTokens: number; contextWindow: number | null }): string {
-  if (!t.contextWindow) return ""
-  const used = t.contextTokens / t.contextWindow
-  if (used >= 0.9) return " hot"
-  if (used >= 0.7) return " warm"
-  return ""
 }

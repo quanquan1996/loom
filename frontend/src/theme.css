@@ -177,7 +177,7 @@ samp,
 /* ── Chat ───────────────────────────────────────────────────────────────── */
 
 .chat-header {
-  background: var(--bg);
+  background: transparent;
   border-bottom-color: transparent;
 }
 
@@ -212,6 +212,8 @@ samp,
 
 .timeline {
   padding: 20px 16px 32px;
+  padding-top: calc(var(--top-h, 0px) + 12px);
+  padding-bottom: calc(var(--dock-h, 0px) + 24px);
 }
 
 .timeline-inner {
@@ -292,10 +294,77 @@ pre.code {
   padding: 6px 8px;
   border: 0;
   border-radius: 1.75rem;
-  background: var(--composer);
+  /* Glass: the conversation scrolls on underneath. Light while empty… */
+  background: color-mix(in srgb, var(--composer) 45%, transparent);
+  -webkit-backdrop-filter: blur(8px) saturate(1.5);
+  backdrop-filter: blur(8px) saturate(1.5);
+  transition:
+    background-color 0.2s,
+    backdrop-filter 0.2s,
+    -webkit-backdrop-filter 0.2s;
   box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--fg) 5%, transparent),
-    0 4px 20px var(--shadow);
+    inset 0 0.5px 0 color-mix(in srgb, #fff 16%, transparent),
+    0 0 0 0.5px color-mix(in srgb, var(--fg) 10%, transparent),
+    0 8px 28px var(--shadow);
+}
+
+/* …and frosted once there is text in it, so what is typed stays legible over
+   whatever passes behind. */
+.composer-box:has(.composer-input:not(:placeholder-shown)) {
+  background: color-mix(in srgb, var(--composer) 82%, transparent);
+  -webkit-backdrop-filter: blur(24px) saturate(1.6);
+  backdrop-filter: blur(24px) saturate(1.6);
+}
+
+/* ChatGPT's round buttons in a phone's header, in iOS's glass: see-through,
+   blurred, with a faint rim of light. */
+.chat-header .icon-btn.glass,
+.chat-header .chip.button.pane-more {
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--fg) 8%, transparent);
+  -webkit-backdrop-filter: blur(16px) saturate(1.6);
+  backdrop-filter: blur(16px) saturate(1.6);
+  box-shadow: inset 0 0.5px 0 color-mix(in srgb, #fff 22%, transparent),
+    inset 0 0 0 0.5px color-mix(in srgb, var(--fg) 10%, transparent);
+  color: var(--fg);
+}
+
+.pane-menu {
+  border: 0;
+  border-radius: 1.25rem;
+  padding: 6px;
+  background: color-mix(in srgb, var(--surface-menu) 72%, transparent);
+  -webkit-backdrop-filter: blur(30px) saturate(1.8);
+  backdrop-filter: blur(30px) saturate(1.8);
+  box-shadow: inset 0 0.5px 0 color-mix(in srgb, #fff 18%, transparent),
+    0 12px 40px var(--shadow);
+  font-family: var(--ui);
+}
+
+.pane-menu button {
+  border-radius: 0.875rem;
+}
+
+.chat-header .chip.button.pane-more {
+  position: relative;
+}
+
+.chat-header .chip.button.pane-more .count {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  font-size: 0.7rem;
+}
+
+.chat-header .icon-btn.glass svg,
+.chat-header .chip.button.pane-more svg {
+  width: 20px;
+  height: 20px;
 }
 
 .composer-box:focus-within {

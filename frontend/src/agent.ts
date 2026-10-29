@@ -647,17 +647,19 @@ export function splitReplies(raw: string): { text: string; replies?: string[] } 
 }
 
 /**
- * The replies to offer now: the newest reply's, while the turn that wrote it is
- * the last thing in the conversation. Anything said since — a message, a new
- * turn — and they no longer apply.
+ * The replies to offer now, and the reply they follow: the newest reply's,
+ * while the turn that wrote it is the last thing in the conversation. Anything
+ * said since — a message, a new turn — and they no longer apply.
  */
-export function currentReplies(items: TimelineItem[]): string[] {
+export function currentReplies(items: TimelineItem[]): { key: string; replies: string[] } | null {
   for (let i = items.length - 1; i >= 0; i--) {
     const item = items[i]
     if (item.kind === "turn" || item.kind === "outputs") continue
-    return item.kind === "assistant" && !item.streaming ? (item.replies ?? []) : []
+    return item.kind === "assistant" && !item.streaming && item.replies
+      ? { key: item.key, replies: item.replies }
+      : null
   }
-  return []
+  return null
 }
 
 /**
