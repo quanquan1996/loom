@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, Plus, Trash2 } from "lucide-react"
+import { ChevronRight, Plus, Trash2 } from "lucide-react"
 import { useEffect, useState } from "react"
 import { addBossLine, bossProfile, deleteBossLine, updateBossLine, type BossLine } from "./api"
 import { isComposing } from "./ime"
@@ -7,13 +7,24 @@ import "./Boss.css"
 /**
  * The boss profile (`Loom.Employees`) in Settings: what every employee knows
  * about the user, a sentence a line, with who heard it and when. Employees
- * add to it when the user tells them something about themselves; here it is
- * only looked over. Folded like Archived; open, tap a line to change or
- * delete it, or add one at the foot.
+ * add to it when the user tells them something about themselves. Settings
+ * shows only a row; the lines are a page of their own, opened from it.
  */
-export function BossProfile() {
+export function BossRow({ onOpen }: { onOpen: () => void }) {
+  return (
+    <div className="settings-row archived">
+      <button className="settings-text archived-head" onClick={onOpen}>
+        <span className="settings-label">Boss profile</span>
+        <span className="settings-hint">What every employee knows about you.</span>
+        <ChevronRight className="archived-fold" />
+      </button>
+    </div>
+  )
+}
+
+/** The page: tap a line to change or delete it, or add one at the foot. */
+export function BossPage() {
   const [lines, setLines] = useState<BossLine[] | null>(null)
-  const [open, setOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [editing, setEditing] = useState<string | null>(null)
 
@@ -33,42 +44,35 @@ export function BossProfile() {
   }, [])
 
   return (
-    <div className="settings-row archived">
-      <button className="settings-text archived-head" onClick={() => setOpen((o) => !o)}>
-        <span className="settings-label">Boss profile</span>
-        <span className="settings-hint">
-          What every employee knows about you{lines ? `: ${lines.length} ${lines.length === 1 ? "line" : "lines"}` : ""}.
-        </span>
-        {open ? <ChevronDown className="archived-fold" /> : <ChevronRight className="archived-fold" />}
-      </button>
-      {open && (
-        <div className="boss-list">
-          {error && <div className="boss-error">{error}</div>}
-          {lines?.map((line) =>
-            editing === line.id ? (
-              <EditLine
-                key={line.id}
-                line={line}
-                onSave={async (text) => {
-                  if (text === line.text || (await act(updateBossLine(line.id, text)))) setEditing(null)
-                }}
-                onDelete={async () => {
-                  if (await act(deleteBossLine(line.id))) setEditing(null)
-                }}
-                onCancel={() => setEditing(null)}
-              />
-            ) : (
-              <button key={line.id} className="boss-line" onClick={() => setEditing(line.id)}>
-                <span className="boss-text">{line.text}</span>
-                <span className="boss-meta">
-                  {day(line.at)} · {line.by_name ? `told ${line.by_name}` : "you wrote it"}
-                </span>
-              </button>
-            ),
-          )}
-          <AddLine onAdd={(text) => act(addBossLine(text))} />
-        </div>
+    <div className="boss-page">
+      <div className="settings-hint boss-intro">
+        Tell any employee something about yourself and it lands here, for all of them, from their next wake-up.
+      </div>
+      {error && <div className="boss-error">{error}</div>}
+      {lines?.length === 0 && <div className="settings-hint">Nothing yet.</div>}
+      {lines?.map((line) =>
+        editing === line.id ? (
+          <EditLine
+            key={line.id}
+            line={line}
+            onSave={async (text) => {
+              if (text === line.text || (await act(updateBossLine(line.id, text)))) setEditing(null)
+            }}
+            onDelete={async () => {
+              if (await act(deleteBossLine(line.id))) setEditing(null)
+            }}
+            onCancel={() => setEditing(null)}
+          />
+        ) : (
+          <button key={line.id} className="boss-line" onClick={() => setEditing(line.id)}>
+            <span className="boss-text">{line.text}</span>
+            <span className="boss-meta">
+              {day(line.at)} · {line.by_name ? `told ${line.by_name}` : "you wrote it"}
+            </span>
+          </button>
+        ),
       )}
+      <AddLine onAdd={(text) => act(addBossLine(text))} />
     </div>
   )
 }

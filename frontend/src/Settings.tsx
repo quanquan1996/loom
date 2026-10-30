@@ -1,10 +1,10 @@
-import { ArchiveRestore, ChevronDown, ChevronRight, Moon, Sun, X } from "lucide-react"
+import { ArchiveRestore, ChevronDown, ChevronLeft, ChevronRight, Moon, Sun, X } from "lucide-react"
 import { useEffect, useState, type ReactNode } from "react"
 import { createPortal } from "react-dom"
 import type { AgentBackend, AgentInfo, Project } from "./api"
 import type { Appearance, Settings } from "./settings"
 import { Slider } from "./Slider"
-import { BossProfile } from "./Boss"
+import { BossPage, BossRow } from "./Boss"
 
 /**
  * The gear at the foot of the sidebar: this device's appearance and text sizes, the
@@ -29,52 +29,67 @@ export function SettingsDialog({
   onOpen: (id: string) => void
   onUnarchive: (id: string) => Promise<void>
 }) {
+  // A page opened from a row, in place of the list, with a way back.
+  const [page, setPage] = useState<"boss" | null>(null)
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose()
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && (page ? setPage(null) : onClose())
     document.addEventListener("keydown", onKey)
     return () => document.removeEventListener("keydown", onKey)
-  }, [onClose])
+  }, [onClose, page])
 
   return createPortal(
     <div className="modal-scrim" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal settings-dialog" role="dialog" aria-label="Settings">
         <div className="modal-head">
-          <span>Settings</span>
+          {page ? (
+            <button className="settings-back" onClick={() => setPage(null)}>
+              <ChevronLeft />
+              Boss profile
+            </button>
+          ) : (
+            <span>Settings</span>
+          )}
           <button className="icon-btn" onClick={onClose} title="Close">
             <X />
           </button>
         </div>
 
-        <div className="settings-body">
-          <Row label="Appearance" hint="On this device.">
-            <Segmented<Appearance>
-              value={settings.appearance}
-              options={[
-                ["light", "Light", <Sun key="s" />],
-                ["dark", "Dark", <Moon key="m" />],
-              ]}
-              onChange={(appearance) => onChange({ appearance })}
-            />
-          </Row>
+        {page === "boss" ? (
+          <div className="settings-body">
+            <BossPage />
+          </div>
+        ) : (
+          <div className="settings-body">
+            <Row label="Appearance" hint="On this device.">
+              <Segmented<Appearance>
+                value={settings.appearance}
+                options={[
+                  ["light", "Light", <Sun key="s" />],
+                  ["dark", "Dark", <Moon key="m" />],
+                ]}
+                onChange={(appearance) => onChange({ appearance })}
+              />
+            </Row>
 
-          <TextSizes settings={settings} onChange={onChange} />
+            <TextSizes settings={settings} onChange={onChange} />
 
-          <Row label="New sessions" hint="The agent + starts. A session keeps its agent for good.">
-            <Segmented<AgentBackend>
-              value={settings.backend}
-              options={[
-                ["claude_code", "Claude Code"],
-                ["codex", "Codex"],
-                ["kiro", "Kiro"],
-              ]}
-              onChange={(backend) => onChange({ backend })}
-            />
-          </Row>
+            <Row label="New sessions" hint="The agent + starts. A session keeps its agent for good.">
+              <Segmented<AgentBackend>
+                value={settings.backend}
+                options={[
+                  ["claude_code", "Claude Code"],
+                  ["codex", "Codex"],
+                  ["kiro", "Kiro"],
+                ]}
+                onChange={(backend) => onChange({ backend })}
+              />
+            </Row>
 
-          <BossProfile />
+            <BossRow onOpen={() => setPage("boss")} />
 
-          <Archived sessions={archived} projects={projects} onOpen={onOpen} onUnarchive={onUnarchive} />
-        </div>
+            <Archived sessions={archived} projects={projects} onOpen={onOpen} onUnarchive={onUnarchive} />
+          </div>
+        )}
       </div>
     </div>,
     document.body,
@@ -82,7 +97,10 @@ export function SettingsDialog({
 }
 
 // The interface in px, as it is set; each area in percent of it.
-const AREAS: { key: "sidebarScale" | "chatScale" | "codeScale"; label: string }[] = [
+const AREAS: {
+  key: "sidebarScale" | "chatScale" | "codeScale"
+  label: string
+}[] = [
   { key: "sidebarScale", label: "Sidebar" },
   { key: "chatScale", label: "Messages" },
   { key: "codeScale", label: "Code" },
@@ -93,16 +111,9 @@ const AREAS: { key: "sidebarScale" | "chatScale" | "codeScale"; label: string }[
  * code each on top of it. Sliders, applied as they move, so the page behind
  * the dialog is the preview.
  */
-function TextSizes({
-  settings,
-  onChange,
-}: {
-  settings: Settings
-  onChange: (patch: Partial<Settings>) => void
-}) {
+function TextSizes({ settings, onChange }: { settings: Settings; onChange: (patch: Partial<Settings>) => void }) {
   const px = Math.round(16 * settings.fontScale)
-  const changed =
-    settings.fontScale !== 1 || AREAS.some(({ key }) => settings[key] !== 1)
+  const changed = settings.fontScale !== 1 || AREAS.some(({ key }) => settings[key] !== 1)
   return (
     <div className="settings-row text-sizes">
       <div className="settings-text">
@@ -111,7 +122,14 @@ function TextSizes({
         {changed && (
           <button
             className="settings-reset"
-            onClick={() => onChange({ fontScale: 1, sidebarScale: 1, chatScale: 1, codeScale: 1 })}
+            onClick={() =>
+              onChange({
+                fontScale: 1,
+                sidebarScale: 1,
+                chatScale: 1,
+                codeScale: 1,
+              })
+            }
           >
             Reset
           </button>
@@ -178,7 +196,8 @@ function Archived({
         <span className="settings-hint">
           {sessions.length ? `${sessions.length}, hidden from the lists. Writing in one brings it back.` : "None."}
         </span>
-        {sessions.length > 0 && (open ? <ChevronDown className="archived-fold" /> : <ChevronRight className="archived-fold" />)}
+        {sessions.length > 0 &&
+          (open ? <ChevronDown className="archived-fold" /> : <ChevronRight className="archived-fold" />)}
       </button>
       {open && sessions.length > 0 && (
         <div className="archived-list">
