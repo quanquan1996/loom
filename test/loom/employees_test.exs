@@ -182,6 +182,26 @@ defmodule Loom.EmployeesTest do
     assert Loom.Notices.open_of(e["id"]) == []
   end
 
+  test "a daily report's turn rings no bell", %{server: server} do
+    {:ok, e} = Employees.create(%{"name" => "小日"}, server)
+    {:ok, _} = Employees.wake(e["id"], nil, server)
+    BackendStub.await_turn()
+
+    :sys.replace_state(server, fn st ->
+      put_in(st.employees[e["id"]]["turn_reason"], "daily_report")
+    end)
+
+    end_turn(
+      e["work_session"],
+      card(%{"report" => %{"priority" => 3, "text" => "日报写好了"}}),
+      server
+    )
+
+    assert Loom.Notices.open_of(e["id"]) == []
+    {:ok, e} = Employees.get(e["id"], server)
+    assert e["attention"] == nil
+  end
+
   test "a long work session is turned over, once there is a handoff to carry it",
        %{server: server} do
     {:ok, e} = Employees.create(%{"name" => "小轮"}, server)

@@ -318,8 +318,9 @@ defmodule Loom.Employees.Prompt do
     Write `reports/daily-#{ctx.today}.md`: what you did today (from
     `worklog.md`), where each KPI stands, what it cost (#{ctx.spent_text} so far),
     problems or risks, and the plan for tomorrow. Short and concrete. Then end
-    with the work card (`report` level `info`, unless something in it needs
-    the boss).
+    with the work card, without a `report`: the boss reads reports on your
+    page, and the bell is not for them. Anything that needs the boss goes in
+    a report at your next wake-up.
     """
   end
 
@@ -329,7 +330,8 @@ defmodule Loom.Employees.Prompt do
 
     Write `reports/weekly-#{ctx.week}.md`: the week's results against the
     KPIs, what is done and waiting for review, what slipped and why, what it
-    cost, and the plan for next week. Then end with the work card.
+    cost, and the plan for next week. Then end with the work card, without a
+    `report`, as for the daily one.
     """
   end
 

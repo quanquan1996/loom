@@ -502,6 +502,7 @@ defmodule Loom.Employees do
       e
       |> Map.merge(%{
         "turn_started_at" => now,
+        "turn_reason" => to_string(reason),
         "last_wake_at" => now,
         "wake_at" => nil,
         "wake_reason" => nil,
@@ -620,7 +621,12 @@ defmodule Loom.Employees do
     # place of the last. Without one, an important report stays until the
     # boss has seen it; an urgent one was answered, or is moot, once the
     # employee has worked again.
-    report = report && Map.put(report, "level", level(report))
+    # Not from a daily or weekly report's turn: those are read on its page,
+    # and a bell rung every evening by every employee is one nobody hears.
+    report =
+      if e["turn_reason"] in ["daily_report", "weekly_report"],
+        do: nil,
+        else: report && Map.put(report, "level", level(report))
 
     if report && (report["level"] != "info" or is_integer(report["priority"])),
       do: post(e, report)
@@ -636,6 +642,7 @@ defmodule Loom.Employees do
     e
     |> Map.merge(%{
       "turn_started_at" => nil,
+      "turn_reason" => nil,
       "wake_at" => next,
       "wake_reason" => why,
       "attention" => attention,
@@ -1137,7 +1144,7 @@ defmodule Loom.Employees do
       end
 
     e
-    |> Map.drop(["inbox", "spend", "turns", "extra", "approval_asked", "fresh"])
+    |> Map.drop(["inbox", "spend", "turns", "extra", "approval_asked", "fresh", "turn_reason"])
     |> Map.merge(%{
       "status" => status,
       "spent_today" => spent(e, now),
