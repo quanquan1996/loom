@@ -53,7 +53,6 @@ For example, from this user's sidebar:
 
 ## Doing it
 
-Inside `loom-tidy`, retitling is one of the actions in the plan and is
-confirmed with the rest: show "old → new" for each. Asked directly, show the
-same list and wait for a yes. Then `retitle` each, and the sidebar changes at
-once.
+Inside `loom-tidy`, as part of its one go: retitle, and list "old → new" in
+its report. Asked directly, likewise: retitle them, then show the list.
+Begin with the sessions marked `[new since last tidy]`.

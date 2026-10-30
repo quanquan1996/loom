@@ -188,6 +188,12 @@ defmodule Loom.Agent.Session do
   def seed(id, display, prompt), do: GenServer.call(via(id), {:seed, display, prompt})
 
   @doc """
+  Record that a tidying looked at it now (`tidied_at`), so the next one can
+  start with what is new since. Local to loom.
+  """
+  def tidied(id), do: GenServer.call(via(id), :tidied)
+
+  @doc """
   Record that the user has read the session up to `seq`. Local to loom, and
   only ever moves forward. What the sleep session's unread mark is made of; see
   `Loom.Dream`.
@@ -390,6 +396,7 @@ defmodule Loom.Agent.Session do
           project_id: meta[:project_id],
           pinned: meta[:pinned] == true,
           archived_at: if(is_integer(meta[:archived_at]), do: meta[:archived_at]),
+          tidied_at: if(is_integer(meta[:tidied_at]), do: meta[:tidied_at]),
           kind: if(is_binary(meta[:kind]), do: meta[:kind]),
           employee_id: if(is_binary(meta[:employee_id]), do: meta[:employee_id]),
           seen_seq: if(is_integer(meta[:seen_seq]), do: meta[:seen_seq], else: 0),
@@ -512,6 +519,8 @@ defmodule Loom.Agent.Session do
       pinned: false,
       # When the user archived it, or nil. See `archive/2`.
       archived_at: nil,
+      # When a tidying last looked at it, or nil. See `tidied/1`.
+      tidied_at: nil,
       # nil for a conversation; "dream" for a project's sleep session, which
       # the sidebar keeps out of its lists. See `Loom.Dream`.
       kind: nil,
@@ -631,6 +640,12 @@ defmodule Loom.Agent.Session do
   def handle_call({:archive, archived?}, _from, state) do
     at = if archived? == true, do: System.system_time(:millisecond)
     state = %{state | archived_at: at}
+    persist_meta(state)
+    {:reply, :ok, state}
+  end
+
+  def handle_call(:tidied, _from, state) do
+    state = %{state | tidied_at: System.system_time(:millisecond)}
     persist_meta(state)
     {:reply, :ok, state}
   end
@@ -1302,6 +1317,7 @@ defmodule Loom.Agent.Session do
       project_id: state.project_id,
       pinned: state.pinned,
       archived_at: state.archived_at,
+      tidied_at: state.tidied_at,
       kind: state.kind,
       employee_id: state.employee_id,
       seen_seq: state.seen_seq,
@@ -1402,6 +1418,7 @@ defmodule Loom.Agent.Session do
       project_id: state.project_id,
       pinned: state.pinned,
       archived_at: state.archived_at,
+      tidied_at: state.tidied_at,
       kind: state.kind,
       employee_id: state.employee_id,
       seen_seq: state.seen_seq,

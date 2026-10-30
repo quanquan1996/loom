@@ -329,8 +329,9 @@ for 3–5.
 ### 2.11 Tidying sessions
 
 Making the right session quick to pick on a phone: the `loom-tidy` skill
-(and `loom-retitle` inside it) proposes titles, archives and merges, and acts
-once the user confirms. The agent runs `loom-session` (`rel/loom-session`,
+(and `loom-retitle` inside it) retitles, archives and merges in one go, with
+no confirmation (all of it can be undone), asked in a chat or as a scheduled
+task. The agent runs `loom-session` (`rel/loom-session`,
 installed like `loom-notice`), calling `/api/tidy/*` (`TidyController`).
 
 - **Nothing is deleted.** Archiving sets `archived_at` and nothing else: the
@@ -343,6 +344,9 @@ installed like `loom-notice`), calling `/api/tidy/*` (`TidyController`).
   most recent source, with the summary shown as its first message (`origin:
   "tidy"`, rendered as markdown) and given to the backend ahead of the next
   message (`Session.seed/3`, the `notice` slot); the sources are archived.
+- **New first.** Each action, and `keep` (looked at, left as is), sets
+  `tidied_at`; `list` puts first the sessions never tidied or active since,
+  so a scheduled run reads only what changed.
 - **Titles** record who gave them (`title_by`: auto, user, tidy; inferred for
   older sessions). A retitle never replaces the user's.
 - **What may be tidied is a whitelist in code**: Recents only — no `kind`, no

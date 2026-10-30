@@ -152,6 +152,23 @@ defmodule LoomWeb.TidyControllerTest do
     assert json_response(conn, 422)["error"] =~ "the user named it"
   end
 
+  test "what was tidied comes after what is new since", %{caller: caller} do
+    old = start!(title: "old")
+    new = start!(title: "new")
+    conn = post(cli(caller), "/api/tidy/keep", %{ids: [old]})
+    assert json_response(conn, 200)["ok"]
+
+    assert ids(get(cli(caller), "/api/tidy/list", %{fresh: "1"})) |> Enum.member?(new)
+    refute ids(get(cli(caller), "/api/tidy/list", %{fresh: "1"})) |> Enum.member?(old)
+    listed = ids(get(cli(caller), "/api/tidy/list"))
+    assert Enum.find_index(listed, &(&1 == new)) < Enum.find_index(listed, &(&1 == old))
+
+    # Used again: new again.
+    Process.sleep(2)
+    {:ok, _} = Agent.submit(old, "back to it")
+    assert old in ids(get(cli(caller), "/api/tidy/list", %{fresh: "1"}))
+  end
+
   test "read gives each turn's messages without tools", %{caller: caller} do
     s = start!(title: "q")
     {:ok, _} = Agent.submit(s, "hello?")

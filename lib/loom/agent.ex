@@ -105,6 +105,7 @@ defmodule Loom.Agent do
   defdelegate pin(id, pinned?), to: Session
   defdelegate archive(id, archived?), to: Session
   defdelegate seed(id, display, prompt), to: Session
+  defdelegate tidied(id), to: Session
   defdelegate seen(id, seq), to: Session
   defdelegate set_effort(id, effort), to: Session
   defdelegate move(id, project_id), to: Session

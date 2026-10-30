@@ -1,7 +1,9 @@
 defmodule LoomWeb.TidyController do
   @moduledoc """
   `loom-session`, which an agent runs to tidy the user's sessions (the
-  `loom-tidy` skill): list, read, archive, unarchive, merge, and retitle. Behind
+  `loom-tidy` skill): list, read, archive, unarchive, merge, retitle, and
+  keep. Each but unarchive records that the session was tidied (`tidied_at`),
+  and `list` puts the ones new since — never tidied, or active since — first. Behind
   `LoomWeb.Plugs.NodeCliAuth`, like `loom-notice`; the caller is the
   `x-loom-session` header.
 
@@ -22,8 +24,9 @@ defmodule LoomWeb.TidyController do
 
   @gist 200
 
-  # GET /api/tidy/list — `project` (an id, or "home"), `all`, `archived`.
-  # Without `project` or `all`, the caller's own project.
+  # GET /api/tidy/list — `project` (an id, or "home"), `all`, `archived`,
+  # `fresh` (only those new since the last tidying). Without `project` or
+  # `all`, the caller's own project. New since the last tidying first.
   def list(conn, params) do
     with {:ok, caller} <- caller(conn) do
       scope =
@@ -35,6 +38,7 @@ defmodule LoomWeb.TidyController do
         end
 
       archived? = params["archived"] in ["1", "true"]
+      fresh_only? = params["fresh"] in ["1", "true"]
       open = open_notices()
 
       sessions =
@@ -42,7 +46,8 @@ defmodule LoomWeb.TidyController do
         |> Enum.filter(&tidyable?/1)
         |> Enum.filter(&(scope == :all or &1.project_id == scope))
         |> Enum.filter(&(archived?(&1) == archived?))
-        |> Enum.sort_by(&(-(&1.last_active_at || &1.created_at || 0)))
+        |> Enum.filter(&(not fresh_only? or fresh?(&1)))
+        |> Enum.sort_by(&{not fresh?(&1), -(&1.last_active_at || &1.created_at || 0)})
         |> Enum.map(&row(&1, caller.id, open))
 
       json(conn, %{sessions: sessions})
@@ -80,6 +85,7 @@ defmodule LoomWeb.TidyController do
     with {:ok, caller} <- caller(conn),
          :ok <- check.(caller) do
       Enum.each(ids, &Agent.archive(&1, archived?))
+      if archived?, do: Enum.each(ids, &Agent.tidied/1)
       json(conn, %{ok: true, ids: ids})
     else
       error -> reply(conn, error)
@@ -107,6 +113,7 @@ defmodule LoomWeb.TidyController do
          :ok <- one_project(infos),
          {:ok, id} <- start_merged(infos, String.trim(title), summary) do
       Enum.each(ids, &Agent.archive(&1, true))
+      Enum.each([id | ids], &Agent.tidied/1)
       json(conn, %{ok: true, id: id})
     else
       error -> reply(conn, error)
@@ -114,6 +121,17 @@ defmodule LoomWeb.TidyController do
   end
 
   def merge(conn, _params), do: reply(conn, {:error, "merge takes title, summary and ids"})
+
+  # POST /api/tidy/keep — `ids`: looked at, and left as they are.
+  def keep(conn, %{"ids" => ids}) when is_list(ids) do
+    with {:ok, _caller} <- caller(conn),
+         :ok <- Enum.find_value(ids, :ok, &with({:ok, _} <- tidyable(&1), do: nil)) do
+      Enum.each(ids, &Agent.tidied/1)
+      json(conn, %{ok: true, ids: ids})
+    else
+      error -> reply(conn, error)
+    end
+  end
 
   # POST /api/tidy/retitle — `id`, `title`.
   def retitle(conn, %{"id" => id, "title" => title}) when is_binary(title) do
@@ -125,6 +143,7 @@ defmodule LoomWeb.TidyController do
              else: :ok
            ),
          :ok <- Agent.retitle(id, title) do
+      Agent.tidied(id)
       json(conn, %{ok: true, id: id, title: String.trim(title)})
     else
       {:error, :empty} -> reply(conn, {:error, "the title may not be empty"})
@@ -178,6 +197,12 @@ defmodule LoomWeb.TidyController do
   defp archived?(info) do
     at = info[:archived_at]
     is_integer(at) and (info.last_active_at || 0) <= at
+  end
+
+  # Never tidied, or used since it was.
+  defp fresh?(info) do
+    at = info[:tidied_at]
+    not is_integer(at) or (info.last_active_at || 0) > at
   end
 
   defp tidyable?(info),
@@ -242,6 +267,8 @@ defmodule LoomWeb.TidyController do
       created_at: info.created_at,
       last_active_at: info.last_active_at,
       archived_at: info[:archived_at],
+      tidied_at: info[:tidied_at],
+      fresh: fresh?(info),
       status: info.status,
       first: first_message(info.id),
       title_by: title_by(info),

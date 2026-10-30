@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """loom-session: tidy the user's Loom sessions, from a Loom session.
 
-  loom-session list [--project ID|home | --all] [--archived]
+  loom-session list [--project ID|home | --all] [--archived] [--fresh]
   loom-session read ID [--full]
   loom-session archive ID...
   loom-session unarchive ID...
   loom-session merge --title T --summary-file F ID...
   loom-session retitle ID TITLE
+  loom-session keep ID...
 
 Only the sidebar's Recents can be tidied; nothing is deleted. Archiving hides
 a session from the lists and nothing else. See the loom-tidy skill.
@@ -63,9 +64,11 @@ def main():
     ls.add_argument("--project", help="a project id, or home")
     ls.add_argument("--all", action="store_true", help="every project and home")
     ls.add_argument("--archived", action="store_true", help="the archived ones instead")
+    ls.add_argument("--fresh", action="store_true", help="only those new since the last tidying")
     rd = sub.add_parser("read", help="a session's conversation, without tool calls")
     rd.add_argument("id")
     rd.add_argument("--full", action="store_true", help="every reply, not only each turn's last")
+    sub.add_parser("keep", help="looked at, left as it is: not new at the next tidying").add_argument("ids", nargs="+")
     for name in ("archive", "unarchive"):
         sub.add_parser(name).add_argument("ids", nargs="+")
     mg = sub.add_parser("merge", help="a new session that begins with SUMMARY; the sources are archived")
@@ -81,11 +84,13 @@ def main():
         q = {"all": "1"} if a.all else ({"project": a.project} if a.project else {})
         if a.archived:
             q["archived"] = "1"
+        if a.fresh:
+            q["fresh"] = "1"
         rows = call("GET", "list", query=q)["sessions"]
         if not rows:
             print("none")
         for s in rows:
-            marks = "".join([" (you)" if s["you"] else "", " [open notice]" if s["open_notice"] else "",
+            marks = "".join([" [new since last tidy]" if s.get("fresh") else ""," (you)" if s["you"] else "", " [open notice]" if s["open_notice"] else "",
                              f" [{s['status']}]" if s["status"] in ("starting", "running") else ""])
             first = (s.get("first") or "").replace("\n", " ")[:100]
             by = {"auto": "title=first message", "user": "title=the user's", "tidy": "title=tidied"}.get(s.get("title_by"), "")
@@ -97,6 +102,9 @@ def main():
         print(f"# {r['title']} ({r['id']})\n")
         for m in r["messages"]:
             print(f"## {m['role']}\n{m['text']}\n")
+    elif a.cmd == "keep":
+        call("POST", "keep", {"ids": a.ids})
+        print(f"kept: {' '.join(a.ids)}")
     elif a.cmd in ("archive", "unarchive"):
         call("POST", "archive", {"ids": a.ids, "archived": a.cmd == "archive"})
         print(f"{a.cmd}d: {' '.join(a.ids)}")
