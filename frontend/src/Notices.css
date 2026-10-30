@@ -309,3 +309,158 @@
     gap: 8px;
   }
 }
+
+/* Notifications · To-do · Chat */
+.bell-tabs {
+  display: flex;
+  flex: 1 1 auto;
+  gap: 6px;
+  min-width: 0;
+}
+
+.bell-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--fg) 8%, transparent);
+  color: var(--fg-dim);
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.bell-tabs button.on {
+  background: var(--fg);
+  color: var(--bg);
+  font-weight: 600;
+}
+
+.bell-tab-n {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+}
+
+.bell-panel.chatting {
+  height: 80vh;
+}
+
+.bell-chat {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.bell-chat .chat.bare .chat-top::before {
+  display: none;
+}
+
+.todo-add {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0 10px;
+  padding: 4px 4px 4px 14px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--fg) 8%, transparent);
+}
+
+.todo-add input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  font-size: max(0.95rem, 16px);
+}
+
+.todo-add .todo-due {
+  flex: 0 0 auto;
+  width: 8.5rem;
+  color: var(--fg-dim);
+  font-size: 0.85rem;
+  color-scheme: dark;
+}
+
+.todo-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 9px 6px;
+  border-bottom: 1px solid var(--line);
+}
+
+.todo-check,
+.todo-rm {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--fg-dim);
+  cursor: pointer;
+}
+
+.todo-check svg {
+  width: 20px;
+  height: 20px;
+}
+
+.todo-row.done .todo-check {
+  color: var(--green);
+}
+
+.todo-rm svg {
+  width: 15px;
+  height: 15px;
+}
+
+.todo-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--fg);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.todo-row.done .todo-text {
+  color: var(--fg-dim);
+  text-decoration: line-through;
+}
+
+.todo-meta {
+  display: flex;
+  gap: 8px;
+  margin-top: 2px;
+  color: var(--fg-dim);
+  font-size: 0.8rem;
+}
+
+.todo-meta .late {
+  color: var(--red);
+}
+
+.todo-meta .today {
+  color: #fb923c;
+}
+
+.todo-done-toggle {
+  width: 100%;
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+@media (max-width: 640px) {
+  .bell-panel.chatting {
+    height: 100%;
+  }
+}

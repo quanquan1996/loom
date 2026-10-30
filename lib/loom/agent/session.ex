@@ -310,6 +310,9 @@ defmodule Loom.Agent.Session do
   # Loom's own, plus the project's when there is one, or a virtual employee's
   # standing orders (`Loom.Employees`). Built again on every restore, so a
   # renamed project or edited instructions are what the backend is told next.
+  defp instructions(id, project, {_, "bell"}),
+    do: instructions(id, project, nil) <> "\n" <> Loom.Notices.Prompt.system()
+
   defp instructions(id, project, {employee_id, kind}) when is_binary(employee_id),
     do: instructions(id, project, nil) <> "\n" <> Loom.Employees.Prompt.system(employee_id, kind)
 

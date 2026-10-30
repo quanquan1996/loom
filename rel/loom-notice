@@ -3,7 +3,13 @@
 
   loom-notice post --priority N [--key KEY] [--needs read|reply|approve] SUMMARY
   loom-notice withdraw KEY
-  loom-notice list
+  loom-notice list                       your notices still open
+  loom-notice todos                      the user's to-do list
+  loom-notice todo add TEXT [--due DATE] only when the user asked for it
+  loom-notice todo done|undo|rm ID
+  loom-notice all                        (the bell's chat) every open notice
+  loom-notice act ID approve|reject|done (the bell's chat) for the user
+  loom-notice act ID reply TEXT
 
 The session is LOOM_SESSION_ID, which Loom sets for every session it starts;
 the address and key are in LOOM_CLI (default ~/.loom/node-cli.json), as for
@@ -45,9 +51,15 @@ def call(method, route, body=None):
         sys.exit(f"loom-notice: cannot reach Loom at {url}: {err.reason}")
 
 
-def show(n):
+def show(n, ids=False):
     note = f"  ({n['note']})" if n.get("note") else ""
-    print(f"[{n.get('key') or '-'}] P{n['priority']} {n['needs']} {n['status']}: {n['summary']}{note}")
+    who = f"{n['id']} {n['source']['name']} · " if ids else f"[{n.get('key') or '-'}] "
+    print(f"{who}P{n['priority']} {n['needs']} {n['status']}: {n['summary']}{note}")
+
+
+def show_todo(t):
+    due = f" (due {t['due']})" if t.get("due") else ""
+    print(f"{t['id']} [{'x' if t['done'] else ' '}] {t['text']}{due}  — added by {t.get('by') or '?'}")
 
 
 def main():
@@ -62,6 +74,16 @@ def main():
     w = sub.add_parser("withdraw", help="take back your open notice with KEY")
     w.add_argument("key")
     sub.add_parser("list", help="your notices still open")
+    sub.add_parser("todos", help="the user's to-do list")
+    td = sub.add_parser("todo", help="add to the user's to-dos (only when they asked), or tick one off")
+    td.add_argument("op", choices=["add", "done", "undo", "rm"])
+    td.add_argument("what", nargs="+", help="the text to add, or the to-do's id")
+    td.add_argument("--due", help="YYYY-MM-DD")
+    sub.add_parser("all", help="every open notice (the bell's chat only)")
+    act = sub.add_parser("act", help="act on a notice for the user (the bell's chat only)")
+    act.add_argument("id")
+    act.add_argument("action", choices=["approve", "reject", "reply", "done"])
+    act.add_argument("text", nargs="*")
     a = p.parse_args()
 
     if a.cmd == "post":
@@ -72,12 +94,37 @@ def main():
     elif a.cmd == "withdraw":
         call("POST", "withdraw", {"key": a.key})
         print(f"withdrawn: {a.key}")
-    else:
+    elif a.cmd == "list":
         notices = call("GET", "mine")["notices"]
         if not notices:
             print("none open")
         for n in notices:
             show(n)
+    elif a.cmd == "todos":
+        todos = call("GET", "todos")["todos"]
+        if not todos:
+            print("no to-dos")
+        for t in todos:
+            show_todo(t)
+    elif a.cmd == "todo":
+        what = " ".join(a.what)
+        body = {"op": a.op, "text": what, "due": a.due} if a.op == "add" else {"op": a.op, "id": what}
+        r = call("POST", "todo", body)
+        if "todo" in r:
+            show_todo(r["todo"])
+        else:
+            print(f"removed: {what}")
+    elif a.cmd == "all":
+        notices = call("GET", "all")["notices"]
+        if not notices:
+            print("none open")
+        for n in sorted(notices, key=lambda n: n["priority"]):
+            show(n, ids=True)
+    else:
+        if a.action == "reply" and not a.text:
+            sys.exit("loom-notice: reply needs the text")
+        body = {"id": a.id, "action": a.action, "text": " ".join(a.text)}
+        show(call("POST", "act", body)["notice"], ids=True)
 
 
 if __name__ == "__main__":

@@ -315,6 +315,14 @@ for 3–5.
   handled where it is (`Notices.tsx`): approve or reject, a line of reply
   (sent to its session as the user's message), or done; tapping it opens
   its session instead.
+- **To-dos** sit beside the notices, in the same file: added in the bell, or
+  by an agent the user told to (`loom-notice todo add`; the skill says only
+  when asked — soft). Pushed as `todos`.
+- **The bell's chat** is a hidden Claude Code session, `kind: "bell"`,
+  made on first use (`POST /api/notices/session`) and shown bare inside the
+  bell. Its standing orders are `Loom.Notices.Prompt`; it alone may list
+  every open notice and act on them for the user (`loom-notice all`, `act`).
+  Its turns notify nothing.
 - **Sleep** posts its night with the same command, and sleeps in a new
   session each night (`past` keeps the old ones, answerable still).
 

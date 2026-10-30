@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { Channel } from "phoenix"
 import { getSocket } from "./socket"
-import type { AgentInfo, Device, Employee, Notice, Project } from "./api"
+import type { AgentInfo, Device, Employee, Notice, Project, Todo } from "./api"
 
 export type Watching = { endpoint: string; session: string | null }
 
@@ -22,6 +22,8 @@ type Lobby = {
   // The bell, newest first, pushed whole whenever it changes; see `Notices.tsx`.
   notices: Notice[]
   upsertNotice: (notice: Notice) => void
+  // The user's to-dos, open first, pushed whole likewise.
+  todos: Todo[]
   loaded: boolean
   // For the caller's own create/delete, so the sidebar does not wait for the
   // push. The push still arrives and is merged by `seq`.
@@ -52,6 +54,7 @@ export function useLobby(enabled: boolean, watching: Watching | null = null): Lo
   const [projects, setProjects] = useState<Map<string, Project>>(new Map())
   const [employees, setEmployees] = useState<Map<string, Employee>>(new Map())
   const [notices, setNotices] = useState<Notice[]>([])
+  const [todos, setTodos] = useState<Todo[]>([])
   // The caller's own answer, before the push: the list comes again anyway.
   const upsertNotice = useCallback(
     (n: Notice) => setNotices((list) => list.map((x) => (x.id === n.id ? n : x))),
@@ -142,6 +145,7 @@ export function useLobby(enabled: boolean, watching: Watching | null = null): Lo
     channel.on("employee", upsertEmployee)
     channel.on("employee_removed", ({ id }: { id: string }) => dropEmployee(id))
     channel.on("notices", ({ notices }: { notices: Notice[] }) => setNotices(notices))
+    channel.on("todos", ({ todos }: { todos: Todo[] }) => setTodos(todos))
 
     channel
       .join()
@@ -153,12 +157,14 @@ export function useLobby(enabled: boolean, watching: Watching | null = null): Lo
           projects,
           employees,
           notices,
+          todos,
         }: {
           sessions: AgentInfo[]
           nodes: Device[]
           projects?: Project[]
           employees?: Employee[]
           notices?: Notice[]
+          todos?: Todo[]
         }) => {
         joined = true
         if (leaveWhenJoined) {
@@ -172,6 +178,7 @@ export function useLobby(enabled: boolean, watching: Watching | null = null): Lo
         setProjects(new Map((projects ?? []).map((p) => [p.id, p])))
         setEmployees(new Map((employees ?? []).map((e) => [e.id, e])))
         setNotices(notices ?? [])
+        setTodos(todos ?? [])
         setLoaded(true)
         },
       )
@@ -215,6 +222,7 @@ export function useLobby(enabled: boolean, watching: Watching | null = null): Lo
     dropEmployee,
     notices,
     upsertNotice,
+    todos,
     devices: deviceList,
     upsertDevice,
     projects: projectList,

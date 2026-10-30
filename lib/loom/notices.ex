@@ -23,8 +23,17 @@ defmodule Loom.Notices do
     to be read, opening it. The source may withdraw it. 6–10 expire after a
     week unread; anything settled is kept for 30 days.
 
-  Truth is `~/.loom/notices.json`. The whole list goes to every client on the
-  lobby topic as `{:notices, list}` whenever it changes.
+  **To-dos** live here too: the user's own list, beside the bell. The user
+  adds to it, or tells an agent to (`loom-notice todo`): a soft rule, kept by
+  the `loom-notify` skill, not by this code.
+
+  **The bell's chat** is a hidden Claude Code session (`kind: "bell"`), made
+  on first use, whose standing orders (`Loom.Notices.Prompt`) are to go
+  through the notices and to-dos with the user in plain words. Only it may
+  act on notices for the user through `loom-notice` (answer, reply, done).
+
+  Truth is `~/.loom/notices.json`. The whole lists go to every client on the
+  lobby topic as `{:notices, list}` and `{:todos, list}` whenever they change.
   """
   use GenServer
 
@@ -78,6 +87,21 @@ defmodule Loom.Notices do
   @doc "Settled by hand, without an answer."
   def dismiss(id, server \\ @name), do: GenServer.call(server, {:dismiss, id})
 
+  @doc "The user's to-dos: open first (by due date), then the done ones."
+  def todos(server \\ @name), do: GenServer.call(server, :todos)
+
+  @doc "A to-do: `text`, and optionally `due` (`YYYY-MM-DD`) and `session`; `by` who added it."
+  def add_todo(attrs, by, server \\ @name), do: GenServer.call(server, {:add_todo, attrs, by})
+
+  @doc "Change one: `done`, `text`, `due`."
+  def update_todo(id, attrs, server \\ @name),
+    do: GenServer.call(server, {:update_todo, id, attrs})
+
+  def delete_todo(id, server \\ @name), do: GenServer.call(server, {:delete_todo, id})
+
+  @doc "The bell's chat session, made on first use."
+  def session(server \\ @name), do: GenServer.call(server, :session, 30_000)
+
   @doc "The user wrote in `session_id`: what was open there is answered."
   def replied(session_id, server \\ @name), do: GenServer.cast(server, {:replied, session_id})
 
@@ -94,7 +118,7 @@ defmodule Loom.Notices do
   def init(opts) do
     path = Keyword.get(opts, :path, path())
     tick = Keyword.get(opts, :tick) || Application.get_env(:loom, __MODULE__, [])[:tick] || @tick
-    {notices, marks} = load(path)
+    {notices, marks, todos} = load(path)
 
     state = %{
       path: path,
@@ -102,6 +126,7 @@ defmodule Loom.Notices do
       notices: notices,
       # The days the 20:00 digest and the 07:00 catch-up last went out.
       marks: marks,
+      todos: todos,
       clock: Keyword.get(opts, :clock, &now/0),
       notify: Keyword.get(opts, :notify, &Loom.Push.notify/3),
       submit: Keyword.get(opts, :submit, &submit/2)
@@ -113,6 +138,79 @@ defmodule Loom.Notices do
 
   @impl true
   def handle_call(:list, _from, state), do: {:reply, views(state), state}
+
+  def handle_call(:todos, _from, state), do: {:reply, todo_views(state), state}
+
+  def handle_call({:add_todo, attrs, by}, _from, state) do
+    attrs = Map.new(attrs, fn {k, v} -> {to_string(k), v} end)
+    text = attrs["text"] |> to_string() |> String.trim()
+
+    cond do
+      text == "" ->
+        {:reply, {:error, "a to-do needs its text"}, state}
+
+      not due?(attrs["due"]) ->
+        {:reply, {:error, "due is a date, YYYY-MM-DD"}, state}
+
+      true ->
+        now = state.clock.()
+
+        t = %{
+          "id" => "t_" <> (:crypto.strong_rand_bytes(6) |> Base.url_encode64(padding: false)),
+          "text" => text,
+          "due" => blank_to_nil(attrs["due"]),
+          "session" => blank_to_nil(attrs["session"]),
+          "by" => by,
+          "done" => false,
+          "created_at" => now
+        }
+
+        state = put_in(state.todos[t["id"]], t)
+        {:reply, {:ok, t}, changed(state)}
+    end
+  end
+
+  def handle_call({:update_todo, id, attrs}, _from, state) do
+    attrs = Map.new(attrs, fn {k, v} -> {to_string(k), v} end)
+
+    cond do
+      state.todos[id] == nil -> {:reply, {:error, :not_found}, state}
+      not due?(attrs["due"]) -> {:reply, {:error, "due is a date, YYYY-MM-DD"}, state}
+      true -> do_update_todo(state, id, attrs)
+    end
+  end
+
+  def handle_call({:delete_todo, id}, _from, state) do
+    case state.todos[id] do
+      nil -> {:reply, {:error, :not_found}, state}
+      _ -> {:reply, :ok, changed(update_in(state.todos, &Map.delete(&1, id)))}
+    end
+  end
+
+  def handle_call(:session, _from, state) do
+    id = state.marks["session"]
+
+    result =
+      cond do
+        is_binary(id) and Agent.exists?(id) ->
+          {:ok, id}
+
+        is_binary(id) and match?({:ok, _}, Agent.Store.read_meta(id)) ->
+          with {:ok, _} <- Agent.restore_session(id), do: {:ok, id}
+
+        true ->
+          id = Agent.new_id()
+
+          with {:ok, _} <-
+                 Agent.start_session(id, backend: :claude_code, kind: "bell", title: "Bell"),
+               do: {:ok, id}
+      end
+
+    case result do
+      {:ok, id} -> {:reply, {:ok, id}, changed(put_in(state.marks["session"], id))}
+      error -> {:reply, error, state}
+    end
+  end
 
   def handle_call({:post, source, attrs}, _from, state) do
     case validate(source, attrs) do
@@ -243,6 +341,37 @@ defmodule Loom.Notices do
     {:noreply, state |> expire() |> digest() |> catch_up() |> changed()}
   end
 
+  defp do_update_todo(state, id, attrs) do
+    t = state.todos[id]
+    now = state.clock.()
+
+    t =
+      t
+      |> then(&if(is_boolean(attrs["done"]), do: Map.put(&1, "done", attrs["done"]), else: &1))
+      |> then(&if(&1["done"] and not t["done"], do: Map.put(&1, "done_at", now), else: &1))
+      |> then(&if(&1["done"], do: &1, else: Map.delete(&1, "done_at")))
+      |> then(fn t ->
+        case attrs["text"] do
+          text when is_binary(text) and text != "" -> Map.put(t, "text", String.trim(text))
+          _ -> t
+        end
+      end)
+      |> then(
+        &if(Map.has_key?(attrs, "due"),
+          do: Map.put(&1, "due", blank_to_nil(attrs["due"])),
+          else: &1
+        )
+      )
+
+    state = put_in(state.todos[id], t)
+    {:reply, {:ok, t}, changed(state)}
+  end
+
+  defp due?(nil), do: true
+  defp due?(""), do: true
+  defp due?(d) when is_binary(d), do: match?({:ok, _}, Date.from_iso8601(d))
+  defp due?(_), do: false
+
   # ── Posting ─────────────────────────────────────────────────────────────
 
   defp validate(source, attrs) do
@@ -365,6 +494,13 @@ defmodule Loom.Notices do
           state
       end
     end)
+    |> then(fn state ->
+      # Done to-dos are kept as long as settled notices.
+      todos =
+        Map.reject(state.todos, fn {_, t} -> t["done"] and now - (t["done_at"] || 0) > @kept end)
+
+      %{state | todos: todos}
+    end)
   end
 
   # 20:00: one notification for all the important ones still open.
@@ -459,12 +595,26 @@ defmodule Loom.Notices do
 
   # Saved and told to every client, if anything changed since last time.
   defp changed(state) do
-    snapshot = {state.notices, state.marks}
+    snapshot = {state.notices, state.marks, state.todos}
 
-    if Process.get(:notices_saved) != snapshot do
-      Process.put(:notices_saved, snapshot)
-      save(state)
-      Phoenix.PubSub.broadcast(Loom.PubSub, Agent.lobby_topic(), {:notices, views(state)})
+    case Process.get(:notices_saved) do
+      ^snapshot ->
+        :ok
+
+      old ->
+        Process.put(:notices_saved, snapshot)
+        save(state)
+
+        if not match?({notices, _, _} when notices == state.notices, old),
+          do: Phoenix.PubSub.broadcast(Loom.PubSub, Agent.lobby_topic(), {:notices, views(state)})
+
+        if not match?({_, _, todos} when todos == state.todos, old),
+          do:
+            Phoenix.PubSub.broadcast(
+              Loom.PubSub,
+              Agent.lobby_topic(),
+              {:todos, todo_views(state)}
+            )
     end
 
     state
@@ -477,6 +627,13 @@ defmodule Loom.Notices do
   @doc false
   def view(n), do: Map.drop(n, ["asked", "held"])
 
+  defp todo_views(state) do
+    {done, open} = state.todos |> Map.values() |> Enum.split_with(& &1["done"])
+    # Open: what is due first, then the undated, newest first. Done: latest first.
+    Enum.sort_by(open, &{&1["due"] || "9999", -&1["created_at"]}) ++
+      Enum.sort_by(done, &(-(&1["done_at"] || 0)))
+  end
+
   defp submit(session, text) do
     Agent.submit(session, text, origin: "notice")
   catch
@@ -487,14 +644,16 @@ defmodule Loom.Notices do
     with {:ok, body} <- File.read(path),
          {:ok, %{"notices" => list} = data} when is_list(list) <- Jason.decode(body) do
       Process.put(:notices_saved, nil)
-      {Map.new(list, &{&1["id"], &1}), data["marks"] || %{}}
+
+      {Map.new(list, &{&1["id"], &1}), data["marks"] || %{},
+       Map.new(data["todos"] || [], &{&1["id"], &1})}
     else
       {:error, :enoent} ->
-        {%{}, %{}}
+        {%{}, %{}, %{}}
 
       other ->
         Logger.error("Loom.Notices cannot read #{path} (#{inspect(other)}); starting over")
-        {%{}, %{}}
+        {%{}, %{}, %{}}
     end
   end
 
@@ -502,7 +661,13 @@ defmodule Loom.Notices do
     File.mkdir_p!(Path.dirname(state.path))
     tmp = state.path <> ".tmp"
     list = state.notices |> Map.values() |> Enum.sort_by(& &1["created_at"])
-    File.write!(tmp, Jason.encode_to_iodata!(%{notices: list, marks: state.marks}, pretty: true))
+    todos = state.todos |> Map.values() |> Enum.sort_by(& &1["created_at"])
+
+    File.write!(
+      tmp,
+      Jason.encode_to_iodata!(%{notices: list, marks: state.marks, todos: todos}, pretty: true)
+    )
+
     File.rename!(tmp, state.path)
   end
 

@@ -89,6 +89,8 @@ type Props = {
   // Under the header, across the whole column: a virtual employee's tabs and
   // where it stands (see `Employees.tsx`).
   subhead?: ReactNode
+  // No header: the chat inside another pane, the bell's (see `Notices.tsx`).
+  bare?: boolean
   // Earlier sessions of the same thread, newest first, shown above this one a
   // day at a time: a virtual employee's work (see `Employees.tsx`).
   earlier?: string[]
@@ -123,6 +125,7 @@ export function Chat({
   tabs,
   subhead,
   earlier,
+  bare = false,
   onSeen,
   reading = true,
 }: Props) {
@@ -224,7 +227,7 @@ export function Chat({
   return (
     <div
       ref={chatRef}
-      className={"chat" + (drop.dragging ? " dragging" : "")}
+      className={"chat" + (bare ? " bare" : "") + (drop.dragging ? " dragging" : "")}
       {...drop.handlers}
     >
       {drop.dragging && (
@@ -232,6 +235,7 @@ export function Chat({
       )}
 
       <div className="chat-top" ref={topRef}>
+      {!bare && (
       <header className="chat-header">
         {!sidebarOpen && (
           <button
@@ -285,6 +289,7 @@ export function Chat({
           )}
         </div>
       </header>
+      )}
       {subhead}
 
       {joinError && <div className="chat-banner">{joinError}</div>}

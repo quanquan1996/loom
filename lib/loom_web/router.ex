@@ -96,6 +96,11 @@ defmodule LoomWeb.Router do
     post "/notices/:id/answer", NoticeController, :answer
     post "/notices/:id/reply", NoticeController, :respond
     post "/notices/:id/dismiss", NoticeController, :dismiss
+    post "/notices/session", NoticeController, :session
+    get "/todos", NoticeController, :todos
+    post "/todos", NoticeController, :add_todo
+    patch "/todos/:id", NoticeController, :update_todo
+    delete "/todos/:id", NoticeController, :delete_todo
 
     get "/push", PushController, :show
     post "/push/subscriptions", PushController, :create
@@ -126,6 +131,10 @@ defmodule LoomWeb.Router do
     post "/post", NoticeController, :post
     post "/withdraw", NoticeController, :withdraw
     get "/mine", NoticeController, :mine
+    get "/todos", NoticeController, :cli_todos
+    post "/todo", NoticeController, :cli_todo
+    get "/all", NoticeController, :all
+    post "/act", NoticeController, :act
   end
 
   # A device joining: the install script (its one-time code is the credential)

@@ -151,6 +151,8 @@ defmodule Loom.Push do
 
   @impl true
   def handle_info({:turn_ended, _id, %{kind: "employee_work"}}, state), do: {:noreply, state}
+  # The bell's chat is answered while the user is looking at it.
+  def handle_info({:turn_ended, _id, %{kind: "bell"}}, state), do: {:noreply, state}
 
   def handle_info({:turn_ended, id, summary}, state) do
     {title, body} = describe(summary)

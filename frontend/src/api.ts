@@ -149,7 +149,7 @@ export type AgentInfo = {
   // moon opens; see `Sleep.tsx`. "employee_chat" and "employee_work" for a
   // virtual employee's, opened from its page; see `Employees.tsx`. Older
   // servers do not send it.
-  kind?: "dream" | "employee_chat" | "employee_work" | null
+  kind?: "dream" | "employee_chat" | "employee_work" | "bell" | null
   employee_id?: string | null
   // How far the user has read; with `seq`, the moon's unread mark.
   seen_seq?: number
@@ -972,4 +972,37 @@ export function dismissNotice(id: string): Promise<Notice> {
 /** Approved or rejected from the bell; its session is told. */
 export function answerNotice(id: string, approve: boolean): Promise<Notice> {
   return notice(apiCall(`/api/notices/${id}/answer`, { method: "POST", body: JSON.stringify({ approve }) }))
+}
+
+/** The user's own list, beside the bell: added by them, or by an agent they told to. */
+export type Todo = {
+  id: string
+  text: string
+  due: string | null
+  // The session it was added from, if an agent added it.
+  session: string | null
+  // "you", or the agent's name.
+  by: string
+  done: boolean
+  done_at?: number
+  created_at: number
+}
+
+const todo = async (call: Promise<{ todo: Todo }>) => (await call).todo
+
+export function addTodo(text: string, due: string | null): Promise<Todo> {
+  return todo(apiCall("/api/todos", { method: "POST", body: JSON.stringify({ text, due }) }))
+}
+
+export function updateTodo(id: string, attrs: Partial<Pick<Todo, "done" | "text" | "due">>): Promise<Todo> {
+  return todo(apiCall(`/api/todos/${id}`, { method: "PATCH", body: JSON.stringify(attrs) }))
+}
+
+export async function deleteTodo(id: string): Promise<void> {
+  await apiCall(`/api/todos/${id}`, { method: "DELETE" })
+}
+
+/** The bell's chat session, made on first use. */
+export async function bellSession(): Promise<string> {
+  return (await apiCall<{ session: string }>("/api/notices/session", { method: "POST" })).session
 }

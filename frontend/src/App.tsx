@@ -34,6 +34,7 @@ import {
   onUnauthorized,
   openDream,
   readNotice,
+  bellSession,
   type AgentBackend,
   type Employee,
   type Notice,
@@ -91,6 +92,7 @@ function App() {
     dropEmployee,
     notices,
     upsertNotice,
+    todos,
     loaded,
     upsert,
     drop,
@@ -100,8 +102,9 @@ function App() {
   )
   // The sleep sessions stay out of every list; the moons open them. See Sleep.tsx.
   // A virtual employee's two sessions likewise; its page opens them.
+  // And the bell's chat, which lives in the bell.
   const sessions = useMemo(
-    () => everything.filter((s) => !isDream(s) && !isEmployeeSession(s)),
+    () => everything.filter((s) => !isDream(s) && !isEmployeeSession(s) && s.kind !== "bell"),
     [everything],
   )
   // Newest first: each night sleeps in a session of its own, and the moon
@@ -559,6 +562,7 @@ function App() {
   if (!loaded) return <div className="loading">connecting…</div>
 
   const active = everything.find((s) => s.id === activeId) ?? null
+  const bellChat = everything.find((s) => s.kind === "bell")
   // By its sessions rather than `employee_id`: a summary from an older
   // server, or an older route, may not carry it.
   const activeEmployee =
@@ -857,6 +861,26 @@ function App() {
       {bellOpen && (
         <NoticesSheet
           notices={notices}
+          todos={todos}
+          chat={
+            bellChat && (
+              <Chat
+                key={bellChat.id}
+                session={bellChat}
+                bare
+                sidebarOpen
+                onToggleSidebar={() => {}}
+                terminalOpen={false}
+                terminalCount={0}
+                onToggleTerminal={() => {}}
+                canvasOpen={false}
+                onToggleCanvas={() => {}}
+                onOpenCanvas={() => {}}
+                onFilesChanged={() => {}}
+              />
+            )
+          }
+          onWantChat={() => void bellSession().catch(() => {})}
           onOpen={openNotice}
           onAnswered={upsertNotice}
           onClose={() => setBellOpen(false)}

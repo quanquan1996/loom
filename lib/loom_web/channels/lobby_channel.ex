@@ -4,7 +4,8 @@ defmodule LoomWeb.LobbyChannel do
 
   Server → client:
     - join reply : `%{sessions: [summary], nodes: [device], projects: [project],
-                     employees: [employee], notices: [notice]}`,
+                     employees: [employee], notices: [notice],
+                     todos: [todo]}`,
                    all whole lists
     - "session"  : one summary, whenever that session's header changes
     - "removed"  : `%{id: _}`, when a session is stopped or deleted
@@ -17,6 +18,7 @@ defmodule LoomWeb.LobbyChannel do
     - "employee_removed" : `%{id: _}`, when one is let go
     - "notices"  : `%{notices: [notice]}`, the whole bell (`Loom.Notices`),
                    whenever it changes
+    - "todos"    : `%{todos: [todo]}`, the user's to-dos, likewise
 
   Client → server:
     - "watching" : `%{endpoint:, session:}`, which session this device is
@@ -47,7 +49,8 @@ defmodule LoomWeb.LobbyChannel do
        nodes: Loom.Nodes.list(),
        projects: Enum.map(Loom.Projects.list(), &Loom.Projects.view/1),
        employees: Loom.Employees.list(),
-       notices: Loom.Notices.list()
+       notices: Loom.Notices.list(),
+       todos: Loom.Notices.todos()
      }, socket}
   end
 
@@ -96,6 +99,11 @@ defmodule LoomWeb.LobbyChannel do
 
   def handle_info({:notices, list}, socket) do
     push(socket, "notices", %{notices: list})
+    {:noreply, socket}
+  end
+
+  def handle_info({:todos, list}, socket) do
+    push(socket, "todos", %{todos: list})
     {:noreply, socket}
   end
 

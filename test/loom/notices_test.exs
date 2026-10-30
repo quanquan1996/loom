@@ -92,6 +92,22 @@ defmodule Loom.NoticesTest do
     assert {:ok, %{"status" => "done", "note" => "Dismissed"}} = Notices.dismiss(d["id"], s)
   end
 
+  test "to-dos: added, ticked off, open first by due date, kept on disk", %{s: s, path: path} do
+    {:ok, a} = Notices.add_todo(%{text: "续费域名", due: "2026-11-06"}, "you", s)
+    {:ok, b} = Notices.add_todo(%{text: "回复房东"}, "钱多多", s)
+    {:ok, c} = Notices.add_todo(%{text: "交报销", due: "2026-11-01"}, "you", s)
+    assert {:error, _} = Notices.add_todo(%{text: " "}, "you", s)
+    assert {:error, _} = Notices.add_todo(%{text: "x", due: "Friday"}, "you", s)
+    assert Enum.map(Notices.todos(s), & &1["id"]) == [c["id"], a["id"], b["id"]]
+
+    {:ok, c} = Notices.update_todo(c["id"], %{done: true}, s)
+    assert c["done"] and is_integer(c["done_at"])
+    assert List.last(Notices.todos(s))["id"] == c["id"]
+    assert :ok = Notices.delete_todo(b["id"], s)
+    assert length(Notices.todos(s)) == 2
+    assert File.read!(path) =~ "续费域名"
+  end
+
   test "read settles only what asks to be read", %{s: s} do
     {:ok, r} = post(s, %{summary: "日报", priority: 7})
 

@@ -1,6 +1,6 @@
 ---
 name: loom-notify
-description: Post to the user's bell in Loom — something they should see, decide, approve or answer, with a priority from 0 (most urgent) to 10 — and keep it right afterwards (update, re-rate, withdraw). Use when work running without the user (a virtual employee, a scheduled task, a sleep, a long job) has something for them; not for replying to the user in a chat they are reading.
+description: Post to the user's bell in Loom — something they should see, decide, approve or answer, with a priority from 0 (most urgent) to 10 — and keep it right afterwards (update, re-rate, withdraw); and put things on the user's to-do list when they ask ("加到我的待办", "add to my todo"). Use when work running without the user (a virtual employee, a scheduled task, a sleep, a long job) has something for them, or the user asks for a to-do; not for replying to the user in a chat they are reading.
 ---
 
 # loom-notify: the user's bell
@@ -67,3 +67,18 @@ beats "Deployment update".
 - When you wake up or start a turn, `loom-notice list` and look over what you
   still have open.
 - The user answering in your session settles your open notices there.
+
+## The user's to-do list
+
+Beside the bell is the user's own to-do list. **Add to it only when the user
+asks you to** ("put it on my list", "加到待办") — never on your own; what you
+think they should do is a notice, not a to-do.
+
+```sh
+loom-notice todo add "text" [--due YYYY-MM-DD]
+loom-notice todos                    # the list, open first
+loom-notice todo done|undo|rm ID
+```
+
+One line each, in the user's language, phrased as what they will do
+("续费域名 loom.example"), with the due date if they gave one.

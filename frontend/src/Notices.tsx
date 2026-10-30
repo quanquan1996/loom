@@ -1,7 +1,7 @@
-import { ArrowUp, Bell, Check, CheckCircle2, History, MessageSquare, Moon, Reply, X } from "lucide-react"
-import { useState } from "react"
+import { ArrowUp, Bell, Check, CheckCircle2, Circle, History, MessageSquare, Moon, Reply, X } from "lucide-react"
+import { useEffect, useState, type ReactNode } from "react"
 import { createPortal } from "react-dom"
-import { answerNotice, dismissNotice, replyNotice, type Notice } from "./api"
+import { addTodo, answerNotice, deleteTodo, dismissNotice, replyNotice, updateTodo, type Notice, type Todo } from "./api"
 import "./Notices.css"
 
 /**
@@ -12,7 +12,12 @@ import "./Notices.css"
  *
  * The bands, by priority: 0–2 urgent (notified at once), 3–5 important (one
  * notification at 20:00), 6–10 the rest.
+ *
+ * Beside the notices, the user's to-dos, and a chat with the bell's own
+ * session to go through both in plain words.
  */
+
+type Tab = "notices" | "todos" | "chat"
 
 export const urgent = (n: Notice) => n.status === "open" && n.priority <= 2
 export const important = (n: Notice) => n.status === "open" && n.priority >= 3 && n.priority <= 5
@@ -42,66 +47,172 @@ export function BellButton({ notices, onClick }: { notices: Notice[]; onClick: (
 
 export function NoticesSheet({
   notices,
+  todos,
+  chat,
+  onWantChat,
   onOpen,
   onAnswered,
   onClose,
 }: {
   notices: Notice[]
+  todos: Todo[]
+  // The bell's chat, once its session exists; asked for on first use.
+  chat: ReactNode | null
+  onWantChat: () => void
   onOpen: (n: Notice) => void
   onAnswered: (n: Notice) => void
   onClose: () => void
 }) {
+  const [tab, setTab] = useState<Tab>("notices")
   const [history, setHistory] = useState(false)
   const open = openNotices(notices)
   const settled = notices.filter((n) => n.status !== "open").sort((a, b) => (b.done_at ?? 0) - (a.done_at ?? 0))
+  const openTodos = todos.filter((t) => !t.done).length
+
+  useEffect(() => {
+    if (tab === "chat" && !chat) onWantChat()
+  }, [tab, chat])
 
   return createPortal(
     <div className="search-sheet" onClick={onClose}>
-      <div className="search-panel bell-panel" onClick={(e) => e.stopPropagation()}>
+      <div className={"search-panel bell-panel" + (tab === "chat" ? " chatting" : "")} onClick={(e) => e.stopPropagation()}>
         <div className="bell-head">
-          <span className="bell-title">{history ? "History" : "Notifications"}</span>
-          <button
-            className={"icon-btn" + (history ? " on" : "")}
-            onClick={() => setHistory((h) => !h)}
-            title={history ? "Back to the open ones" : "History"}
-          >
-            <History />
-          </button>
+          <div className="bell-tabs" role="tablist">
+            <button role="tab" aria-selected={tab === "notices"} className={tab === "notices" ? "on" : ""} onClick={() => setTab("notices")}>
+              Notifications{open.length > 0 && <span className="bell-tab-n">{open.length}</span>}
+            </button>
+            <button role="tab" aria-selected={tab === "todos"} className={tab === "todos" ? "on" : ""} onClick={() => setTab("todos")}>
+              To-do{openTodos > 0 && <span className="bell-tab-n">{openTodos}</span>}
+            </button>
+            <button role="tab" aria-selected={tab === "chat"} className={tab === "chat" ? "on" : ""} onClick={() => setTab("chat")}>
+              Chat
+            </button>
+          </div>
+          {tab === "notices" && (
+            <button
+              className={"icon-btn" + (history ? " on" : "")}
+              onClick={() => setHistory((h) => !h)}
+              title={history ? "Back to the open ones" : "History"}
+            >
+              <History />
+            </button>
+          )}
           <button className="icon-btn" onClick={onClose} title="Close">
             <X />
           </button>
         </div>
-        <div className="search-results bell-list">
-          {history ? (
-            settled.length ? (
-              settled.map((n) => <Card key={n.id} n={n} onOpen={onOpen} onAnswered={onAnswered} />)
-            ) : (
-              <div className="search-empty">Nothing yet.</div>
-            )
-          ) : open.length ? (
-            BANDS.map((band) => {
-              const inBand = open.filter(band.has)
-              return (
-                inBand.length > 0 && (
-                  <section key={band.label}>
-                    <div className={"bell-band " + band.tone}>{band.label}</div>
-                    {inBand.map((n) => (
-                      <Card key={n.id} n={n} onOpen={onOpen} onAnswered={onAnswered} />
-                    ))}
-                  </section>
-                )
+        {tab === "chat" ? (
+          <div className="bell-chat">{chat ?? <div className="bell-empty">Starting…</div>}</div>
+        ) : tab === "todos" ? (
+          <TodoList todos={todos} />
+        ) : (
+          <div className="search-results bell-list">
+            {history ? (
+              settled.length ? (
+                settled.map((n) => <Card key={n.id} n={n} onOpen={onOpen} onAnswered={onAnswered} />)
+              ) : (
+                <div className="search-empty">Nothing yet.</div>
               )
-            })
-          ) : (
-            <div className="bell-empty">
-              <CheckCircle2 />
-              <span>All caught up</span>
-            </div>
-          )}
-        </div>
+            ) : open.length ? (
+              BANDS.map((band) => {
+                const inBand = open.filter(band.has)
+                return (
+                  inBand.length > 0 && (
+                    <section key={band.label}>
+                      <div className={"bell-band " + band.tone}>{band.label}</div>
+                      {inBand.map((n) => (
+                        <Card key={n.id} n={n} onOpen={onOpen} onAnswered={onAnswered} />
+                      ))}
+                    </section>
+                  )
+                )
+              })
+            ) : (
+              <div className="bell-empty">
+                <CheckCircle2 />
+                <span>All caught up</span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>,
     document.body,
+  )
+}
+
+/** The user's own list: added here, or by an agent told to; ticked off here. */
+function TodoList({ todos }: { todos: Todo[] }) {
+  const [text, setText] = useState("")
+  const [due, setDue] = useState("")
+  const [showDone, setShowDone] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const open = todos.filter((t) => !t.done)
+  const done = todos.filter((t) => t.done)
+  const today = new Date().toLocaleDateString("sv")
+
+  const run = async (call: Promise<unknown>) => {
+    setError(null)
+    try {
+      await call
+    } catch (err) {
+      setError((err as Error).message)
+    }
+  }
+  const add = async () => {
+    if (!text.trim()) return
+    await run(addTodo(text.trim(), due || null))
+    setText("")
+    setDue("")
+  }
+
+  const row = (t: Todo) => (
+    <div key={t.id} className={"todo-row" + (t.done ? " done" : "")}>
+      <button className="todo-check" onClick={() => run(updateTodo(t.id, { done: !t.done }))} title={t.done ? "Not done" : "Done"}>
+        {t.done ? <CheckCircle2 /> : <Circle />}
+      </button>
+      <span className="todo-text">
+        {t.text}
+        {(t.due || t.by !== "you") && (
+          <span className="todo-meta">
+            {t.due && <span className={!t.done && t.due < today ? "late" : t.due === today ? "today" : ""}>{t.due}</span>}
+            {t.by !== "you" && <span>via {t.by}</span>}
+          </span>
+        )}
+      </span>
+      <button className="todo-rm" onClick={() => run(deleteTodo(t.id))} title="Remove">
+        <X />
+      </button>
+    </div>
+  )
+
+  return (
+    <div className="search-results bell-list">
+      <form
+        className="todo-add"
+        onSubmit={(e) => {
+          e.preventDefault()
+          void add()
+        }}
+      >
+        <input value={text} placeholder="Add a to-do" enterKeyHint="done" onChange={(e) => setText(e.target.value)} />
+        <input className="todo-due" type="date" value={due} onChange={(e) => setDue(e.target.value)} title="Due" />
+        <button className="bell-send" type="submit" disabled={!text.trim()} title="Add">
+          <ArrowUp />
+        </button>
+      </form>
+      {error && <div className="bell-note bell-error">{error}</div>}
+      {open.map(row)}
+      {open.length === 0 && <div className="search-empty">Nothing to do.</div>}
+      {done.length > 0 && (
+        <>
+          <button className="bell-band todo-done-toggle" onClick={() => setShowDone((v) => !v)}>
+            Done · {done.length}
+          </button>
+          {showDone && done.map(row)}
+        </>
+      )}
+    </div>
   )
 }
 
