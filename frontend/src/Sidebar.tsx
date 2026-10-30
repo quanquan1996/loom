@@ -24,8 +24,9 @@ import {
   X,
 } from "lucide-react"
 import { useEffect, useState } from "react"
-import type { AgentBackend, AgentInfo, Device, Employee, Project } from "./api"
-import { Avatar, BudgetRing, hasNews, short, STATUS, StatusIcon } from "./Employees"
+import type { AgentBackend, AgentInfo, Device, Employee, Notice, Project } from "./api"
+import { Avatar, BudgetRing, short, STATUS, StatusIcon } from "./Employees"
+import { BellButton } from "./Notices"
 import { RenameInput } from "./Confirm"
 import { DevicesDialog } from "./Devices"
 import { SessionMenu } from "./SessionMenu"
@@ -138,13 +139,14 @@ type Props = {
   // The sleep sessions, which the lists leave out: one moon each. See Sleep.tsx.
   dreams: AgentInfo[]
   onOpenDream: (scope: string) => void
-  // Virtual employees, and their work sessions for the unread mark; see
-  // Employees.tsx. The one whose page is showing, if any.
+  // Virtual employees; see Employees.tsx. The one whose page is showing, if any.
   employees: Employee[]
-  employeeSessions: AgentInfo[]
   activeEmployeeId: string | null
   onOpenEmployee: (id: string) => void
   onHire: () => void
+  // The bell, whose button sits beside Search; see Notices.tsx.
+  notices: Notice[]
+  onOpenBell: () => void
 }
 
 export function Sidebar({
@@ -177,10 +179,11 @@ export function Sidebar({
   dreams,
   onOpenDream,
   employees,
-  employeeSessions,
   activeEmployeeId,
   onOpenEmployee,
   onHire,
+  notices,
+  onOpenBell,
 }: Props) {
   // Ages are relative, so they go stale without any new data. A local clock,
   // not a poll: nothing is fetched.
@@ -255,6 +258,7 @@ export function Sidebar({
       <div className="sidebar-head">
         <span className="brand">loom</span>
         <span className="sidebar-actions">
+          <BellButton notices={notices} onClick={onOpenBell} />
           <button className="icon-btn search-btn" onClick={() => setSearching(true)} title="Search chats">
             <Search />
           </button>
@@ -362,7 +366,6 @@ export function Sidebar({
           <div className="nav-children">
             {employees.map((e) => {
               const status = STATUS[e.status]
-              const news = hasNews(employeeSessions.find((s) => s.id === e.work_session))
               return (
                 <div
                   key={e.id}
@@ -372,7 +375,6 @@ export function Sidebar({
                 >
                   <Avatar employee={e} size="sm" />
                   <span className="emp-row-name">{e.name}</span>
-                  {news && <span className="emp-row-news" title="New updates" />}
                   <StatusIcon status={e.status} />
                   <BudgetRing employee={e} />
                 </div>

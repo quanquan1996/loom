@@ -152,6 +152,67 @@ defmodule Loom.EmployeesTest do
     assert e["attention"] == nil
   end
 
+  test "a report goes to the bell by its priority, and is listed in later wake-ups",
+       %{server: server} do
+    {:ok, e} = Employees.create(%{"name" => "小报"}, server)
+    {:ok, _} = Employees.wake(e["id"], nil, server)
+    BackendStub.await_turn()
+
+    end_turn(
+      e["work_session"],
+      card(%{
+        "report" => %{
+          "priority" => 3,
+          "text" => "要不要换供应商？",
+          "key" => "supplier",
+          "needs" => "reply"
+        }
+      }),
+      server
+    )
+
+    assert [n] = Loom.Notices.open_of(e["id"])
+    assert n["priority"] == 3 and n["needs"] == "reply" and n["session"] == e["work_session"]
+    {:ok, e2} = Employees.get(e["id"], server)
+    assert e2["attention"]["level"] == "important"
+
+    {:ok, _} = Employees.wake(e["id"], nil, server)
+    assert BackendStub.await_turn() =~ "[supplier] priority 3"
+    end_turn(e["work_session"], card(%{"withdraw" => ["supplier"]}), server)
+    assert Loom.Notices.open_of(e["id"]) == []
+  end
+
+  test "a long work session is turned over, once there is a handoff to carry it",
+       %{server: server} do
+    {:ok, e} = Employees.create(%{"name" => "小轮"}, server)
+    first = e["work_session"]
+    {:ok, _} = Employees.wake(e["id"], nil, server)
+    BackendStub.await_turn()
+    end_turn(first, card(%{}), server)
+
+    grow = fn ->
+      meta = Path.join(Agent.Store.session_dir(first), "meta.json")
+      raw = meta |> File.read!() |> Jason.decode!()
+      File.write!(meta, Jason.encode!(Map.merge(raw, %{"context_tokens" => 70_000})))
+    end
+
+    # No HANDOFF.md yet: it is asked to write one, in the session it has.
+    grow.()
+    {:ok, _} = Employees.wake(e["id"], nil, server)
+    assert BackendStub.await_turn() =~ "write HANDOFF.md"
+    end_turn(first, card(%{}), server)
+    {:ok, e} = Employees.get(e["id"], server)
+    assert e["work_session"] == first
+
+    File.write!(Path.join(Employees.workspace(e["id"]), "HANDOFF.md"), "# Handoff")
+    grow.()
+    {:ok, _} = Employees.wake(e["id"], nil, server)
+    assert BackendStub.await_turn() =~ "A fresh session"
+    {:ok, e} = Employees.get(e["id"], server)
+    assert e["work_session"] != first
+    assert e["past_work"] == [first]
+  end
+
   test "a turn's end still in the mailbox is read before waking again", %{server: server} do
     {:ok, e} = Employees.create(%{"name" => "小码"}, server)
     {:ok, _} = Employees.wake(e["id"], nil, server)

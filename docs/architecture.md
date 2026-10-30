@@ -266,16 +266,56 @@ says when it needs the user.
   turns a day (`budget_turns`), counted at each turn's end. Spent, the work turn is interrupted, nothing
   wakes, and the user is notified once; an approval adds to that day only.
   A turn past `max_turn_min` is interrupted too.
-- **Reports**: `info` is only logged; `important` is a notification
-  (`Loom.Push.notify/4`); `urgent` a notification and the status "Needs
-  you" until a later turn reports otherwise. The work session's own turn ends
-  notify nothing (`kind` rides on `{:turn_ended, …}`).
+- **Reports go to the bell** (§2.10): the card's `report` has a `priority`
+  (0–10; the old `info`/`important`/`urgent` read as 7/4/2), an optional
+  `key` and `needs`, and `withdraw` takes keys back. 0–2 also shows "Needs
+  you" until a later turn reports otherwise. Each wake-up lists its reports
+  still open, to re-rate or withdraw. The work session's own turn ends notify
+  nothing (`kind` rides on `{:turn_ended, …}`).
+- **A fresh work session a day**, and sooner past 60k tokens of context (12
+  turns where the backend gives none): at the next wake-up the old one goes
+  to `past_work` and a new one starts, told to read `HANDOFF.md`, which the
+  rules have it keep. Until that file exists the old session is asked to
+  write it first. The page shows `past_work` above today as one thread, a
+  day at a time (`EarlierDays` in `Chat.tsx`).
 - **Permissions are soft**: the projects and their workspaces are named in
   the prompt, with what to ask first. Same Unix user as every agent.
 - **Truth is `~/.loom/employees.json`.** Pushed on the lobby as `employee`
   and `employee_removed`; `/api/employees` and its `pause`, `wake`,
   `approve`, `kpis` and `reports` routes serve the page. Sleep (§2.8) leaves
   employee sessions out of every scope.
+
+### 2.10 The bell
+
+`Loom.Notices`: what the agents want the user to see, each with a priority
+from 0 (most urgent) to 10, in one list by priority instead of a
+notification per report. The sidebar's bell shows the count of 0–2, or a dot
+for 3–5.
+
+- **Posting.** Employees through their card (§2.9); any session with
+  `loom-notice post --priority N [--key K] [--needs read|reply|approve]`
+  (`rel/loom-notice`, installed into `~/.local/bin` by `rel/deploy.sh`). It
+  calls `/api/notice/*` with the `loom-node` key (`NodeCliAuth`) and the
+  session from `LOOM_SESSION_ID`, which `Loom.Agent.Proc.spawn/4` gives every
+  agent process along with `LOOM_CLI`, the key file's path. A session posts
+  as its employee, a sleep session as Dream, any other as itself.
+- **Judgement is the agents'**, in the `loom-notify` skill: which priority,
+  when to re-rate (post the same key again) or withdraw. Code keeps only what
+  cannot be left to them: one 0–2 a day per source (the next is posted as 3,
+  with a note), the clock, and what counts as answered.
+- **Notifying.** 0–2 at once (between 22:00 and 07:00 only 0–1; a 2 waits
+  for 07:00); 3–5 in one notification at 20:00; 6–10 never. Through
+  `Loom.Push.notify/4`.
+- **Done** when the user writes in the notice's session (`AgentChannel`'s
+  submit calls `replied/1`), approves or rejects it in the bell (told to the
+  session as a message, `origin: "notice"`), or opens one that only asks to be
+  read. 6–10 expire after a week unread; settled ones are kept 30 days.
+- **Truth is `~/.loom/notices.json`.** The whole list rides on the lobby
+  join and comes again as `notices` on every change. Opening a notice from
+  the bell keeps the rest in order behind a bar over the composer, to go on
+  to the next without the list (`Notices.tsx`).
+- **Sleep** posts its night with the same command, and sleeps in a new
+  session each night (`past` keeps the old ones, answerable still).
 
 ## 3. Client protocol
 

@@ -50,6 +50,14 @@ defmodule Loom.Employees.Prompt do
     is rewritten on every change. What you have done is in `worklog.md`, which
     you keep.
 
+    Loom starts your work session afresh every day, and sooner when it grows
+    long, so the conversation does not carry yesterday. What carries over is
+    your files: keep `HANDOFF.md` in your workspace current at the end of
+    every work turn — what you are doing, how far it got (and where the output
+    is), what you are stuck on, what is next, and anything the boss told you
+    to keep in mind. A fresh session starts by reading it. Earlier sessions'
+    transcripts are still on disk if you ever need a detail from them.
+
     ## Rules
 
     - **Stay in your projects.** Work only inside your own workspace and the
@@ -58,8 +66,10 @@ defmodule Loom.Employees.Prompt do
     - **Ask first** before anything on the list in status.md (deploying,
       deleting what is not your scratch work, git push or merging or a pull
       request, publishing or sending anything outside this machine, unless the
-      boss changed the list). Asking is an `urgent` report that says exactly what
-      you want to do and why; then wait for the answer.
+      boss changed the list). Asking is a report with priority 0–2 and
+      `"needs": "approve"` that says exactly what you want to do and why; the
+      boss approves or rejects it from the bell, and the answer comes to your
+      work session as a message. Until then, it is not approved: wait.
     - **Development work goes on a branch.** In a git repository that is not
       yours, make a `git worktree` (or at least a branch) for the task and work
       there; never commit to the branch someone else has checked out, and never
@@ -91,16 +101,25 @@ defmodule Loom.Employees.Prompt do
     3. If so, do one focused piece of it — something you can finish and check
        in well under an hour — and stop. The next wake-up continues.
     4. Append a dated entry to `worklog.md`: what you did, what you found, what
-       is next.
+       is next. Update `HANDOFF.md`.
     5. End your reply with a short summary for the boss and the work card.
 
-    Report through the card's `report`:
-    - `info`: written down only. Most turns need no report at all.
-    - `important`: the boss gets a notification. A KPI ready for review, a real
-      finding, a milestone.
-    - `urgent`: a notification, and you are marked as waiting for the boss.
-      You are blocked, need a decision, or need permission (see Ask first).
-      Say exactly what you need.
+    Report through the card's `report`, which goes to the boss's bell. Its
+    `priority` is from 0 (most urgent) to 10; the `loom-notify` skill has the
+    full guide. In short:
+    - 0–2 urgent: the boss is notified at once. You are blocked, need a
+      decision or permission now, or something is going wrong. At most one a
+      day is let through as urgent; more come in as 3.
+    - 3–5 important: one notification at 20:00 for all of them. A decision
+      that can wait for the evening, a KPI ready for review, a real finding.
+    - 6–10: no notification; the boss sees it when they look. Progress worth
+      knowing, by-the-way findings. Most turns need no report at all.
+    The text is one or two plain sentences: what, and what you need. Give a
+    `key` to a report you may update later; reporting the same key again
+    replaces it, with a new priority if things changed (it is listed in your
+    wake-ups while open). `withdraw` the keys that no longer matter. `needs`
+    is `read` (the default above 2), `reply` (the default for 0–2) or
+    `approve`.
     """
   end
 
@@ -117,7 +136,9 @@ defmodule Loom.Employees.Prompt do
      "wake_at": "2026-10-29 09:00",
      "summary": "one line: what this turn did",
      "kpis": [{"id": "k_abc", "progress": 40, "status": "doing", "note": "what is left"}],
-     "report": {"level": "important", "text": "what the boss should know or decide"}}
+     "report": {"priority": 4, "text": "what the boss should know or decide",
+                "key": "supplier-switch", "needs": "reply"},
+     "withdraw": ["build-failed"]}
     ```
 
     - `next`: `continue` to be woken again in a minute (only while a piece of
@@ -127,7 +148,7 @@ defmodule Loom.Employees.Prompt do
       leave both out to sleep until the heartbeat.
     - `kpis`: progress (0–100), status (`todo`, `doing`, `review`, `parked`)
       and a note, by KPI id. Only the ones that changed.
-    - `report`: see above. Leave it out when there is nothing to say.
+    - `report`, `withdraw`: see above. Leave them out when there is nothing to say.
     """
   end
 
@@ -193,10 +214,34 @@ defmodule Loom.Employees.Prompt do
     """
     [Wake-up from Loom — #{date_time(ctx.now, ctx.offset)} (the boss's time), because: #{why}]
 
+    #{fresh(ctx)}
     #{standing(e, ctx)}
     #{inbox(e["inbox"])}
+    #{notices(ctx[:notices] || [])}
     #{task(reason, ctx)}
     """
+  end
+
+  defp fresh(%{fresh: true}) do
+    """
+    ## A fresh session
+
+    This work session is new: nothing from earlier conversations is in it.
+    Before anything else, read `HANDOFF.md` and the end of `worklog.md`.
+    """
+  end
+
+  defp fresh(_ctx), do: ""
+
+  defp notices([]), do: ""
+
+  defp notices(list) do
+    "## Your reports still open in the boss's bell\n\n" <>
+      Enum.map_join(list, "\n", fn n ->
+        "- [#{n["key"] || "no key"}] priority #{n["priority"]}, needs #{n["needs"]}: #{n["summary"]}" <>
+          if(n["note"], do: " (#{n["note"]})", else: "")
+      end) <>
+      "\n\nStill right? Report a key again to change it, `withdraw` it if it no longer matters.\n"
   end
 
   @doc "`.employee/status.md`: where the employee stands, for both sessions to read."
@@ -315,7 +360,6 @@ defmodule Loom.Employees.Prompt do
   defp hours([from, to]), do: "#{pad(from)}:00–#{pad(to)}:00"
 
   defp day(d), do: Enum.at(~w(Monday Tuesday Wednesday Thursday Friday Saturday Sunday), d - 1)
-
 
   defp date_time(now, offset) do
     now

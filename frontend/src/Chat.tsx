@@ -31,14 +31,18 @@ import {
 import { createPortal } from "react-dom"
 import { EffortButton } from "./Effort"
 import {
+  applySnapshot,
   buildTimeline,
   currentReplies,
+  emptyTranscript,
   foldFinished,
   isBusy,
   type CronJob,
   type Question,
+  type Snapshot,
   type TimelineItem,
 } from "./agent"
+import { getSocket } from "./socket"
 import { itemForAttachment, itemForOutput, itemForPath, type CanvasItem } from "./canvasItems"
 import { BackendIcon } from "./BackendIcon"
 import { formatBytes } from "./format"
@@ -85,6 +89,11 @@ type Props = {
   // Under the header, across the whole column: a virtual employee's tabs and
   // where it stands (see `Employees.tsx`).
   subhead?: ReactNode
+  // Earlier sessions of the same thread, newest first, shown above this one a
+  // day at a time: a virtual employee's work (see `Employees.tsx`).
+  earlier?: string[]
+  // Over the composer: going through the bell (see `Notices.tsx`).
+  banner?: ReactNode
   // Read up to here, from any device; clears the sidebar's unread mark. Only
   // for a plain conversation: the sleep and employee pages keep their own.
   onSeen?: (seq: number) => void
@@ -115,6 +124,8 @@ export function Chat({
   onFilesChanged,
   tabs,
   subhead,
+  earlier,
+  banner,
   onSeen,
   reading = true,
 }: Props) {
@@ -291,6 +302,7 @@ export function Chat({
             items={items}
             sessionId={session.id}
             truncatedBefore={transcript.truncatedBefore}
+            before={earlier && earlier.length > 0 && <EarlierDays ids={earlier} currentAt={session.created_at} />}
             onAnswer={submit}
             onAtEnd={setAtEnd}
             tail={<Working status={transcript.status} queued={transcript.queue.length} />}
@@ -319,6 +331,7 @@ export function Chat({
         </Unsent.Provider>
 
         <div className="dock" ref={dockRef}>
+        {banner}
         {transcript.queue.length > 0 && (
           <QueuePanel
             messages={transcript.queue}
@@ -638,10 +651,13 @@ function Timeline({
   onAtEnd,
   after,
   tail,
+  before,
 }: {
   items: TimelineItem[]
   sessionId: string
   truncatedBefore: number | null
+  // Above everything, once all of this one is shown: earlier sessions.
+  before?: ReactNode
   onAnswer: (text: string) => void
   onAtEnd: (atEnd: boolean) => void
   // Shown just below the item with this key: the suggested replies.
@@ -738,6 +754,7 @@ function Timeline({
             width — a card spanning the window while the text beside it stopped
             half way across read as two different layouts. */}
         <div className="timeline-inner">
+          {hidden === 0 && before}
           {hidden > 0 ? (
             // Scrolling up gets here first and loads more on its own; this is
             // for `gg`, which lands on it, and for anyone who would rather click.
@@ -751,7 +768,7 @@ function Timeline({
             </div>
           ) : null}
 
-          {items.length === 0 && (
+          {items.length === 0 && !before && (
             <div className="empty">Send a message to start.</div>
           )}
 
@@ -778,6 +795,70 @@ function Timeline({
         </button>
       )}
     </div>
+  )
+}
+
+const noAnswer = () => {}
+const dayOf = (ms: number) =>
+  new Date(ms).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })
+
+/**
+ * Earlier sessions of a thread, read-only, loaded a day at a time on demand:
+ * each is joined once for its transcript and left. Oldest at the top, each
+ * under a line with its date.
+ */
+function EarlierDays({ ids, currentAt }: { ids: string[]; currentAt: number }) {
+  const [days, setDays] = useState<{ id: string; at: number; items: TimelineItem[] }[]>([])
+  const [loading, setLoading] = useState(false)
+  const [failed, setFailed] = useState(false)
+  const next = ids[days.length]
+  // What was added goes above the reader, who stays on the line they were on.
+  const ref = useRef<HTMLDivElement>(null)
+  const heightRef = useRef<number | null>(null)
+  useLayoutEffect(() => {
+    const el = ref.current?.closest(".timeline")
+    if (el && heightRef.current !== null) el.scrollTop += el.scrollHeight - heightRef.current
+    heightRef.current = null
+  }, [days])
+
+  const load = () => {
+    if (!next || loading) return
+    setLoading(true)
+    const channel = getSocket().channel(`agent:${next}`, () => ({ since_seq: 0, device: "earlier" }))
+    channel
+      .join()
+      .receive("ok", (snapshot: Snapshot) => {
+        const items = foldFinished(buildTimeline(applySnapshot(snapshot, emptyTranscript)), false)
+        heightRef.current = ref.current?.closest(".timeline")?.scrollHeight ?? null
+        setDays((d) => [...d, { id: next, at: snapshot.meta.created_at, items }])
+        setLoading(false)
+        channel.leave()
+      })
+      .receive("error", () => {
+        setFailed(true)
+        setLoading(false)
+        channel.leave()
+      })
+  }
+
+  return (
+    <>
+      <div ref={ref} hidden />
+      {next && !failed && (
+        <button type="button" className="notice show-earlier" onClick={load} disabled={loading}>
+          {loading ? "loading…" : "earlier days"}
+        </button>
+      )}
+      {[...days].reverse().map((day) => (
+        <Fragment key={day.id}>
+          <div className="earlier-day">{dayOf(day.at)}</div>
+          {day.items.map((item) => (
+            <Item key={item.key} item={item} sessionId={day.id} onAnswer={noAnswer} />
+          ))}
+        </Fragment>
+      ))}
+      {days.length > 0 && <div className="earlier-day">{dayOf(currentAt)}</div>}
+    </>
   )
 }
 

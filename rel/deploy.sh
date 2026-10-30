@@ -52,6 +52,11 @@ for skills in "$HOME/.claude/skills" "$HOME/.codex/skills"; do
   done
 done
 
+# loom-notice: what agents post to the bell with (the loom-notify skill).
+mkdir -p "$HOME/.local/bin"
+cp rel/loom-notice "$HOME/.local/bin/.loom-notice.new"
+mv "$HOME/.local/bin/.loom-notice.new" "$HOME/.local/bin/loom-notice"
+
 mix release --path "$next" --overwrite
 
 if [ "${1:-}" = "--build" ]; then

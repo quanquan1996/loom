@@ -816,6 +816,9 @@ export type Employee = {
   status: EmployeeStatus
   chat_session: string
   work_session: string
+  // Its earlier work sessions, newest first: one a day, shown above the
+  // current one as a single thread.
+  past_work?: string[]
   created_at: number
   kpis: Kpi[]
   // Newest first: one line per work turn.
@@ -925,4 +928,37 @@ export async function employeeReport(id: string, file: string): Promise<string> 
     method: "GET",
   })
   return text
+}
+
+// ── The bell (`Loom.Notices`) ────────────────────────────────────────────
+
+/** What an agent wants the user to see, 0 (most urgent) to 10. */
+export type Notice = {
+  id: string
+  source: { kind: "employee" | "dream" | "session"; id: string; name: string }
+  // The session it points to, where it is answered.
+  session: string | null
+  summary: string
+  priority: number
+  key: string | null
+  needs: "read" | "reply" | "approve"
+  status: "open" | "done" | "expired" | "withdrawn"
+  // Why Loom changed or settled it: lowered, answered in chat, expired…
+  note: string | null
+  answer?: "approve" | "reject"
+  created_at: number
+  updated_at: number
+  done_at?: number
+}
+
+const notice = async (call: Promise<{ notice: Notice }>) => (await call).notice
+
+/** Opened: done, if it only asked to be read. */
+export function readNotice(id: string): Promise<Notice> {
+  return notice(apiCall(`/api/notices/${id}/read`, { method: "POST" }))
+}
+
+/** Approved or rejected from the bell; its session is told. */
+export function answerNotice(id: string, approve: boolean): Promise<Notice> {
+  return notice(apiCall(`/api/notices/${id}/answer`, { method: "POST", body: JSON.stringify({ approve }) }))
 }

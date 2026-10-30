@@ -244,7 +244,7 @@ defmodule Loom.Dream do
   # Every turn of a sleep session ends with its memory committed: the night's
   # work, or what the user's answer changed the morning after.
   def handle_info({:turn_ended, id, _summary}, state) do
-    case Enum.find(state.scopes, fn {_scope, s} -> s["session"] == id end) do
+    case Enum.find(state.scopes, fn {_scope, s} -> id in [s["session"] | s["past"] || []] end) do
       {scope, _} ->
         if dir = memory_dir(scope), do: commit(dir, "after a sleep turn")
         {:noreply, state}
@@ -313,7 +313,7 @@ defmodule Loom.Dream do
 
   defp sleep(state, scope) do
     with :ok <- not_sleeping(state, scope),
-         {:ok, id, state} <- ensure_session(state, scope),
+         {:ok, id, state} <- new_night(state, scope),
          dir when is_binary(dir) <- memory_dir(scope) || {:error, :no_memory_dir} do
       File.mkdir_p!(dir)
       s = scope_state(state, scope)
@@ -399,6 +399,28 @@ defmodule Loom.Dream do
     case Loom.Projects.get(id) do
       {:ok, project} -> ~s(the project "#{project.name}")
       :error -> id
+    end
+  end
+
+  # Each night in a session of its own: last night's conversation is no help
+  # tonight (the memory directory and its git log are), and only makes every
+  # sleep read more. The one on record is kept, for the user to answer in, as
+  # long as it has not slept yet.
+  defp new_night(state, scope) do
+    s = scope_state(state, scope)
+
+    with id when is_binary(id) <- s["session"],
+         {:ok, %{turns: turns}} when is_integer(turns) and turns > 0 <- Agent.Store.read_meta(id),
+         {:ok, new} <- start_session(scope) do
+      s =
+        s
+        |> Map.put("session", new)
+        |> Map.update("past", [id], &Enum.take([id | &1], @runs_kept))
+
+      {:ok, new, put_in(state.scopes[scope], s)}
+    else
+      {:error, _} = error -> error
+      _ -> ensure_session(state, scope)
     end
   end
 

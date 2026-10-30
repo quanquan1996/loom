@@ -33,10 +33,13 @@ import {
   listSessions,
   onUnauthorized,
   openDream,
+  readNotice,
   type AgentBackend,
   type Employee,
+  type Notice,
   type Project,
 } from "./api"
+import { NextBar, NoticesSheet, openNotices } from "./Notices"
 import { dropSocket } from "./socket"
 import "./App.css"
 // Last, so it decides the look over every other stylesheet.
@@ -86,6 +89,8 @@ function App() {
     employees,
     upsertEmployee,
     dropEmployee,
+    notices,
+    upsertNotice,
     loaded,
     upsert,
     drop,
@@ -99,8 +104,12 @@ function App() {
     () => everything.filter((s) => !isDream(s) && !isEmployeeSession(s)),
     [everything],
   )
-  const employeeSessions = useMemo(() => everything.filter(isEmployeeSession), [everything])
-  const dreams = useMemo(() => everything.filter(isDream), [everything])
+  // Newest first: each night sleeps in a session of its own, and the moon
+  // opens the latest.
+  const dreams = useMemo(
+    () => everything.filter(isDream).sort((a, b) => b.created_at - a.created_at),
+    [everything],
+  )
   const narrow = useNarrow()
   // This device's appearance and default agent; see settings.ts.
   const [settings, changeSettings] = useSettings()
@@ -309,6 +318,29 @@ function App() {
     setSleepTab("report")
     select(id)
   }
+
+  // The bell. Opening a notice goes to where it is answered; the ones after it
+  // wait in `flow`, for the bar over the composer to go on to.
+  const [bellOpen, setBellOpen] = useState(false)
+  const [flow, setFlow] = useState<string[] | null>(null)
+  const openNotice = (n: Notice, rest: string[]) => {
+    if (n.status === "open" && n.needs === "read") readNotice(n.id).then(upsertNotice, () => {})
+    if (n.session) select(n.session)
+    setBellOpen(false)
+    setFlow(rest)
+  }
+  const stillOpen = (ids: string[]) =>
+    ids.map((id) => notices.find((n) => n.id === id)).filter((n): n is Notice => n?.status === "open")
+  const banner = flow && (
+    <NextBar
+      left={stillOpen(flow).length}
+      onNext={() => {
+        const [next, ...rest] = stillOpen(flow)
+        if (next) openNotice(next, rest.map((n) => n.id))
+      }}
+      onClose={() => setFlow(null)}
+    />
+  )
 
   // A notification tapped while the app is already open: the worker names the
   // session rather than opening a second window.
@@ -590,7 +622,11 @@ function App() {
       dreams={dreams}
       onOpenDream={(scope) => void openSleep(scope)}
       employees={employees}
-      employeeSessions={employeeSessions}
+      notices={notices}
+      onOpenBell={() => {
+        setBellOpen(true)
+        setDrawerOpen(false)
+      }}
       activeEmployeeId={view === "chat" ? (activeEmployee?.id ?? null) : null}
       onOpenEmployee={(id) => openEmployee(id)}
       onHire={() => {
@@ -601,6 +637,7 @@ function App() {
   )
 
   const chatProps = active && {
+    banner,
     sidebarOpen: !narrow && sidebarOpen,
     onToggleSidebar: () => (narrow ? setDrawerOpen(true) : setSidebarOpen((open) => !open)),
     terminalOpen,
@@ -831,6 +868,17 @@ function App() {
             openEmployee(e)
           }}
           onClose={() => setHiring(false)}
+        />
+      )}
+      {bellOpen && (
+        <NoticesSheet
+          notices={notices}
+          onOpen={(n) => {
+            const after = openNotices(notices).filter((x) => x.id !== n.id)
+            openNotice(n, n.status === "open" ? after.map((x) => x.id) : [])
+          }}
+          onAnswered={upsertNotice}
+          onClose={() => setBellOpen(false)}
         />
       )}
       {settingsOpen && (

@@ -181,7 +181,14 @@ export function EmployeePage({
   if (tab === "chat" && chatSession)
     return <Chat {...chat} session={{ ...chatSession, title: employee.name }} subhead={bar} />
   if (tab === "updates" && workSession)
-    return <Chat {...chat} session={{ ...workSession, title: `${employee.name} · updates` }} subhead={bar} />
+    return (
+      <Chat
+        {...chat}
+        session={{ ...workSession, title: `${employee.name} · updates` }}
+        subhead={bar}
+        earlier={employee.past_work}
+      />
+    )
 
   return (
     <div className="chat">

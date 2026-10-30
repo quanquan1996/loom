@@ -1,0 +1,283 @@
+/* The bell: a panel over the page like Search; on a phone, the whole screen. */
+.bell-btn {
+  position: relative;
+}
+
+.bell-count {
+  position: absolute;
+  top: -5px;
+  right: -7px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--red);
+  color: #111;
+  font-family: var(--ui);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 15px;
+  text-align: center;
+}
+
+.bell-dot {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--red);
+}
+
+.bell-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 12px 6px 18px;
+}
+
+.bell-title {
+  flex: 1 1 auto;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.bell-head .icon-btn {
+  background: transparent;
+  color: var(--fg-dim);
+  border-radius: 8px;
+}
+
+.bell-head .icon-btn.on,
+.bell-head .icon-btn:hover {
+  background: color-mix(in srgb, var(--fg) 7%, transparent);
+  color: var(--fg);
+}
+
+.bell-list {
+  padding: 0 10px calc(16px + env(safe-area-inset-bottom));
+}
+
+.bell-band {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 6px 6px;
+  color: var(--fg-dim);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.bell-band::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--fg-dim);
+}
+
+.bell-band.urgent::before {
+  background: var(--red);
+}
+
+.bell-band.important::before {
+  background: #fb923c;
+}
+
+.bell-card {
+  margin-bottom: 8px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: var(--bg-card);
+  cursor: pointer;
+}
+
+.bell-card.settled {
+  opacity: 0.7;
+}
+
+.bell-card-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  color: var(--fg-dim);
+  font-size: 0.8rem;
+}
+
+.bell-mark {
+  flex: 0 0 auto;
+  width: 15px;
+  height: 15px;
+}
+
+.bell-source {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.bell-age {
+  flex: 0 0 auto;
+}
+
+.bell-p {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding: 0 6px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--fg) 10%, transparent);
+  color: var(--fg-dim);
+  font-family: var(--mono);
+  font-size: 0.75rem;
+}
+
+.bell-p.urgent {
+  background: color-mix(in srgb, var(--red) 18%, transparent);
+  color: var(--red);
+}
+
+.bell-p.important {
+  background: color-mix(in srgb, #fb923c 18%, transparent);
+  color: #fb923c;
+}
+
+.bell-summary {
+  margin-top: 5px;
+  color: var(--fg);
+  font-size: 0.95rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.bell-note {
+  margin-top: 3px;
+  color: var(--fg-dim);
+  font-size: 0.8rem;
+}
+
+.bell-acts {
+  display: flex;
+  gap: 6px;
+  margin-top: 9px;
+}
+
+.bell-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 13px;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--fg) 12%, transparent);
+  color: var(--fg);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.bell-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.bell-btn.pri {
+  background: var(--fg);
+  color: var(--bg);
+  font-weight: 600;
+}
+
+.bell-btn:disabled {
+  opacity: 0.5;
+}
+
+.bell-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 56px 12px;
+  color: var(--fg-dim);
+}
+
+.bell-empty svg {
+  width: 32px;
+  height: 32px;
+  color: var(--green);
+}
+
+/* Going through the bell: over the composer. */
+.bell-next {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 max(16px, calc((100% - var(--measure)) / 2)) 8px;
+  padding: 6px 6px 6px 12px;
+  border-radius: 16px;
+  background: var(--bg-card);
+  color: var(--fg-dim);
+  font-size: 0.85rem;
+}
+
+.bell-next-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.bell-next .icon-btn {
+  background: transparent;
+}
+
+/* Earlier days of an employee's work, above today's. */
+.earlier-day {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0;
+  color: var(--fg-dim);
+  font-size: 0.8rem;
+}
+
+.earlier-day::before,
+.earlier-day::after {
+  content: "";
+  flex: 1 1 auto;
+  height: 1px;
+  background: var(--line);
+}
+
+/* On a phone, round like Search beside it. */
+@media (max-width: 640px) {
+  .sidebar .sidebar-head .bell-btn {
+    display: grid;
+    place-items: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    padding: 0;
+    border-radius: 50%;
+    border: 1px solid color-mix(in srgb, var(--fg) 18%, transparent);
+    color: var(--fg);
+  }
+
+  .sidebar .sidebar-head .bell-btn svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .sidebar .bell-count {
+    top: -3px;
+    right: -3px;
+  }
+
+  .sidebar .bell-dot {
+    top: 2px;
+    right: 2px;
+  }
+
+  .sidebar .sidebar-actions {
+    gap: 8px;
+  }
+}

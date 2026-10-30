@@ -793,14 +793,6 @@
   }
 }
 
-.emp-row-news {
-  flex: 0 0 auto;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--red);
-}
-
 .emp-hire-row {
   color: var(--fg-dim);
 }

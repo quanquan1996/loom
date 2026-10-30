@@ -47,6 +47,11 @@ config :loom, Loom.Dream,
   path: Path.join(System.tmp_dir!(), "loom-test-#{System.pid()}/dream.json"),
   tick: :timer.hours(24)
 
+# Nor the real bell, and no digest on its own during a run.
+config :loom, Loom.Notices,
+  path: Path.join(System.tmp_dir!(), "loom-test-#{System.pid()}/notices.json"),
+  tick: :timer.hours(24)
+
 # Nor employees waking on their own; the tests drive them by hand.
 config :loom, Loom.Employees,
   path: Path.join(System.tmp_dir!(), "loom-test-#{System.pid()}/employees.json"),

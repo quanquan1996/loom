@@ -91,6 +91,11 @@ defmodule LoomWeb.Router do
     delete "/devices/:id", DevicesController, :delete
     post "/devices/:id/install", DevicesController, :install
 
+    get "/notices", NoticeController, :index
+    post "/notices/:id/read", NoticeController, :read
+    post "/notices/:id/answer", NoticeController, :answer
+    post "/notices/:id/dismiss", NoticeController, :dismiss
+
     get "/push", PushController, :show
     post "/push/subscriptions", PushController, :create
     delete "/push/subscriptions", PushController, :delete
@@ -110,6 +115,16 @@ defmodule LoomWeb.Router do
     post "/exec", NodeController, :exec
     get "/read", NodeController, :read
     post "/write", NodeController, :write
+  end
+
+  # `loom-notice`, which an agent runs to post to the bell. The same key as
+  # `loom-node`; the session it comes from is in `x-loom-session`.
+  scope "/api/notice", LoomWeb do
+    pipe_through :node_cli
+
+    post "/post", NoticeController, :post
+    post "/withdraw", NoticeController, :withdraw
+    get "/mine", NoticeController, :mine
   end
 
   # A device joining: the install script (its one-time code is the credential)

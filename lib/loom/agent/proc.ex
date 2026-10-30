@@ -71,7 +71,12 @@ defmodule Loom.Agent.Proc do
 
     with :ok <- run("mkfifo", [Path.join(dir, "in")], dir),
          :ok <- File.write(Path.join(dir, "out"), ""),
-         :ok <- run("setsid", ["-f", "sh", "-c", @script, @marker, dir, exe | args], cwd),
+         # Who is asking, for what the agent runs to tell Loom: `loom-notice`.
+         :ok <-
+           run("setsid", ["-f", "sh", "-c", @script, @marker, dir, exe | args], cwd, [
+             {"LOOM_SESSION_ID", session_id},
+             {"LOOM_CLI", Loom.Nodes.cli_path()}
+           ]),
          {:ok, pid} <- await_pid(dir, 200) do
       open(dir, pid, 0)
     end
@@ -197,8 +202,12 @@ defmodule Loom.Agent.Proc do
     :ok
   end
 
-  defp run(binary, args, cwd) do
-    case System.cmd(binary, args, cd: cwd, env: Loom.ChildEnv.cmd_env(), stderr_to_stdout: true) do
+  defp run(binary, args, cwd, env \\ []) do
+    case System.cmd(binary, args,
+           cd: cwd,
+           env: Loom.ChildEnv.cmd_env() ++ env,
+           stderr_to_stdout: true
+         ) do
       {_, 0} -> :ok
       {output, status} -> {:error, "#{binary} exited #{status}: #{String.trim(output)}"}
     end

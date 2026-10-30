@@ -109,6 +109,8 @@ defmodule Loom.Dream.Prompt do
 
     If nothing needed changing, say so in one line.
 
+    Then put the night in the user's bell, once (the `loom-notify` skill): with something under "Needs your OK", `loom-notice post --priority 4 --needs reply --key sleep "<how many proposals, and the gist of them>"`; otherwise `loom-notice post --priority 9 --key sleep "<the one line>"`.
+
     When the user answers later in this conversation, do what they agreed to — that is when a skill is written (under `~/.claude/skills/<name>/SKILL.md`) or anything outside the memory directory is changed.
     """
   end

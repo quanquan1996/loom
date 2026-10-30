@@ -52,6 +52,9 @@ defmodule Loom.Application do
       Loom.Nodes,
       # Notifications on the user's devices when a turn ends.
       Loom.Push,
+      # The bell: what the agents want the user to see, by priority. After the
+      # push service it notifies through, before the employees that post to it.
+      Loom.Notices,
       # Sleep: each scope's memory gone over by night. See its doc.
       Loom.Dream,
       # Virtual employees: agents at work on a heartbeat, within a budget.

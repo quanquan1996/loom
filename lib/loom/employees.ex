@@ -43,6 +43,10 @@ defmodule Loom.Employees do
   @tick :timer.minutes(1)
   @offset 480
   @log_kept 100
+  @past_kept 60
+  @fresh_tokens 60_000
+  @fresh_turns 12
+  @write_handoff "Loom starts your work session afresh from your next wake-up. Before this turn ends, write HANDOFF.md as the rules say, so the new session can carry on."
   @spend_days_kept 60
 
   @defaults %{
@@ -258,7 +262,10 @@ defmodule Loom.Employees do
 
   def handle_call({:delete, id}, _from, state) do
     with {:ok, e} <- fetch(state, id) do
-      for s <- [e["chat_session"], e["work_session"]], is_binary(s), do: Agent.delete_session(s)
+      for s <- [e["chat_session"], e["work_session"] | e["past_work"] || []],
+          is_binary(s),
+          do: Agent.delete_session(s)
+
       File.rm_rf(dir(id))
       state = %{state | employees: Map.delete(state.employees, id)}
       save(state)
@@ -485,7 +492,7 @@ defmodule Loom.Employees do
   end
 
   defp wake_up(e, reason, now) do
-    with {:ok, e} <- ensure_sessions(e),
+    with {:ok, e} <- e |> turn_over(now) |> ensure_sessions(),
          prompt = Prompt.wake(e, reason, context(e, now)),
          {:ok, _} <-
            Agent.submit(e["work_session"], Prompt.display(e, reason, now, @offset),
@@ -498,7 +505,8 @@ defmodule Loom.Employees do
         "last_wake_at" => now,
         "wake_at" => nil,
         "wake_reason" => nil,
-        "inbox" => []
+        "inbox" => [],
+        "fresh" => false
       })
       |> mark_report(reason, now)
     else
@@ -512,12 +520,55 @@ defmodule Loom.Employees do
       Map.put(e, "wake_at", now + min_gap(e))
   end
 
+  defp open_notices(e) do
+    Loom.Notices.open_of(e["id"])
+  catch
+    :exit, _ -> []
+  end
+
   defp mark_report(e, :daily_report, now), do: Map.put(e, "last_daily", today(now))
   defp mark_report(e, :weekly_report, now), do: Map.put(e, "last_weekly", week(now))
   defp mark_report(e, _reason, _now), do: e
 
+  # A fresh work session each day, and sooner once one has grown past
+  # @fresh_tokens (or @fresh_turns, for a backend that does not say): a long
+  # context costs on every wake-up and drags yesterday's reasoning into
+  # today's. What carries over is in its files, `HANDOFF.md` above all. The
+  # page shows the old ones above the new as one thread.
+  defp turn_over(e, now) do
+    id = e["work_session"]
+
+    with true <- is_binary(id),
+         {:ok, meta} <- Agent.Store.read_meta(id),
+         true <- stale?(meta, now) do
+      # The first time, there is nothing to carry over yet: it writes one in
+      # the session it has, and moves on at the wake-up after.
+      if File.exists?(Path.join(workspace(e["id"]), "HANDOFF.md")) do
+        e
+        |> Map.put("work_session", nil)
+        |> Map.put("fresh", true)
+        |> Map.update("past_work", [id], &Enum.take([id | &1], @past_kept))
+      else
+        note(e, @write_handoff)
+      end
+    else
+      _ -> e
+    end
+  end
+
+  defp stale?(meta, now) do
+    turns = meta[:turns] || 0
+    tokens = meta[:context_tokens]
+
+    turns > 0 and
+      (today(meta[:created_at] || now) != today(now) or
+         if(is_integer(tokens), do: tokens > @fresh_tokens, else: turns >= @fresh_turns))
+  end
+
   defp context(e, now) do
     %{
+      fresh: e["fresh"] == true,
+      notices: open_notices(e),
       now: now,
       offset: @offset,
       today: today(now),
@@ -564,25 +615,23 @@ defmodule Loom.Employees do
       }
       |> Map.reject(fn {_, v} -> is_nil(v) end)
 
-    # A new important or urgent report takes the place of the last. Without
-    # one, an important report stays until the boss has seen it; an urgent
-    # one was answered, or is moot, once the employee has worked again.
-    {attention, new?} =
+    # A report goes to the bell, which notifies by its priority; what it took
+    # back is withdrawn there. A new important or urgent report takes the
+    # place of the last. Without one, an important report stays until the
+    # boss has seen it; an urgent one was answered, or is moot, once the
+    # employee has worked again.
+    report = report && Map.put(report, "level", level(report))
+
+    if report && (report["level"] != "info" or is_integer(report["priority"])),
+      do: post(e, report)
+
+    for key <- card["withdraw"] || [], do: Loom.Notices.withdraw(e["id"], key)
+
+    attention =
       case report do
-        %{"level" => level} = r when level in ["important", "urgent"] ->
-          {Map.put(r, "at", now), true}
-
-        _ ->
-          {if(match?(%{"level" => "important"}, e["attention"]), do: e["attention"]), false}
+        %{"level" => level} = r when level in ["important", "urgent"] -> Map.put(r, "at", now)
+        _ -> if(match?(%{"level" => "important"}, e["attention"]), do: e["attention"])
       end
-
-    if new? do
-      Loom.Push.notify(
-        "#{e["name"]} · #{if attention["level"] == "urgent", do: "needs you", else: "report"}",
-        attention["text"] || "",
-        e["work_session"]
-      )
-    end
 
     e
     |> Map.merge(%{
@@ -593,6 +642,32 @@ defmodule Loom.Employees do
       "last_card_at" => if(card == %{}, do: e["last_card_at"], else: now)
     })
     |> Map.update("log", [entry], &Enum.take([entry | &1], @log_kept))
+  end
+
+  # A priority (0 most urgent … 10), given or read from the old three levels;
+  # and the level the page's banner goes by, read from the priority.
+  defp level(%{"priority" => p}) when is_integer(p) and p <= 2, do: "urgent"
+  defp level(%{"priority" => p}) when is_integer(p) and p <= 5, do: "important"
+  defp level(%{"priority" => p}) when is_integer(p), do: "info"
+  defp level(%{"level" => level}), do: level
+
+  defp priority(%{"priority" => p}) when is_integer(p), do: p
+  defp priority(%{"level" => "urgent"}), do: 2
+  defp priority(%{"level" => "important"}), do: 4
+  defp priority(_), do: 7
+
+  defp post(e, report) do
+    p = priority(report)
+
+    Loom.Notices.post(%{kind: "employee", id: e["id"], name: e["name"]}, %{
+      summary: report["text"],
+      priority: p,
+      key: report["key"],
+      needs: report["needs"] || if(p <= 2, do: "reply", else: "read"),
+      session: e["work_session"]
+    })
+  catch
+    :exit, reason -> Logger.warning("Loom.Employees: #{e["id"]} cannot post: #{inspect(reason)}")
   end
 
   defp chat_ended(e, card, now) do
@@ -687,11 +762,12 @@ defmodule Loom.Employees do
     if e["approval_asked"] == day do
       e
     else
-      Loom.Push.notify(
-        "#{e["name"]} · budget reached",
-        "Used #{amount(e, spent(e, now))} of #{amount(e, cap(e, now))} today. Approve more on its page, or it rests until tomorrow.",
-        e["work_session"]
-      )
+      post(e, %{
+        "priority" => 2,
+        "key" => "budget",
+        "text" =>
+          "Budget reached: #{amount(e, spent(e, now))} of #{amount(e, cap(e, now))} used today. Approve more on its page, or it rests until tomorrow."
+      })
 
       Map.put(e, "approval_asked", day)
     end
@@ -1061,7 +1137,7 @@ defmodule Loom.Employees do
       end
 
     e
-    |> Map.drop(["inbox", "spend", "turns", "extra", "approval_asked"])
+    |> Map.drop(["inbox", "spend", "turns", "extra", "approval_asked", "fresh"])
     |> Map.merge(%{
       "status" => status,
       "spent_today" => spent(e, now),

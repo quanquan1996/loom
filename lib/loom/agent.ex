@@ -59,6 +59,7 @@ defmodule Loom.Agent do
   @doc "Stop a session and delete its persisted history."
   def delete_session(id) do
     stop_session(id)
+    Loom.Notices.forget_session(id)
     Loom.Agent.Store.delete_session(id)
   end
 

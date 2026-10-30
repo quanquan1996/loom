@@ -53,8 +53,13 @@ defmodule LoomWeb.AgentChannel do
            client_msg_id: Map.get(params, "client_msg_id"),
            files: file_paths(params)
          ) do
-      {:ok, disposition} -> {:reply, {:ok, %{status: disposition}}, socket}
-      {:error, reason} -> {:reply, {:error, %{reason: inspect(reason)}}, socket}
+      {:ok, disposition} ->
+        # The user wrote here: what the bell had open for this session is answered.
+        Loom.Notices.replied(socket.assigns.session_id)
+        {:reply, {:ok, %{status: disposition}}, socket}
+
+      {:error, reason} ->
+        {:reply, {:error, %{reason: inspect(reason)}}, socket}
     end
   end
 

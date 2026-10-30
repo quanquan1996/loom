@@ -1,0 +1,146 @@
+defmodule Loom.NoticesTest do
+  use ExUnit.Case, async: true
+
+  alias Loom.Notices
+
+  # 2026-10-30 10:00 in Asia/Shanghai.
+  @ten 1_761_789_600_000
+  @hour 3_600_000
+
+  setup do
+    path = Path.join(System.tmp_dir!(), "notices-#{System.unique_integer([:positive])}.json")
+    test = self()
+    clock = :counters.new(1, [:atomics])
+    :counters.put(clock, 1, @ten)
+
+    name = :"notices_#{System.unique_integer([:positive])}"
+
+    start_supervised!(
+      {Notices,
+       name: name,
+       path: path,
+       tick: :timer.hours(24),
+       clock: fn -> :counters.get(clock, 1) end,
+       notify: fn title, body, session -> send(test, {:notified, title, body, session}) end,
+       submit: fn session, text -> send(test, {:submitted, session, text}) end}
+    )
+
+    on_exit(fn -> File.rm(path) end)
+    set = fn ms -> :counters.put(clock, 1, ms) end
+    %{s: name, path: path, set: set}
+  end
+
+  @emp %{kind: "employee", id: "e_1", name: "钱多多"}
+
+  defp post(s, attrs, source \\ @emp), do: Notices.post(source, attrs, s)
+
+  test "an urgent one notifies at once; important and the rest do not", %{s: s} do
+    {:ok, n} = post(s, %{summary: "部署要批准", priority: 1, needs: "approve", session: "a_1"})
+    assert n["status"] == "open" and n["priority"] == 1
+    assert_received {:notified, "钱多多 · needs your approval", "部署要批准", "a_1"}
+
+    {:ok, _} = post(s, %{summary: "换供应商？", priority: 4}, %{kind: "session", id: "a_2", name: "x"})
+    {:ok, _} = post(s, %{summary: "日报", priority: 7}, %{kind: "session", id: "a_3", name: "y"})
+    refute_received {:notified, _, _, _}
+  end
+
+  test "one urgent a day per source; the next is posted as 3", %{s: s} do
+    {:ok, _} = post(s, %{summary: "one", priority: 2})
+    {:ok, n} = post(s, %{summary: "two", priority: 0})
+    assert n["priority"] == 3
+    assert n["note"] =~ "one urgent a day"
+    # Another source is not held to this one's.
+    {:ok, m} =
+      post(s, %{summary: "three", priority: 1}, %{kind: "dream", id: "dream:home", name: "Dream"})
+
+    assert m["priority"] == 1
+  end
+
+  test "the same key updates the open notice, and notifies only if more urgent", %{s: s} do
+    {:ok, a} = post(s, %{summary: "止损没设", priority: 4, key: "stop"})
+    {:ok, b} = post(s, %{summary: "止损没设，收盘前要定", priority: 2, key: "stop"})
+    assert a["id"] == b["id"]
+    assert b["summary"] =~ "收盘前"
+    assert_received {:notified, _, "止损没设，收盘前要定", _}
+    {:ok, _} = post(s, %{summary: "lower again", priority: 5, key: "stop"})
+    refute_received {:notified, _, _, _}
+    assert length(Notices.list(s)) == 1
+  end
+
+  test "answering in its session settles it", %{s: s} do
+    {:ok, n} = post(s, %{summary: "要你回复", priority: 3, needs: "reply", session: "a_9"})
+    Notices.replied("a_other", s)
+    Notices.replied("a_9", s)
+    [m] = Notices.list(s)
+    assert m["id"] == n["id"] and m["status"] == "done" and m["note"] == "Answered in chat"
+  end
+
+  test "approve tells its session, and is done", %{s: s} do
+    {:ok, n} = post(s, %{summary: "部署 2b98e02", priority: 2, needs: "approve", session: "a_1"})
+    {:ok, m} = Notices.answer(n["id"], true, s)
+    assert m["status"] == "done" and m["answer"] == "approve"
+    assert_received {:submitted, "a_1", "✅ Approved: 部署 2b98e02"}
+  end
+
+  test "read settles only what asks to be read", %{s: s} do
+    {:ok, r} = post(s, %{summary: "日报", priority: 7})
+
+    {:ok, q} =
+      post(s, %{summary: "问题", priority: 4, needs: "reply"}, %{
+        kind: "session",
+        id: "a_4",
+        name: "z"
+      })
+
+    assert {:ok, %{"status" => "done"}} = Notices.read(r["id"], s)
+    assert {:ok, %{"status" => "open"}} = Notices.read(q["id"], s)
+  end
+
+  test "withdraw and open_of", %{s: s} do
+    {:ok, _} = post(s, %{summary: "a", priority: 4, key: "a"})
+    {:ok, _} = post(s, %{summary: "b", priority: 6, key: "b"})
+    assert :ok = Notices.withdraw("e_1", "a", s)
+    assert [%{"key" => "b"}] = Notices.open_of("e_1", s)
+    assert {:error, :not_found} = Notices.withdraw("e_1", "a", s)
+  end
+
+  test "a bad priority or empty summary is refused", %{s: s} do
+    assert {:error, _} = post(s, %{summary: "x", priority: 11})
+    assert {:error, _} = post(s, %{summary: " ", priority: 3})
+    assert {:error, _} = post(s, %{summary: "x", priority: 3, needs: "maybe"})
+  end
+
+  test "a 2 at night waits for 07:00; 20:00 sends one digest", %{s: s, set: set} do
+    # 23:00
+    set.(@ten + 13 * @hour)
+    {:ok, _} = post(s, %{summary: "夜里的", priority: 2})
+    refute_received {:notified, _, _, _}
+    send(s, :tick)
+    _ = Notices.list(s)
+    refute_received {:notified, _, _, _}
+
+    # 07:10 the next day
+    set.(@ten + 21 * @hour + 600_000)
+    send(s, :tick)
+    _ = Notices.list(s)
+    assert_received {:notified, "钱多多 · urgent", "夜里的", nil}
+
+    {:ok, _} = post(s, %{summary: "晚上看", priority: 4}, %{kind: "session", id: "a_5", name: "w"})
+    # 20:05
+    set.(@ten + 34 * @hour + 300_000)
+    send(s, :tick)
+    _ = Notices.list(s)
+    assert_received {:notified, "1 important thing waiting", "w: 晚上看", nil}
+    send(s, :tick)
+    _ = Notices.list(s)
+    refute_received {:notified, _, _, _}
+  end
+
+  test "6–10 expire after a week unread, and survive a restart", %{s: s, set: set, path: path} do
+    {:ok, n} = post(s, %{summary: "日报", priority: 7})
+    set.(@ten + 8 * 24 * @hour)
+    send(s, :tick)
+    assert [%{"status" => "expired"}] = Notices.list(s)
+    assert File.read!(path) =~ n["id"]
+  end
+end
