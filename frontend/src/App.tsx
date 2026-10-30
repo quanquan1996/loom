@@ -103,10 +103,14 @@ function App() {
   )
   // The sleep sessions stay out of every list; the moons open them. See Sleep.tsx.
   // A virtual employee's two sessions likewise; its page opens them.
-  // And the bell's chat, which lives in the bell. What is left is the
+  // And the bell's chat, which lives in the bell; and a task's own session,
+  // opened from the task (Tasks.tsx). What is left is the
   // user's, and the archived of those are in Settings instead.
   const ordinary = useMemo(
-    () => everything.filter((s) => !isDream(s) && !isEmployeeSession(s) && s.kind !== "bell"),
+    () =>
+      everything.filter(
+        (s) => !isDream(s) && !isEmployeeSession(s) && s.kind !== "bell" && s.kind !== "task",
+      ),
     [everything],
   )
   const sessions = useMemo(() => ordinary.filter((s) => !isArchived(s)), [ordinary])

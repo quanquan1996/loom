@@ -150,9 +150,10 @@ export type AgentInfo = {
   archived_at?: number | null
   // "dream" for a scope's sleep session, which the lists leave out and the
   // moon opens; see `Sleep.tsx`. "employee_chat" and "employee_work" for a
-  // virtual employee's, opened from its page; see `Employees.tsx`. Older
-  // servers do not send it.
-  kind?: "dream" | "employee_chat" | "employee_work" | "bell" | null
+  // virtual employee's, opened from its page; see `Employees.tsx`. "bell" for
+  // the bell's chat; "task" for a task's own session, opened from the task.
+  // Older servers do not send it.
+  kind?: "dream" | "employee_chat" | "employee_work" | "bell" | "task" | null
   employee_id?: string | null
   // How far the user has read; with `seq`, the moon's unread mark.
   seen_seq?: number

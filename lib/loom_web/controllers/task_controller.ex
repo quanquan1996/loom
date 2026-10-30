@@ -4,7 +4,8 @@ defmodule LoomWeb.TaskController do
 
   A task made here gets a session of its own, named after it, unless it names
   one to go to: every run's reply lands there, which is where the user reads
-  it. Deleting the task leaves that session, like any other conversation.
+  it. One of its own is `kind: "task"`, kept out of the sidebar's lists and
+  opened from the task. Deleting the task leaves that session.
 
   Times are the user's wall clock: `utc_offset`, minutes east of UTC, Shanghai
   (480) unless the request or `config :loom, Loom.Cron, utc_offset:` says
@@ -102,7 +103,7 @@ defmodule LoomWeb.TaskController do
         :error -> :claude_code
       end
 
-    case Agent.start_session(id, backend: backend, title: name) do
+    case Agent.start_session(id, backend: backend, title: name, kind: "task") do
       {:ok, _pid} -> {:ok, id, true}
       {:error, reason} -> {:error, inspect(reason)}
     end

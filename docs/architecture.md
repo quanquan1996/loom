@@ -113,8 +113,9 @@ steers or queues it as usual.
   its place and never fires.
 - **The Tasks page** (`/api/tasks`, `LoomWeb.TaskController`) lists, makes,
   edits, pauses, runs and deletes them. A task made there gets a session of
-  its own, named after it, where its runs land; deleting the task leaves the
-  session. Times default to Shanghai (480). A task can be said in words:
+  its own, named after it, where its runs land: `kind: "task"`, out of the
+  sidebar's lists (and so out of tidying), opened from the task's dialog;
+  deleting the task leaves the session. Times default to Shanghai (480). A task can be said in words:
   `Loom.Cron.Describe` asks a `Loom.OneShot` (haiku, given the user's local
   time) for a name, a prompt and an expression, and parses the expression
   before anything is made.

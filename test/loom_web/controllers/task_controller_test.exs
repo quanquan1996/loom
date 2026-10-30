@@ -45,7 +45,8 @@ defmodule LoomWeb.TaskControllerTest do
     assert %{"name" => "Morning news", "utc_offset" => 480, "paused" => false, "target" => target} =
              task
 
-    assert {:ok, %{title: "Morning news"}} = Loom.Agent.Store.read_meta(target)
+    # Hidden from the sidebar's lists, opened from the task.
+    assert {:ok, %{title: "Morning news", kind: "task"}} = Loom.Agent.Store.read_meta(target)
     assert {:ok, next, _} = DateTime.from_iso8601(task["next_at"])
     assert next.hour == 1
 
