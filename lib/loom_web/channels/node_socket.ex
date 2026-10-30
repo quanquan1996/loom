@@ -12,6 +12,8 @@ defmodule LoomWeb.NodeSocket do
   def connect(%{"token" => token}, socket, _connect_info) do
     case Loom.Nodes.authenticate(token) do
       {:ok, id} -> {:ok, assign(socket, :node_id, id)}
+      # A removed device, let in only to be told to uninstall itself.
+      {:wipe, name} -> {:ok, assign(socket, wipe: {token, name}, node_id: nil)}
       :error -> :error
     end
   end
@@ -19,5 +21,6 @@ defmodule LoomWeb.NodeSocket do
   def connect(_params, _socket, _connect_info), do: :error
 
   @impl true
+  def id(%{assigns: %{node_id: nil}}), do: nil
   def id(socket), do: "node_socket:#{socket.assigns.node_id}"
 end

@@ -65,7 +65,7 @@ export function DevicesDialog({
   }
 
   const remove = async (device: Device) => {
-    if (!confirm(`Remove ${device.name}? Its loom-node stops working until it is added and installed again.`)) return
+    if (!confirm(`Remove ${device.name}? loom-node uninstalls itself from it: right away if it is online, otherwise the next time it connects.`)) return
     try {
       await deleteDevice(device.id)
       if (install?.id === device.id) setInstall(null)

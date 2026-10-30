@@ -547,6 +547,14 @@ agent ──zsh──> loom-node exec mac -- '…'      CLI, on this host
   same binary with its PE subsystem set to GUI, so no console window ever
   opens for it. Reinstalling is how a token is replaced, and
   removing the device revokes its token.
+- **Removing a device uninstalls it.** The removed token is kept in
+  `nodes.json` under `wipes`. The device is disconnected, redials with it, and
+  is let in only to be pushed `uninstall` (the same happens whenever an offline
+  one comes back). The daemon answers `uninstalled`, then deletes its config
+  and binaries, takes away its service, and stops (on Windows a detached `cmd`
+  deletes `loom-noded.exe` once it has exited). The log of what loom ran there
+  is left for the machine's owner. A daemon that does not say
+  `"uninstall": "1"` when it joins predates this, and is refused as before.
 - **How the CLI gets in.** The CLI's routes, `/api/node/*`, share a port with
   everything Cloudflare forwards. They require the key from
   `~/.loom/node-cli.json`, a mode-600 file that loom writes at boot, so only

@@ -74,12 +74,31 @@ func installWindows(exe string) error {
 
 func uninstallWindows() {
 	stopDaemon()
+	removeRunKey()
+	if exe, err := os.Executable(); err == nil {
+		os.Remove(filepath.Join(filepath.Dir(exe), daemonExe))
+	}
+}
+
+func removeRunKey() {
 	if k, err := registry.OpenKey(registry.CURRENT_USER, runKey, registry.SET_VALUE); err == nil {
 		k.DeleteValue(runValue)
 		k.Close()
 	}
-	if exe, err := os.Executable(); err == nil {
-		os.Remove(filepath.Join(filepath.Dir(exe), daemonExe))
+}
+
+// removeBinaries, from the running daemon: loom-node.exe can go now, but
+// Windows will not delete a running image, so a detached cmd waits for this
+// process to exit and then takes loom-noded.exe and the folder.
+func removeBinaries(exe string) {
+	dir := filepath.Dir(exe)
+	os.Remove(filepath.Join(dir, "loom-node.exe"))
+	cmd := exec.Command("cmd")
+	detach(cmd)
+	// Verbatim: Go's own quoting of arguments is not what cmd expects.
+	cmd.SysProcAttr.CmdLine = fmt.Sprintf(`cmd /c "ping -n 4 127.0.0.1 >nul & del /f /q "%s" & rmdir "%s""`, exe, dir)
+	if cmd.Start() == nil {
+		cmd.Process.Release()
 	}
 }
 

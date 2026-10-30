@@ -68,9 +68,36 @@ defmodule LoomWeb.NodeTest do
       assert {:ok, %{name: "box"}} = Nodes.rename(other.id, "box")
     end
 
-    test "a removed device's token is refused at connect" do
+    test "a removed device too old to uninstall itself is refused, then for good" do
       {node, token} = register()
       :ok = Nodes.delete(node.id)
+      {:ok, socket} = connect(NodeSocket, %{"token" => token})
+      assert {:error, _} = subscribe_and_join(socket, "node", %{"os" => "darwin"})
+      assert :error = connect(NodeSocket, %{"token" => token})
+    end
+
+    test "a removed device is told to uninstall, when online and when it comes back" do
+      {node, token} = register()
+      {:ok, socket} = connect(NodeSocket, %{"token" => token})
+      {:ok, _, channel} = subscribe_and_join(socket, "node", %{"uninstall" => "1"})
+      Process.unlink(channel.channel_pid)
+      ref = Process.monitor(channel.channel_pid)
+
+      :ok = Nodes.delete(node.id)
+      assert_receive {:DOWN, ^ref, _, _, _}
+      assert [] = for(%{id: id} <- Nodes.list(), id == node.id, do: id)
+
+      # It redials with the same token, and is let in only to hear this.
+      {:ok, socket} = connect(NodeSocket, %{"token" => token})
+      {:ok, %{name: name}, channel} = subscribe_and_join(socket, "node", %{"uninstall" => "1"})
+      assert name == node.name
+      assert_push "uninstall", %{"id" => "uninstall"}
+      assert :unknown = Nodes.lookup(node.name)
+
+      Process.unlink(channel.channel_pid)
+      ref = Process.monitor(channel.channel_pid)
+      push(channel, "uninstalled", %{"id" => "uninstall"})
+      assert_receive {:DOWN, ^ref, _, _, _}
       assert :error = connect(NodeSocket, %{"token" => token})
     end
 

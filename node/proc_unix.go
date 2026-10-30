@@ -58,3 +58,8 @@ func daemonLog() {}
 func installWindows(string) error { return errors.New("not windows") }
 
 func uninstallWindows() {}
+
+func removeRunKey() {}
+
+// removeBinaries: a running binary can be unlinked here.
+func removeBinaries(exe string) { os.Remove(exe) }

@@ -91,6 +91,8 @@ func runDaemon(args []string) int {
 		info := map[string]string{
 			"os": runtime.GOOS, "arch": runtime.GOARCH,
 			"hostname": hostname, "version": version,
+			// Tells loom this daemon removes itself when the device is removed.
+			"uninstall": "1",
 		}
 		c, err := dial(ctx, cfg.URL, cfg.Token, info)
 		if errors.Is(err, errRevoked) {
@@ -200,6 +202,13 @@ func (s *session) handle(event string, payload json.RawMessage) {
 		go func() { defer s.wg.Done(); s.read(r) }()
 	case "write":
 		s.write(r)
+	case "uninstall":
+		// The device was removed in loom. Say so before the service is torn
+		// down, which may kill this process.
+		log.Printf("loom removed this device; uninstalling")
+		s.c.push(s.ctx, "uninstalled", map[string]any{"id": r.ID})
+		time.Sleep(time.Second) // for the queue to reach the socket
+		os.Exit(selfUninstall())
 	default:
 		log.Printf("ignoring unknown event %q", event)
 	}

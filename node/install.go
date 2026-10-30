@@ -238,6 +238,34 @@ func runUninstall(args []string) int {
 	return 0
 }
 
+// selfUninstall is uninstall run by the daemon itself, when loom removed the
+// device: the token, the service and the binaries go. The log of what loom ran
+// here stays, for whoever owns the machine. Stopping the service kills this
+// process on macOS and under systemd, so that is done last.
+func selfUninstall() int {
+	os.Remove(configPath())
+	if exe, err := os.Executable(); err == nil {
+		if exe, err = filepath.EvalSymlinks(exe); err == nil {
+			removeBinaries(exe)
+		}
+	}
+	switch runtime.GOOS {
+	case "darwin":
+		os.Remove(plistPath())
+		exec.Command("launchctl", "bootout", fmt.Sprintf("gui/%d/%s", os.Getuid(), launchdLabel)).Run()
+	case "linux":
+		if os.Getenv("INVOCATION_ID") != "" {
+			exec.Command("systemctl", "--user", "disable", systemdUnit).Run()
+			os.Remove(unitPath())
+			exec.Command("systemctl", "--user", "daemon-reload").Run()
+			exec.Command("systemctl", "--user", "stop", systemdUnit).Run()
+		}
+	case "windows":
+		removeRunKey()
+	}
+	return 0
+}
+
 // ── Windows ─────────────────────────────────────────────────────────────
 
 // guiCopy marks a PE image as a Windows GUI program: the subsystem field, two

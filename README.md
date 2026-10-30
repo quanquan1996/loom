@@ -83,7 +83,9 @@ that machine as you:
 - **Outbound only.** The device dials Loom; nothing on it listens on a port,
   so it works behind NAT and home routers.
 - **Safe defaults.** Each device has its own token, stored only as a hash;
-  removing the device revokes it. Commands are time-limited, and everything a
+  removing the device revokes it, and loom-node uninstalls itself from that
+  machine (at once, or when it next comes online), which makes lending a
+  friend's or a client's computer to an agent a reversible thing. Commands are time-limited, and everything a
   device runs is logged on that device.
 - The sidebar shows which devices are online, live.
 

@@ -19,7 +19,12 @@ defmodule LoomWeb.NodeChannel do
     - "written" : `{id, size}`, a file write landed
     - "error"   : `{id, message}`, the request failed on the device
 
-  "exit", "done", "written" and "error" end a request. The requester monitors
+  "exit", "done", "written" and "error" end a request.
+
+  A removed device that connects (see `Loom.Nodes`, "Removing a device") joins
+  only to be pushed "uninstall"; its "uninstalled" ends its token, and the
+  channel. A daemon that does not say `"uninstall" => "1"` when it joins cannot
+  do that, and is refused like any dead token. The requester monitors
   this process, so a dropped device shows up there as a `:DOWN` — and the
   device kills whatever it was running when it loses the connection, so
   nothing is left behind on either side.
@@ -31,6 +36,16 @@ defmodule LoomWeb.NodeChannel do
   @final ~w(exit done written error)
 
   @impl true
+  def join("node", info, %{assigns: %{wipe: {token, name}}} = socket) do
+    if info["uninstall"] == "1" do
+      send(self(), :uninstall)
+      {:ok, %{name: name}, assign(socket, :requests, %{})}
+    else
+      Loom.Nodes.wiped(token)
+      {:error, %{reason: "removed device"}}
+    end
+  end
+
   def join("node", info, socket) do
     case Loom.Nodes.connected(socket.assigns.node_id, self(), info) do
       {:ok, node} -> {:ok, %{name: node.name}, assign(socket, :requests, %{})}
@@ -39,6 +54,12 @@ defmodule LoomWeb.NodeChannel do
   end
 
   @impl true
+  def handle_in("uninstalled", _payload, %{assigns: %{wipe: {token, name}}} = socket) do
+    Logger.info("NodeChannel: removed device #{name} has uninstalled itself")
+    Loom.Nodes.wiped(token)
+    {:stop, :normal, socket}
+  end
+
   def handle_in(event, %{"id" => id} = payload, socket)
       when event in ~w(out exit chunk done written error) do
     case socket.assigns.requests do
@@ -64,6 +85,11 @@ defmodule LoomWeb.NodeChannel do
   end
 
   @impl true
+  def handle_info(:uninstall, socket) do
+    push(socket, "uninstall", %{"id" => "uninstall"})
+    {:noreply, socket}
+  end
+
   def handle_info({:node_send, pid, id, event, payload}, socket) do
     socket =
       if Map.has_key?(socket.assigns.requests, id) do

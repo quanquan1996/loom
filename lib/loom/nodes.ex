@@ -23,6 +23,14 @@ defmodule Loom.Nodes do
     by this user — the same reach a unix socket would have had, on the port
     loom already listens on. See `LoomWeb.Plugs.NodeCliAuth`.
 
+  ## Removing a device
+
+  A removed device uninstalls itself. Its token is kept aside, in `wipes`, and
+  a device that connects with it is told to uninstall instead of being let in:
+  straight away if it was online (it is disconnected and redials), or whenever
+  it next comes back. The token goes when the device says it is done, or at
+  once for a daemon too old to know how, which is then simply refused.
+
   ## Broadcasts
 
   On the lobby topic (`Loom.Agent.lobby_topic/0`), for the sidebar:
@@ -51,7 +59,10 @@ defmodule Loom.Nodes do
   @doc "Rename a device. Its token, and so the device itself, is unaffected."
   def rename(id, name, server \\ @name), do: GenServer.call(server, {:rename, id, name})
 
-  @doc "Forget a device: its token stops working and a live connection is dropped."
+  @doc """
+  Forget a device: it can no longer be reached, and it uninstalls itself as soon
+  as it is connected (see "Removing a device").
+  """
   def delete(id, server \\ @name), do: GenServer.call(server, {:delete, id})
 
   @doc "A fresh one-time install code for a registered device."
@@ -63,8 +74,14 @@ defmodule Loom.Nodes do
   """
   def redeem(code, server \\ @name), do: GenServer.call(server, {:redeem, code})
 
-  @doc "The device a token belongs to: `{:ok, id}` or `:error`."
+  @doc """
+  The device a token belongs to: `{:ok, id}`, `{:wipe, name}` for a removed
+  device that has yet to uninstall itself, or `:error`.
+  """
   def authenticate(token, server \\ @name), do: GenServer.call(server, {:authenticate, token})
+
+  @doc "A removed device has uninstalled itself, or cannot: its token is done."
+  def wiped(token, server \\ @name), do: GenServer.call(server, {:wiped, token})
 
   @doc """
   Called by a device's channel once it has joined, with what the device says
@@ -134,8 +151,9 @@ defmodule Loom.Nodes do
     cli_path = Keyword.get(opts, :cli_path, cli_path())
     :persistent_term.put({__MODULE__, :cli_key}, write_cli_file(cli_path))
 
-    nodes = path |> load() |> Map.new(&{&1.id, &1})
-    {:ok, %{path: path, nodes: nodes, online: %{}, codes: %{}}}
+    {nodes, wipes} = load(path)
+    nodes = Map.new(nodes, &{&1.id, &1})
+    {:ok, %{path: path, nodes: nodes, wipes: wipes, online: %{}, codes: %{}}}
   end
 
   @impl true
@@ -186,10 +204,16 @@ defmodule Loom.Nodes do
 
   def handle_call({:delete, id}, _from, state) do
     case fetch(id, state) do
-      {:ok, _node} ->
+      {:ok, node} ->
         state = drop_connection(id, state)
         codes = for {_code, {owner, _}} = entry <- state.codes, owner != id, into: %{}, do: entry
-        state = save(%{state | nodes: Map.delete(state.nodes, id), codes: codes})
+
+        wipes =
+          if node.token_hash,
+            do: Map.put(state.wipes, node.token_hash, %{name: node.name, at: now()}),
+            else: state.wipes
+
+        state = save(%{state | nodes: Map.delete(state.nodes, id), codes: codes, wipes: wipes})
         Phoenix.PubSub.broadcast(Loom.PubSub, Loom.Agent.lobby_topic(), {:node_removed, id})
         {:reply, :ok, state}
 
@@ -233,10 +257,19 @@ defmodule Loom.Nodes do
         node.token_hash != nil and Plug.Crypto.secure_compare(node.token_hash, hashed)
       end)
 
-    case found do
-      {id, _node} -> {:reply, {:ok, id}, state}
-      nil -> {:reply, :error, state}
+    case {found, Map.fetch(state.wipes, hashed)} do
+      {{id, _node}, _} -> {:reply, {:ok, id}, state}
+      {nil, {:ok, wipe}} -> {:reply, {:wipe, wipe.name}, state}
+      {nil, :error} -> {:reply, :error, state}
     end
+  end
+
+  def handle_call({:wiped, token}, _from, state) do
+    hashed = hash(token)
+
+    if Map.has_key?(state.wipes, hashed),
+      do: {:reply, :ok, save(%{state | wipes: Map.delete(state.wipes, hashed)})},
+      else: {:reply, :ok, state}
   end
 
   def handle_call({:authenticate, _token}, _from, state), do: {:reply, :error, state}
@@ -417,20 +450,28 @@ defmodule Loom.Nodes do
     case File.read(path) do
       {:ok, body} ->
         case Jason.decode(body) do
-          {:ok, %{"nodes" => nodes}} when is_list(nodes) ->
-            for node <- nodes do
-              Map.new(@persisted, fn key -> {key, node[Atom.to_string(key)]} end)
-            end
+          {:ok, %{"nodes" => nodes} = file} when is_list(nodes) ->
+            nodes =
+              for node <- nodes do
+                Map.new(@persisted, fn key -> {key, node[Atom.to_string(key)]} end)
+              end
+
+            wipes =
+              for {hash, %{"name" => name, "at" => at}} <- file["wipes"] || %{},
+                  into: %{},
+                  do: {hash, %{name: name, at: at}}
+
+            {nodes, wipes}
 
           _ ->
             aside = "#{path}.bad-#{System.os_time(:second)}"
             File.rename(path, aside)
             Logger.error("Loom.Nodes cannot read #{path}; moved it to #{aside}")
-            []
+            {[], %{}}
         end
 
       {:error, :enoent} ->
-        []
+        {[], %{}}
     end
   end
 
@@ -443,7 +484,7 @@ defmodule Loom.Nodes do
 
     File.mkdir_p!(Path.dirname(state.path))
     tmp = state.path <> ".tmp"
-    File.write!(tmp, Jason.encode_to_iodata!(%{nodes: nodes}, pretty: true))
+    File.write!(tmp, Jason.encode_to_iodata!(%{nodes: nodes, wipes: state.wipes}, pretty: true))
     File.chmod!(tmp, 0o600)
     File.rename!(tmp, state.path)
     state
