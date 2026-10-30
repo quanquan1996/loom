@@ -15,6 +15,11 @@ export MIX_ENV=prod
 # Inherited from loom's own .env when run from a loom shell; would make the
 # build try to start a server.
 unset PHX_SERVER
+# An agent's shell may not have corepack's pnpm on PATH.
+command -v pnpm >/dev/null 2>&1 || PATH=/usr/lib/node_modules/corepack/shims:$PATH
+# Where the release is staged; rel/ship.sh builds in a worktree and points this
+# at the live checkout's.
+next="${LOOM_NEXT:-_build/prod/rel/loom.next}"
 
 mix deps.get --only prod
 mix assets.deploy
@@ -41,14 +46,16 @@ fi
 for skills in "$HOME/.claude/skills" "$HOME/.codex/skills"; do
   for skill in skills/*/; do
     mkdir -p "$skills/$(basename "$skill")"
-    cp "$skill"SKILL.md "$skills/$(basename "$skill")/SKILL.md"
+    # A skill linked into the repo is already the file itself.
+    [ "$skill"SKILL.md -ef "$skills/$(basename "$skill")/SKILL.md" ] ||
+      cp "$skill"SKILL.md "$skills/$(basename "$skill")/SKILL.md"
   done
 done
 
-mix release --path _build/prod/rel/loom.next --overwrite
+mix release --path "$next" --overwrite
 
 if [ "${1:-}" = "--build" ]; then
-  echo "built _build/prod/rel/loom.next; not restarting"
+  echo "built $next; not restarting"
   exit 0
 fi
 
