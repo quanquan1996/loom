@@ -17,6 +17,11 @@ defmodule LoomWeb.TidyController do
   refused: a session mid-turn, the caller itself, one with an open notice in
   the bell, and a merge across projects. A retitle may be of any of them,
   mid-turn or the caller, but never of a title the user gave.
+
+  A handoff (the `loom-handoff` skill) is the one call here that tidies
+  nothing: a new session in Recents that begins with a brief from the caller,
+  so the user carries a matter on there. That the boss agreed is the skill's
+  rule, as an employee's "ask first" is; Loom only names who handed it off.
   """
   use LoomWeb, :controller
 
@@ -121,6 +126,68 @@ defmodule LoomWeb.TidyController do
   end
 
   def merge(conn, _params), do: reply(conn, {:error, "merge takes title, summary and ids"})
+
+  # POST /api/tidy/handoff — `title`, `brief`, and `project` (an id or
+  # "home"; the caller's own by default), `start` to begin it now rather than
+  # wait for the user. A new session in Recents, on the caller's backend.
+  def handoff(conn, %{"title" => title, "brief" => brief} = params)
+      when is_binary(title) and is_binary(brief) do
+    with {:ok, caller} <- caller(conn),
+         :ok <-
+           if(String.trim(title) != "" and String.trim(brief) != "",
+             do: :ok,
+             else: {:error, "title and brief may not be empty"}
+           ),
+         {:ok, project} <- handoff_project(params["project"], caller),
+         {:ok, id} <-
+           start_handoff(caller, project, String.trim(title), brief, params["start"] == true) do
+      json(conn, %{ok: true, id: id, project_id: project})
+    else
+      error -> reply(conn, error)
+    end
+  end
+
+  def handoff(conn, _params), do: reply(conn, {:error, "handoff takes title and brief"})
+
+  defp handoff_project("home", _caller), do: {:ok, nil}
+  defp handoff_project(nil, caller), do: {:ok, caller.project_id}
+
+  defp handoff_project(id, _caller) when is_binary(id) do
+    case Loom.Projects.get(id) do
+      {:ok, _} -> {:ok, id}
+      _ -> {:error, "#{id}: no such project"}
+    end
+  end
+
+  defp start_handoff(caller, project, title, brief, start?) do
+    id = Agent.new_id()
+    opts = [backend: caller.backend, title: title, title_by: "tidy"]
+    opts = if project, do: [{:project, project} | opts], else: opts
+
+    who =
+      with e when is_binary(e) <- caller[:employee_id],
+           {:ok, %{"name" => name}} <- Loom.Employees.get(e) do
+        "#{name}, a virtual employee,"
+      else
+        _ -> "another session (\"#{caller.title}\", #{caller.id})"
+      end
+
+    prompt =
+      "[Loom: #{who} handed this matter off to you, with the user's agreement. Its brief " <>
+        "follows: carry the matter on from here, and ask the user what it leaves unclear.]\n\n" <>
+        brief
+
+    with {:ok, _pid} <- Agent.start_session(id, opts),
+         {:ok, _} <-
+           if(start?,
+             do: Agent.submit(id, brief, origin: "handoff", prompt: prompt),
+             else: with(:ok <- Agent.seed(id, brief, prompt, "handoff"), do: {:ok, :seeded})
+           ) do
+      {:ok, id}
+    else
+      {:error, reason} -> {:error, "could not start the session: #{inspect(reason)}"}
+    end
+  end
 
   # POST /api/tidy/keep — `ids`: looked at, and left as they are.
   def keep(conn, %{"ids" => ids}) when is_list(ids) do

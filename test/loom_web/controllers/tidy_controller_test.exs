@@ -123,6 +123,35 @@ defmodule LoomWeb.TidyControllerTest do
     assert text =~ "go on"
   end
 
+  test "a handoff is a new session in Recents that begins with the brief", %{caller: caller} do
+    conn =
+      post(cli(caller), "/api/tidy/handoff", %{
+        title: "供应商比价",
+        brief: "老板同意转交：比较三家供应商。",
+        project: "home"
+      })
+
+    assert %{"id" => id, "project_id" => nil} = json_response(conn, 200)
+    info = Agent.info(id)
+    assert info.title == "供应商比价" and info.turns == 0 and info.kind == nil
+    {:ok, %{events: events}} = Agent.attach(id)
+    assert [%{kind: :user, payload: %{origin: "handoff", text: "老板同意转交：比较三家供应商。"}}] = events
+
+    {:ok, _} = Agent.submit(id, "开始吧")
+    assert_receive {:stub_turn, text}, 1000
+    assert text =~ "handed this matter off to you"
+    assert text =~ "比较三家供应商"
+
+    # Started at once, when asked to.
+    conn = post(cli(caller), "/api/tidy/handoff", %{title: "t", brief: "do it", start: true})
+    assert %{"id" => _} = json_response(conn, 200)
+    assert_receive {:stub_turn, text}, 1000
+    assert text =~ "do it"
+
+    conn = post(cli(caller), "/api/tidy/handoff", %{title: "t", brief: "x", project: "p_nope"})
+    assert json_response(conn, 422)["error"] =~ "no such project"
+  end
+
   test "merge needs two, within one project", %{caller: caller} do
     a = start!(title: "a")
     conn = post(cli(caller), "/api/tidy/merge", %{title: "t", summary: "s", ids: [a]})
