@@ -284,22 +284,10 @@ export function Sidebar({
         >
           <Folder className="nav-icon" />
           <span className="nav-label">Projects</span>
-          {projects.length > 0 && <span className="nav-count">{projects.length}</span>}
-          <span className="nav-actions" onClick={(e) => e.stopPropagation()}>
-            <button className="session-del nav-btn" onClick={() => onEditProject(null)} title="New project">
-              <FolderPlus />
-            </button>
-          </span>
           <ChevronRight className="nav-chevron" />
         </div>
         {open(PROJECTS_SECTION) && (
           <div className="nav-children">
-            {groups.length === 0 && (
-              <button className="project-row project-new-row" onClick={() => onEditProject(null)}>
-                <FolderPlus className="project-icon" />
-                <span className="session-label">New project</span>
-              </button>
-            )}
             {groups.map(({ project, sessions: inside }) => {
               const unfolded = open(project.id)
               return (
@@ -351,6 +339,11 @@ export function Sidebar({
                 </div>
               )
             })}
+            {/* New goes last, inside: the heading carries nothing but its name. */}
+            <button className="project-row project-new-row" onClick={() => onEditProject(null)}>
+              <FolderPlus className="project-icon" />
+              <span className="session-label">New project</span>
+            </button>
           </div>
         )}
 
@@ -363,22 +356,10 @@ export function Sidebar({
         >
           <Users className="nav-icon" />
           <span className="nav-label">Employees</span>
-          {employees.length > 0 && <span className="nav-count">{employees.length}</span>}
-          <span className="nav-actions" onClick={(e) => e.stopPropagation()}>
-            <button className="session-del nav-btn" onClick={onHire} title="Hire a virtual employee">
-              <UserPlus />
-            </button>
-          </span>
           <ChevronRight className="nav-chevron" />
         </div>
         {open(EMPLOYEES_SECTION) && (
           <div className="nav-children">
-            {employees.length === 0 && (
-              <button className="project-row project-new-row" onClick={onHire}>
-                <UserPlus className="project-icon" />
-                <span className="session-label">Hire one</span>
-              </button>
-            )}
             {employees.map((e) => {
               const status = STATUS[e.status]
               const news = hasNews(employeeSessions.find((s) => s.id === e.work_session))
@@ -397,6 +378,10 @@ export function Sidebar({
                 </div>
               )
             })}
+            <button className="project-row project-new-row" onClick={onHire}>
+              <UserPlus className="project-icon" />
+              <span className="session-label">Hire an employee</span>
+            </button>
           </div>
         )}
 
