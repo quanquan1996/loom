@@ -1,33 +1,37 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { attachmentUrl, isThumbnail, seedBlobUrl, uploadAgentFiles, type AgentFile } from "./api"
+import { isThumbnail } from "./api"
 import { shrinkImage } from "./shrink"
 
 /**
- * One row in the composer's attachment tray.
- *
- * The upload starts the moment a file is picked, dropped or pasted — not on
- * send. So a 413 or a dead connection shows up while the user is still looking
- * at the composer and can do something about it, and pressing send stays
- * instant no matter how big the file was.
+ * A file picked for the next message, held on this device. Nothing travels
+ * until send: then the message's files go up together, in one request the
+ * server stores all-or-nothing, and the message follows only once they are
+ * there. So a message goes with every file it was sent with, or is marked as
+ * not got through with all of them — never half. See `useAgent`'s `send`.
  */
-export type Attachment = {
-  key: string
+export type LocalFile = {
   name: string
   size: number
   type: string
-  // An image shown from the local copy, so the thumbnail is there before the
-  // upload finishes.
+  // An image shown from the local copy, in the tray and in the bubble.
   preview: string | null
-  // Set once the server has the file; `null` means still uploading.
-  file: AgentFile | null
-  error: string | null
+  // The bytes, scaled down if an image (shrink.ts). Memory only: a message
+  // kept across a reload has lost them, and says so.
+  blob?: Blob
+}
+
+/** One row in the composer's attachment tray. */
+export type Attachment = LocalFile & {
+  key: string
+  // Still being scaled down; it can't be sent yet.
+  preparing: boolean
 }
 
 export type Attachments = {
   items: Attachment[]
-  /** Files whose upload finished — the ones a submit can carry. */
-  ready: AgentFile[]
-  uploading: boolean
+  /** What a submit carries: every file in the tray, ready. */
+  ready: LocalFile[]
+  preparing: boolean
   add: (files: File[]) => void
   remove: (key: string) => void
   clear: () => void
@@ -38,8 +42,7 @@ export function useAttachments(sessionId: string | null): Attachments {
   const nextKey = useRef(0)
 
   // Switching session must not carry one conversation's attachments into
-  // another: the files live under the session that owns them, and the server
-  // refuses a path from anywhere else.
+  // another.
   useEffect(() => setItems([]), [sessionId])
 
   const patch = useCallback((key: string, change: Partial<Attachment>) => {
@@ -57,43 +60,25 @@ export function useAttachments(sessionId: string | null): Attachments {
         name: file.name,
         size: file.size,
         type: file.type,
+        // Never revoked: the sent bubble shows it too, until the server's copy
+        // is seeded with it.
         preview: isThumbnail(file.type) ? URL.createObjectURL(file) : null,
-        file: null,
-        error: null,
+        preparing: true,
       }))
       setItems((prev) => [...prev, ...rows])
 
-      // One request per file: the server stores a request all-or-nothing, so
-      // batching would let an oversized fourth file void three good ones.
-      // An image is scaled down first; see shrink.ts.
+      // Scaled down now, on the device, so send has nothing left to do but
+      // upload. An image only; see shrink.ts.
       files.forEach((file, i) => {
-        shrinkImage(file)
-          .then((small) => {
-            if (small !== file) patch(rows[i].key, { name: small.name, size: small.size })
-            return uploadAgentFiles(sessionId, [small])
-          })
-          .then(([stored]) => {
-            // The sent bubble will ask for this file by its server URL; it can
-            // have the local copy instead. Never revoked for the same reason.
-            const preview = rows[i].preview
-            if (stored && preview) seedBlobUrl(attachmentUrl(sessionId, stored.path), preview)
-            patch(rows[i].key, stored ? { file: stored } : { error: "not stored" })
-          })
-          .catch((e: unknown) =>
-            patch(rows[i].key, {
-              error: e instanceof Error ? e.message : "upload failed",
-            }),
-          )
+        void shrinkImage(file).then((small) =>
+          patch(rows[i].key, { name: small.name, size: small.size, blob: small, preparing: false }),
+        )
       })
     },
     [sessionId, patch],
   )
 
   const remove = useCallback((key: string) => {
-    // Only dropped from the tray. The file stays on disk under the session,
-    // which is harmless — nothing reads it unless a message names it — and
-    // deleting it would need a path from the client, which is exactly the
-    // input we refuse to trust elsewhere.
     setItems((prev) => prev.filter((item) => item.key !== key))
   }, [])
 
@@ -101,8 +86,8 @@ export function useAttachments(sessionId: string | null): Attachments {
 
   return {
     items,
-    ready: items.flatMap((item) => (item.file ? [item.file] : [])),
-    uploading: items.some((item) => !item.file && !item.error),
+    ready: items.map(({ name, size, type, preview, blob }) => ({ name, size, type, preview, blob })),
+    preparing: items.some((item) => item.preparing),
     add,
     remove,
     clear,

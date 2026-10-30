@@ -421,6 +421,13 @@ screenshot doesn't block every event behind it. The model gets an absolute path
 and reads the file with its own tools: CC's `Read`, Codex's `view_image`. There
 is no base64 and no multimodal content block.
 
+- **Nothing travels before send, and a message goes whole.** Picked files
+  stay on the device (scaled down there) until send. Then the bubble shows at
+  once, its files go up together in one request, which the server stores
+  all-or-nothing, and the message is submitted only after (`useAgent`'s
+  `send`). Any failure marks the whole message with the red "!", and Resend
+  uploads what is not stored yet and submits again. Files not uploaded don't
+  survive a reload (a kept message says to attach them again).
 - **The displayed text is not what the model gets.** The user's text and the
   attachment list are stored separately. Only the copy sent to the backend
   carries the paths.

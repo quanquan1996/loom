@@ -57,6 +57,7 @@ import {
   useFileDrop,
   type Attachment,
   type Attachments,
+  type LocalFile,
 } from "./useAttachments"
 import {
   attachmentUrl,
@@ -911,6 +912,7 @@ function ItemView({ item, sessionId, onAnswer }: ItemProps) {
           {item.text.trim() !== "" &&
             (item.origin === "tidy" ? <Markdown text={item.text} /> : <Rich text={item.text} />)}
           {item.files.length > 0 && <SentFiles sessionId={sessionId} files={item.files} />}
+          {item.uploads && item.uploads.length > 0 && <LocalFiles files={item.uploads} sending={!item.failed} />}
           {item.queued && <span className="tag">queued</span>}
           {item.origin === "phone" && <span className="tag">phone</span>}
           {item.origin === "cron" && <span className="tag"><ClockIcon /> cron</span>}
@@ -1325,6 +1327,24 @@ function extension(name: string): string {
   return dot > 0 && dot < name.length - 1 ? name.slice(dot + 1).slice(0, 5).toUpperCase() : "FILE"
 }
 
+/** A message's files still on this device: on their way, or not got through with it. */
+function LocalFiles({ files, sending }: { files: LocalFile[]; sending: boolean }) {
+  return (
+    <div className="files">
+      {files.map((file, i) => (
+        <FileCard
+          key={i}
+          name={file.name}
+          image={file.preview}
+          busy={sending}
+          error={null}
+          title={`${file.name} · ${formatBytes(file.size)}`}
+        />
+      ))}
+    </div>
+  )
+}
+
 /** The attachments that went out with a message. */
 function SentFiles({ sessionId, files }: { sessionId: string; files: AgentFile[] }) {
   return (
@@ -1729,7 +1749,7 @@ function Composer({
   // An attachment on its own is a message: dragging in a screenshot and
   // pressing send, with nothing typed, is a normal way to ask about it.
   const sendable =
-    (text.trim() !== "" || attachments.ready.length > 0) && !attachments.uploading
+    (text.trim() !== "" || attachments.items.length > 0) && !attachments.preparing
 
   const send = () => {
     if (!sendable) return
@@ -1884,8 +1904,8 @@ function Composer({
               onClick={send}
               disabled={!sendable}
               title={
-                attachments.uploading
-                  ? "Uploading…"
+                attachments.preparing
+                  ? "Preparing…"
                   : interrupted
                     ? "Continue"
                     : busy
@@ -1906,8 +1926,8 @@ function Composer({
 const MAX_LINES = 6
 
 /**
- * One pending attachment: uploading, failed, or ready to go. Once the server
- * has it, a click shows it in the canvas, as it will be once sent.
+ * One file in the tray, on this device until send. A moment's spinner while
+ * an image is scaled down.
  */
 function AttachmentChip({
   item,
@@ -1916,17 +1936,13 @@ function AttachmentChip({
   item: Attachment
   onRemove: () => void
 }) {
-  const openCanvas = useContext(OpenCanvas)
-  const shown = item.file ? itemForAttachment(item.file) : null
-
   return (
     <FileCard
       name={item.name}
       image={item.preview}
-      busy={!item.file && !item.error}
-      error={item.error}
-      title={`${shown ? "Show " : ""}${item.name} · ${formatBytes(item.size)}`}
-      onClick={shown ? () => openCanvas(shown) : undefined}
+      busy={item.preparing}
+      error={null}
+      title={`${item.name} · ${formatBytes(item.size)}`}
       onRemove={onRemove}
     />
   )

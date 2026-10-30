@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import type { Channel } from "phoenix"
 import { getSocket } from "./socket"
-import type { AgentFile } from "./api"
+import { attachmentUrl, seedBlobUrl, uploadAgentFiles } from "./api"
+import type { LocalFile } from "./useAttachments"
 import {
   addPending,
   dropPending,
   markPending,
+  updatePending,
   applyDelta,
   applyEvent,
   applySnapshot,
@@ -57,7 +59,13 @@ const unsentOf = (pending: PendingMessage[]): PendingMessage[] =>
 function loadUnsent(id: string): PendingMessage[] {
   try {
     const list = JSON.parse(localStorage.getItem(UNSENT_KEY(id)) ?? "[]")
-    return Array.isArray(list) ? list : []
+    // Files not uploaded yet kept their names only: the bytes and the preview
+    // were this page's.
+    return Array.isArray(list)
+      ? list.map((p: PendingMessage) =>
+          p.uploads?.length ? { ...p, uploads: p.uploads.map((u) => ({ ...u, preview: null, blob: undefined })) } : p,
+        )
+      : []
   } catch {
     return []
   }
@@ -82,7 +90,7 @@ function withUnsent(t: Transcript, id: string): Transcript {
 type Agent = {
   transcript: Transcript
   joinError: string | null
-  submit: (text: string, files?: AgentFile[]) => void
+  submit: (text: string, uploads?: LocalFile[]) => void
   // A message that did not get through: send it again, or let it go.
   resend: (clientMsgId: string) => void
   discard: (clientMsgId: string) => void
@@ -119,6 +127,10 @@ export function useAgent(
   const [joinError, setJoinError] = useState<string | null>(null)
   const [draft, setDraft] = useState<{ id: string; text: string } | null>(null)
   const channelRef = useRef<Channel | null>(null)
+  // Which session the channel is for now: an upload that finishes after the
+  // user moved on must not send its message into the next one.
+  const sessionRef = useRef(sessionId)
+  sessionRef.current = sessionId
   // Read inside the params closure on rejoin, so it must not be state.
   const lastSeqRef = useRef(0)
   // For the cache, written on unmount.
@@ -232,10 +244,8 @@ export function useAgent(
     if (sessionId) saveUnsent(sessionId, transcript.pending)
   }, [sessionId, transcript.pending])
 
-  // One push of a pending message. Its bubble is already on screen; this only
-  // decides whether it ends up marked. Sent again under the same id, so the
-  // server can tell a resend of something that did arrive (`:duplicate`).
-  const send = useCallback((p: PendingMessage) => {
+  // The message itself, its files already on the server.
+  const push = useCallback((p: PendingMessage) => {
     const channel = channelRef.current
     const fail = (reason: string) => setTranscript((t) => markPending(t, p.clientMsgId, reason))
     if (!channel) return fail("not connected")
@@ -262,12 +272,47 @@ export function useAgent(
       .receive("timeout", () => fail("no answer — the connection may be weak"))
   }, [])
 
+  // One go at a pending message. Its bubble is already on screen; this only
+  // decides whether it ends up marked. Files still on this device go up first,
+  // all in one request the server stores all-or-nothing, and the message only
+  // after: it arrives with all of them or is marked with all of them, and a
+  // resend picks up where it stopped (what is stored stays in `files`). Sent
+  // again under the same id, so the server can tell a resend of something
+  // that did arrive (`:duplicate`).
+  const send = useCallback((p: PendingMessage) => {
+    const fail = (reason: string) => setTranscript((t) => markPending(t, p.clientMsgId, reason))
+    const uploads = p.uploads ?? []
+    if (uploads.length === 0) return push(p)
+    if (!sessionId) return fail("not connected")
+    if (uploads.some((u) => !u.blob)) return fail("its files were lost when the page reloaded — attach them again")
+
+    const blobs = uploads.map((u) => (u.blob instanceof File ? u.blob : new File([u.blob!], u.name, { type: u.type })))
+    uploadAgentFiles(sessionId, blobs).then(
+      (stored) => {
+        // Moved to another session meanwhile: this one's copy, kept on the
+        // device, shows it as not got through; a resend uploads again.
+        if (sessionRef.current !== sessionId) return
+        // The bubble will ask for each by its server URL; it can have the
+        // local copy instead.
+        stored.forEach((f, i) => {
+          const preview = uploads[i]?.preview
+          if (preview) seedBlobUrl(attachmentUrl(sessionId, f.path), preview)
+        })
+        const next = { ...p, files: [...p.files, ...stored], uploads: [] }
+        setTranscript((t) => updatePending(t, next))
+        push(next)
+      },
+      (e: unknown) => fail(e instanceof Error ? e.message : "upload failed"),
+    )
+  }, [sessionId, push])
+
+
   const submit = useCallback(
-    (text: string, files: AgentFile[] = []) => {
+    (text: string, uploads: LocalFile[] = []) => {
       // Optimistic: the bubble appears now and is replaced by the
       // authoritative `:user` event, matched on `client_msg_id`. Without that
       // id the sender would see its own message twice.
-      const p: PendingMessage = { clientMsgId: newClientMsgId(), text, files }
+      const p: PendingMessage = { clientMsgId: newClientMsgId(), text, files: [], uploads }
       setTranscript((t) => addPending(t, p))
       send(p)
     },
