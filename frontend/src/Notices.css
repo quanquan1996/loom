@@ -209,26 +209,54 @@
   color: var(--green);
 }
 
-/* Going through the bell: over the composer. */
-.bell-next {
+/* A line back, from the card. */
+.bell-reply {
   display: flex;
+  flex: 1 1 auto;
   align-items: center;
-  gap: 8px;
-  margin: 0 max(16px, calc((100% - var(--measure)) / 2)) 8px;
-  padding: 6px 6px 6px 12px;
-  border-radius: 16px;
-  background: var(--bg-card);
-  color: var(--fg-dim);
-  font-size: 0.85rem;
+  gap: 6px;
+  min-width: 0;
+  padding: 3px 3px 3px 12px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--fg) 8%, transparent);
 }
 
-.bell-next-text {
+.bell-reply input {
   flex: 1 1 auto;
   min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  /* 16px or more, or iOS zooms the page to it. */
+  font-size: max(0.95rem, 16px);
 }
 
-.bell-next .icon-btn {
-  background: transparent;
+.bell-send {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--fg);
+  color: var(--bg);
+  cursor: pointer;
+}
+
+.bell-send:disabled {
+  opacity: 0.4;
+}
+
+.bell-send svg {
+  width: 16px;
+  height: 16px;
+}
+
+.bell-error {
+  color: var(--red);
 }
 
 /* Earlier days of an employee's work, above today's. */

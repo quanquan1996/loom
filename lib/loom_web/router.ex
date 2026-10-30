@@ -94,6 +94,7 @@ defmodule LoomWeb.Router do
     get "/notices", NoticeController, :index
     post "/notices/:id/read", NoticeController, :read
     post "/notices/:id/answer", NoticeController, :answer
+    post "/notices/:id/reply", NoticeController, :respond
     post "/notices/:id/dismiss", NoticeController, :dismiss
 
     get "/push", PushController, :show

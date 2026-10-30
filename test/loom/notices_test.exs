@@ -82,6 +82,16 @@ defmodule Loom.NoticesTest do
     assert_received {:submitted, "a_1", "✅ Approved: 部署 2b98e02"}
   end
 
+  test "a reply from the bell goes to its session as the user's, and is done", %{s: s} do
+    {:ok, n} = post(s, %{summary: "要不要换？", priority: 4, needs: "reply", session: "a_7"})
+    assert {:error, _} = Notices.reply(n["id"], "  ", s)
+    {:ok, m} = Notices.reply(n["id"], "换，先签一个季度", s)
+    assert m["status"] == "done" and m["answer"] == "换，先签一个季度"
+    assert_received {:submitted, "a_7", "换，先签一个季度"}
+    {:ok, d} = post(s, %{summary: "日报", priority: 7}, %{kind: "session", id: "a_8", name: "q"})
+    assert {:ok, %{"status" => "done", "note" => "Dismissed"}} = Notices.dismiss(d["id"], s)
+  end
+
   test "read settles only what asks to be read", %{s: s} do
     {:ok, r} = post(s, %{summary: "日报", priority: 7})
 

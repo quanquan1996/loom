@@ -945,7 +945,8 @@ export type Notice = {
   status: "open" | "done" | "expired" | "withdrawn"
   // Why Loom changed or settled it: lowered, answered in chat, expired…
   note: string | null
-  answer?: "approve" | "reject"
+  // "approve", "reject", or what the user wrote back from the bell.
+  answer?: string
   created_at: number
   updated_at: number
   done_at?: number
@@ -956,6 +957,16 @@ const notice = async (call: Promise<{ notice: Notice }>) => (await call).notice
 /** Opened: done, if it only asked to be read. */
 export function readNotice(id: string): Promise<Notice> {
   return notice(apiCall(`/api/notices/${id}/read`, { method: "POST" }))
+}
+
+/** Answered in the bell: the text goes to its session as the user's. */
+export function replyNotice(id: string, text: string): Promise<Notice> {
+  return notice(apiCall(`/api/notices/${id}/reply`, { method: "POST", body: JSON.stringify({ text }) }))
+}
+
+/** Settled by hand: nothing more to do about it. */
+export function dismissNotice(id: string): Promise<Notice> {
+  return notice(apiCall(`/api/notices/${id}/dismiss`, { method: "POST" }))
 }
 
 /** Approved or rejected from the bell; its session is told. */

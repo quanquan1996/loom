@@ -311,9 +311,10 @@ for 3–5.
   session as a message, `origin: "notice"`), or opens one that only asks to be
   read. 6–10 expire after a week unread; settled ones are kept 30 days.
 - **Truth is `~/.loom/notices.json`.** The whole list rides on the lobby
-  join and comes again as `notices` on every change. Opening a notice from
-  the bell keeps the rest in order behind a bar over the composer, to go on
-  to the next without the list (`Notices.tsx`).
+  join and comes again as `notices` on every change. Each card can be
+  handled where it is (`Notices.tsx`): approve or reject, a line of reply
+  (sent to its session as the user's message), or done; tapping it opens
+  its session instead.
 - **Sleep** posts its night with the same command, and sleeps in a new
   session each night (`past` keeps the old ones, answerable still).
 

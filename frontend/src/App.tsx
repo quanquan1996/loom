@@ -39,7 +39,7 @@ import {
   type Notice,
   type Project,
 } from "./api"
-import { NextBar, NoticesSheet, openNotices } from "./Notices"
+import { NoticesSheet } from "./Notices"
 import { dropSocket } from "./socket"
 import "./App.css"
 // Last, so it decides the look over every other stylesheet.
@@ -319,29 +319,13 @@ function App() {
     select(id)
   }
 
-  // The bell. Opening a notice goes to where it is answered; the ones after it
-  // wait in `flow`, for the bar over the composer to go on to.
+  // The bell. Opening a notice goes to where it is answered.
   const [bellOpen, setBellOpen] = useState(false)
-  const [flow, setFlow] = useState<string[] | null>(null)
-  const openNotice = (n: Notice, rest: string[]) => {
+  const openNotice = (n: Notice) => {
     if (n.status === "open" && n.needs === "read") readNotice(n.id).then(upsertNotice, () => {})
     if (n.session) select(n.session)
     setBellOpen(false)
-    setFlow(rest)
   }
-  const stillOpen = (ids: string[]) =>
-    ids.map((id) => notices.find((n) => n.id === id)).filter((n): n is Notice => n?.status === "open")
-  // Gone once nothing is left to go on to.
-  const banner = flow && stillOpen(flow).length > 0 && (
-    <NextBar
-      left={stillOpen(flow).length}
-      onNext={() => {
-        const [next, ...rest] = stillOpen(flow)
-        if (next) openNotice(next, rest.map((n) => n.id))
-      }}
-      onClose={() => setFlow(null)}
-    />
-  )
 
   // A notification tapped while the app is already open: the worker names the
   // session rather than opening a second window.
@@ -638,7 +622,6 @@ function App() {
   )
 
   const chatProps = active && {
-    banner,
     sidebarOpen: !narrow && sidebarOpen,
     onToggleSidebar: () => (narrow ? setDrawerOpen(true) : setSidebarOpen((open) => !open)),
     terminalOpen,
@@ -874,10 +857,7 @@ function App() {
       {bellOpen && (
         <NoticesSheet
           notices={notices}
-          onOpen={(n) => {
-            const after = openNotices(notices).filter((x) => x.id !== n.id)
-            openNotice(n, n.status === "open" ? after.map((x) => x.id) : [])
-          }}
+          onOpen={openNotice}
           onAnswered={upsertNotice}
           onClose={() => setBellOpen(false)}
         />

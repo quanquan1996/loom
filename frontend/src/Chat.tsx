@@ -92,8 +92,6 @@ type Props = {
   // Earlier sessions of the same thread, newest first, shown above this one a
   // day at a time: a virtual employee's work (see `Employees.tsx`).
   earlier?: string[]
-  // Over the composer: going through the bell (see `Notices.tsx`).
-  banner?: ReactNode
   // Read up to here, from any device; clears the sidebar's unread mark. Only
   // for a plain conversation: the sleep and employee pages keep their own.
   onSeen?: (seq: number) => void
@@ -125,7 +123,6 @@ export function Chat({
   tabs,
   subhead,
   earlier,
-  banner,
   onSeen,
   reading = true,
 }: Props) {
@@ -331,7 +328,6 @@ export function Chat({
         </Unsent.Provider>
 
         <div className="dock" ref={dockRef}>
-        {banner}
         {transcript.queue.length > 0 && (
           <QueuePanel
             messages={transcript.queue}

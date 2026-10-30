@@ -25,6 +25,9 @@ defmodule LoomWeb.NoticeController do
   def answer(conn, %{"id" => id} = params),
     do: reply(conn, Notices.answer(id, params["approve"] == true))
 
+  # POST /api/notices/:id/reply — `text`, sent to its session as the user's.
+  def respond(conn, %{"id" => id} = params), do: reply(conn, Notices.reply(id, params["text"]))
+
   # POST /api/notices/:id/dismiss
   def dismiss(conn, %{"id" => id}), do: reply(conn, Notices.dismiss(id))
 

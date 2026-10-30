@@ -72,6 +72,9 @@ defmodule Loom.Notices do
   @doc "The user approved (`true`) or rejected it in the bell; told to its session."
   def answer(id, approve?, server \\ @name), do: GenServer.call(server, {:answer, id, approve?})
 
+  @doc "The user answered it in the bell: `text` goes to its session as theirs."
+  def reply(id, text, server \\ @name), do: GenServer.call(server, {:reply, id, text})
+
   @doc "Settled by hand, without an answer."
   def dismiss(id, server \\ @name), do: GenServer.call(server, {:dismiss, id})
 
@@ -170,6 +173,27 @@ defmodule Loom.Notices do
 
         n = Map.put(n, "answer", if(approve?, do: "approve", else: "reject"))
         state = settle(put_in(state.notices[id], n), n, "done", "#{word} in the bell")
+        {:reply, {:ok, view(state.notices[id])}, changed(state)}
+
+      nil ->
+        {:reply, {:error, :not_found}, state}
+
+      n ->
+        {:reply, {:ok, view(n)}, state}
+    end
+  end
+
+  def handle_call({:reply, id, text}, _from, state) do
+    text = String.trim(to_string(text))
+
+    case state.notices[id] do
+      _ when text == "" ->
+        {:reply, {:error, "an empty reply"}, state}
+
+      %{"status" => "open", "session" => session} = n when is_binary(session) ->
+        state.submit.(session, text)
+        n = Map.put(n, "answer", text)
+        state = settle(put_in(state.notices[id], n), n, "done", "Answered in the bell")
         {:reply, {:ok, view(state.notices[id])}, changed(state)}
 
       nil ->

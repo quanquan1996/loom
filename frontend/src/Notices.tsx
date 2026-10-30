@@ -1,7 +1,7 @@
-import { Bell, Check, CheckCircle2, History, MessageSquare, Moon, X } from "lucide-react"
+import { ArrowUp, Bell, Check, CheckCircle2, History, MessageSquare, Moon, Reply, X } from "lucide-react"
 import { useState } from "react"
 import { createPortal } from "react-dom"
-import { answerNotice, type Notice } from "./api"
+import { answerNotice, dismissNotice, replyNotice, type Notice } from "./api"
 import "./Notices.css"
 
 /**
@@ -107,21 +107,30 @@ export function NoticesSheet({
 
 function Card({ n, onOpen, onAnswered }: { n: Notice; onOpen: (n: Notice) => void; onAnswered: (n: Notice) => void }) {
   const [busy, setBusy] = useState(false)
+  const [replying, setReplying] = useState(false)
+  const [text, setText] = useState("")
+  const [error, setError] = useState<string | null>(null)
   const tone = n.priority <= 2 ? "urgent" : n.priority <= 5 ? "important" : "other"
-  const answer = async (approve: boolean) => {
+  const act = async (call: () => Promise<Notice>) => {
     setBusy(true)
+    setError(null)
     try {
-      onAnswered(await answerNotice(n.id, approve))
+      onAnswered(await call())
+    } catch (err) {
+      setError((err as Error).message)
     } finally {
       setBusy(false)
     }
   }
+  const send = () => text.trim() && act(() => replyNotice(n.id, text.trim()))
+  // What the user wrote back from here, beside "Answered in the bell".
+  const said = n.answer && n.answer !== "approve" && n.answer !== "reject" ? `: ${n.answer}` : ""
 
   return (
     <div
       className={"bell-card " + tone + (n.status === "open" ? "" : " settled")}
       role="button"
-      onClick={() => n.session && onOpen(n)}
+      onClick={() => !replying && n.session && onOpen(n)}
     >
       <div className="bell-card-head">
         <SourceMark n={n} />
@@ -130,17 +139,58 @@ function Card({ n, onOpen, onAnswered }: { n: Notice; onOpen: (n: Notice) => voi
         <span className={"bell-p " + tone}>P{n.priority}</span>
       </div>
       <div className="bell-summary">{n.summary}</div>
-      {n.note && <div className="bell-note">{n.note}</div>}
-      {n.status === "open" && n.needs === "approve" && (
-        <div className="bell-acts" onClick={(e) => e.stopPropagation()}>
-          <button className="bell-btn pri" disabled={busy} onClick={() => answer(true)}>
-            <Check /> Approve
-          </button>
-          <button className="bell-btn" disabled={busy} onClick={() => answer(false)}>
-            Reject
-          </button>
+      {n.note && (
+        <div className="bell-note">
+          {n.note}
+          {said}
         </div>
       )}
+      {/* Handled here, without going there: approve, a line back, or done. */}
+      {n.status === "open" && (
+        <div className="bell-acts" onClick={(e) => e.stopPropagation()}>
+          {n.needs === "approve" && (
+            <>
+              <button className="bell-btn pri" disabled={busy} onClick={() => act(() => answerNotice(n.id, true))}>
+                <Check /> Approve
+              </button>
+              <button className="bell-btn" disabled={busy} onClick={() => act(() => answerNotice(n.id, false))}>
+                Reject
+              </button>
+            </>
+          )}
+          {n.needs === "reply" && n.session && !replying && (
+            <button className="bell-btn pri" disabled={busy} onClick={() => setReplying(true)}>
+              <Reply /> Reply
+            </button>
+          )}
+          {replying ? (
+            <form
+              className="bell-reply"
+              onSubmit={(e) => {
+                e.preventDefault()
+                void send()
+              }}
+            >
+              <input
+                autoFocus
+                value={text}
+                placeholder={`Reply to ${n.source.name}`}
+                enterKeyHint="send"
+                onChange={(e) => setText(e.target.value)}
+                onKeyDown={(e) => e.key === "Escape" && setReplying(false)}
+              />
+              <button className="bell-send" type="submit" disabled={busy || !text.trim()} title="Send">
+                <ArrowUp />
+              </button>
+            </form>
+          ) : (
+            <button className="bell-btn" disabled={busy} onClick={() => act(() => dismissNotice(n.id))}>
+              Done
+            </button>
+          )}
+        </div>
+      )}
+      {error && <div className="bell-note bell-error">{error}</div>}
     </div>
   )
 }
@@ -149,25 +199,6 @@ function SourceMark({ n }: { n: Notice }) {
   if (n.source.kind === "dream") return <Moon className="bell-mark" />
   if (n.source.kind === "employee") return <span className="emp-avatar sm">{[...n.source.name.trim()][0] ?? "?"}</span>
   return <MessageSquare className="bell-mark" />
-}
-
-/**
- * Over the composer, while going through the bell: back to it, or on to the
- * next one, without the list in between.
- */
-export function NextBar({ left, onNext, onClose }: { left: number; onNext: () => void; onClose: () => void }) {
-  return (
-    <div className="bell-next">
-      <Bell className="bell-mark" />
-      <span className="bell-next-text">{left} more in the bell</span>
-      <button className="bell-btn pri" onClick={onNext}>
-        Next
-      </button>
-      <button className="icon-btn" onClick={onClose} title="Done going through">
-        <X />
-      </button>
-    </div>
-  )
 }
 
 function when(ms: number): string {
