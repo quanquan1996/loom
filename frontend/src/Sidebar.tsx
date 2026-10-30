@@ -364,11 +364,6 @@ export function Sidebar({
           <Users className="nav-icon" />
           <span className="nav-label">Employees</span>
           {employees.length > 0 && <span className="nav-count">{employees.length}</span>}
-          {/* Folded, an employee's news shows on the heading. */}
-          {!open(EMPLOYEES_SECTION) &&
-            employees.some((e) => hasNews(employeeSessions.find((s) => s.id === e.work_session))) && (
-              <span className="emp-row-news" title="New updates" />
-            )}
           <span className="nav-actions" onClick={(e) => e.stopPropagation()}>
             <button className="session-del nav-btn" onClick={onHire} title="Hire a virtual employee">
               <UserPlus />
