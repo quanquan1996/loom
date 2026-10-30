@@ -181,11 +181,12 @@ defmodule Loom.Agent.Session do
 
   @doc """
   Begin a session with what it should know, without a turn: `display` is shown
-  as a message (origin "tidy"), and `prompt` goes to the backend ahead of the
-  next message, as a project move does. How a merge of sessions starts; see
-  `LoomWeb.TidyController`.
+  as a message (`origin`, "tidy" unless given), and `prompt` goes to the
+  backend ahead of the next message, as a project move does. How a merge of
+  sessions starts, and a handoff; see `LoomWeb.TidyController`.
   """
-  def seed(id, display, prompt), do: GenServer.call(via(id), {:seed, display, prompt})
+  def seed(id, display, prompt, origin \\ "tidy"),
+    do: GenServer.call(via(id), {:seed, display, prompt, origin})
 
   @doc """
   Something the agent should know, sent ahead of its next message and not
@@ -656,7 +657,7 @@ defmodule Loom.Agent.Session do
     {:reply, :ok, state}
   end
 
-  def handle_call({:seed, display, prompt}, _from, state) do
+  def handle_call({:seed, display, prompt, origin}, _from, state) do
     if state.turns > 0 or state.status in [:starting, :running] do
       {:reply, {:error, :busy}, state}
     else
@@ -664,7 +665,7 @@ defmodule Loom.Agent.Session do
         emit(state, :user, %{
           text: display,
           files: [],
-          origin: "tidy",
+          origin: origin,
           client_msg_id: nil,
           status: :sent
         })

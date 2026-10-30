@@ -8,9 +8,12 @@
   loom-session merge --title T --summary-file F ID...
   loom-session retitle ID TITLE
   loom-session keep ID...
+  loom-session handoff --title T --brief-file F [--project ID|home] [--start]
 
 Only the sidebar's Recents can be tidied; nothing is deleted. Archiving hides
-a session from the lists and nothing else. See the loom-tidy skill.
+a session from the lists and nothing else. See the loom-tidy skill. A handoff
+is a new session in Recents that begins with a brief, for the user to carry a
+matter on in, once they agreed; see the loom-handoff skill.
 """
 import argparse, json, os, sys, time, urllib.error, urllib.parse, urllib.request
 
@@ -78,6 +81,11 @@ def main():
     rt = sub.add_parser("retitle", help="a title to tell it apart by (never over one the user gave)")
     rt.add_argument("id")
     rt.add_argument("title", nargs="+")
+    ho = sub.add_parser("handoff", help="a new session in Recents that begins with BRIEF (the user agreed to it)")
+    ho.add_argument("--title", required=True)
+    ho.add_argument("--brief-file", required=True, help="the brief, markdown; - for stdin")
+    ho.add_argument("--project", help="a project id, or home (default: this session's project)")
+    ho.add_argument("--start", action="store_true", help="begin on it now, rather than when the user writes")
     a = p.parse_args()
 
     if a.cmd == "list":
@@ -111,6 +119,13 @@ def main():
     elif a.cmd == "retitle":
         r = call("POST", "retitle", {"id": a.id, "title": " ".join(a.title)})
         print(f"{r['id']}: {r['title']}")
+    elif a.cmd == "handoff":
+        brief = sys.stdin.read() if a.brief_file == "-" else open(a.brief_file).read()
+        body = {"title": a.title, "brief": brief, "start": a.start}
+        if a.project:
+            body["project"] = a.project
+        r = call("POST", "handoff", body)
+        print(f"handed off to {r['id']} ({r['project_id'] or 'home'}){' — started' if a.start else ''}")
     else:
         summary = sys.stdin.read() if a.summary_file == "-" else open(a.summary_file).read()
         r = call("POST", "merge", {"title": a.title, "summary": summary, "ids": a.ids})

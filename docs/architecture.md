@@ -351,7 +351,7 @@ installed like `loom-notice`), calling `/api/tidy/*` (`TidyController`).
 - **Merge** starts a new session in the same project, on the backend of the
   most recent source, with the summary shown as its first message (`origin:
   "tidy"`, rendered as markdown) and given to the backend ahead of the next
-  message (`Session.seed/3`, the `notice` slot); the sources are archived.
+  message (`Session.seed/4`, the `notice` slot); the sources are archived.
 - **New first.** Each action, and `keep` (looked at, left as is), sets
   `tidied_at`; `list` puts first the sessions never tidied or active since,
   so a scheduled run reads only what changed.
@@ -362,6 +362,12 @@ installed like `loom-notice`), calling `/api/tidy/*` (`TidyController`).
   always refused, as is any kind added later. Archive and merge also refuse a
   session mid-turn, the caller, one with an open notice, and a merge across
   projects.
+- **Handoff** (`loom-session handoff`, the `loom-handoff` skill) tidies
+  nothing: a new session in Recents (the caller's project, another, or home),
+  on the caller's backend, that begins with the caller's brief (`origin:
+  "handoff"`, "handed off"), or starts on it at once with `--start`. The
+  user's agreement first is the skill's rule; the backend is told who handed
+  it off.
 
 ## 3. Client protocol
 

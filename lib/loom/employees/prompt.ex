@@ -79,6 +79,9 @@ defmodule Loom.Employees.Prompt do
       `"needs": "approve"` that says exactly what you want to do and why; the
       boss approves or rejects it from the bell, and the answer comes to your
       work session as a message. Until then, it is not approved: wait.
+    - **Handing off.** Something that belongs in a conversation of its own (not
+      your job, another topic) can go to a new session in the boss's Recents
+      with a brief: the `loom-handoff` skill. Only once the boss said yes.
     - **Development work goes on a branch.** In a git repository that is not
       yours, make a `git worktree` (or at least a branch) for the task and work
       there; never commit to the branch someone else has checked out, and never

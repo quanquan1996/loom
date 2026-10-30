@@ -152,6 +152,7 @@ defmodule LoomWeb.Router do
     post "/merge", TidyController, :merge
     post "/retitle", TidyController, :retitle
     post "/keep", TidyController, :keep
+    post "/handoff", TidyController, :handoff
   end
 
   # A device joining: the install script (its one-time code is the credential)

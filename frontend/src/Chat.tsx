@@ -7,6 +7,7 @@ import {
   ChevronRight,
   Clock as ClockIcon,
   Ellipsis,
+  Forward,
   Merge,
   Moon,
   PanelLeft,
@@ -910,7 +911,7 @@ function ItemView({ item, sessionId, onAnswer }: ItemProps) {
           {item.failed && item.clientMsgId && <UnsentMark id={item.clientMsgId} reason={item.failed} />}
           {/* A merge's summary is the agent's writing, not the user's words: markdown. */}
           {item.text.trim() !== "" &&
-            (item.origin === "tidy" ? <Markdown text={item.text} /> : <Rich text={item.text} />)}
+            (item.origin === "tidy" || item.origin === "handoff" ? <Markdown text={item.text} /> : <Rich text={item.text} />)}
           {item.files.length > 0 && <SentFiles sessionId={sessionId} files={item.files} />}
           {item.uploads && item.uploads.length > 0 && <LocalFiles files={item.uploads} sending={!item.failed} />}
           {item.queued && <span className="tag">queued</span>}
@@ -918,6 +919,7 @@ function ItemView({ item, sessionId, onAnswer }: ItemProps) {
           {item.origin === "cron" && <span className="tag"><ClockIcon /> cron</span>}
           {item.origin === "dream" && <span className="tag"><Moon /> dream</span>}
           {item.origin === "tidy" && <span className="tag"><Merge /> merged</span>}
+          {item.origin === "handoff" && <span className="tag"><Forward /> handed off</span>}
           {item.at && <Clock at={item.at} />}
         </div>
       )

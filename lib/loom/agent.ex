@@ -104,7 +104,7 @@ defmodule Loom.Agent do
   defdelegate retitle(id, title), to: Session
   defdelegate pin(id, pinned?), to: Session
   defdelegate archive(id, archived?), to: Session
-  defdelegate seed(id, display, prompt), to: Session
+  defdelegate seed(id, display, prompt, origin \\ "tidy"), to: Session
   defdelegate tell(id, text), to: Session
   defdelegate tidied(id), to: Session
   defdelegate seen(id, seq), to: Session
