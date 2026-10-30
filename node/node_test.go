@@ -71,3 +71,29 @@ func TestKillTakesTheGroup(t *testing.T) {
 		t.Fatalf("exit code %d, want 143", code)
 	}
 }
+
+// What a removed device leaves behind: nothing of loom-node's. Linux only, as
+// if run detached: no INVOCATION_ID, so no systemctl. (On macOS it would boot
+// out the real launchd agent.) It deletes this test binary, which Linux allows
+// while it runs.
+func TestSelfUninstallLeavesNothing(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("would touch this machine's own loom-node service")
+	}
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("INVOCATION_ID", "")
+	for _, p := range []string{configPath(), stateDir("log"), stateDir("work", "repo", "a.txt")} {
+		os.MkdirAll(filepath.Dir(p), 0o700)
+		os.WriteFile(p, []byte("x"), 0o600)
+	}
+
+	if code := selfUninstall(); code != 0 {
+		t.Fatalf("exit %d", code)
+	}
+	for _, p := range []string{filepath.Dir(configPath()), stateDir()} {
+		if _, err := os.Stat(p); !os.IsNotExist(err) {
+			t.Errorf("%s is still there", p)
+		}
+	}
+}

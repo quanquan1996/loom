@@ -88,15 +88,16 @@ func removeRunKey() {
 }
 
 // removeBinaries, from the running daemon: loom-node.exe can go now, but
-// Windows will not delete a running image, so a detached cmd waits for this
-// process to exit and then takes loom-noded.exe and the folder.
+// Windows will not delete a running image or an open file, so a detached cmd
+// waits for this process to exit and then takes loom-noded.exe, its folder and
+// the state folder, whose daemon.log this process holds open.
 func removeBinaries(exe string) {
 	dir := filepath.Dir(exe)
 	os.Remove(filepath.Join(dir, "loom-node.exe"))
 	cmd := exec.Command("cmd")
 	detach(cmd)
 	// Verbatim: Go's own quoting of arguments is not what cmd expects.
-	cmd.SysProcAttr.CmdLine = fmt.Sprintf(`cmd /c "ping -n 4 127.0.0.1 >nul & del /f /q "%s" & rmdir "%s""`, exe, dir)
+	cmd.SysProcAttr.CmdLine = fmt.Sprintf(`cmd /c "ping -n 4 127.0.0.1 >nul & del /f /q "%s" & rmdir "%s" & rmdir /s /q "%s""`, exe, dir, stateDir())
 	if cmd.Start() == nil {
 		cmd.Process.Release()
 	}

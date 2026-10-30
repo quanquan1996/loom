@@ -239,11 +239,14 @@ func runUninstall(args []string) int {
 }
 
 // selfUninstall is uninstall run by the daemon itself, when loom removed the
-// device: the token, the service and the binaries go. The log of what loom ran
-// here stays, for whoever owns the machine. Stopping the service kills this
-// process on macOS and under systemd, so that is done last.
+// device: the token, the service, the binaries, the logs and the agents'
+// scratch space all go, so nothing is left on someone else's machine. Stopping
+// the service kills this process on macOS and under systemd, so that is last.
 func selfUninstall() int {
-	os.Remove(configPath())
+	os.RemoveAll(filepath.Dir(configPath()))
+	if runtime.GOOS != "windows" { // there the daemon's own log is open; see removeBinaries
+		os.RemoveAll(stateDir())
+	}
 	if exe, err := os.Executable(); err == nil {
 		if exe, err = filepath.EvalSymlinks(exe); err == nil {
 			removeBinaries(exe)
@@ -252,6 +255,8 @@ func selfUninstall() int {
 	switch runtime.GOOS {
 	case "darwin":
 		os.Remove(plistPath())
+		home, _ := os.UserHomeDir()
+		os.Remove(filepath.Join(home, "Library", "Logs", "loom-node.log"))
 		exec.Command("launchctl", "bootout", fmt.Sprintf("gui/%d/%s", os.Getuid(), launchdLabel)).Run()
 	case "linux":
 		if os.Getenv("INVOCATION_ID") != "" {

@@ -37,6 +37,16 @@ type config struct {
 	Shell string `json:"shell"`
 }
 
+// stateDir is where loom-node keeps what it writes as it runs: its logs, and
+// work/ ($LOOM_WORK), the agents' scratch space. Removing the device deletes it.
+func stateDir(sub ...string) string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		home = "."
+	}
+	return filepath.Join(append([]string{home, ".local", "state", "loom-node"}, sub...)...)
+}
+
 // One place on every system, macOS included, so it is easy to find and explain.
 func configPath() string {
 	home, err := os.UserHomeDir()
@@ -292,7 +302,9 @@ func (s *session) exec(r request) {
 	var total int64
 	cmd := shellCommand(s.cfg.Shell, r.Cmd)
 	cmd.Dir = cwd
-	cmd.Env = append(os.Environ(), "LOOM_NODE=1")
+	work := stateDir("work")
+	os.MkdirAll(work, 0o700)
+	cmd.Env = append(os.Environ(), "LOOM_NODE=1", "LOOM_WORK="+work)
 	cmd.Stdout = &stream{s: s, id: r.ID, name: "stdout", mu: &mu, total: &total}
 	cmd.Stderr = &stream{s: s, id: r.ID, name: "stderr", mu: &mu, total: &total}
 	cmd.WaitDelay = pipeLinger
@@ -521,11 +533,7 @@ func audit(format string, args ...any) {
 	auditMu.Lock()
 	defer auditMu.Unlock()
 
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return
-	}
-	dir := filepath.Join(home, ".local", "state", "loom-node")
+	dir := stateDir()
 	os.MkdirAll(dir, 0o700)
 	path := filepath.Join(dir, "log")
 	if st, err := os.Stat(path); err == nil && st.Size() > 5<<20 {

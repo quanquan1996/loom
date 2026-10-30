@@ -28,6 +28,10 @@ loom-node exec <device> [--cwd DIR] [--timeout SECONDS] -- '<command>'
   shell (`$SHELL -lc`). Unquoted, `~`, `$VAR`, globs and pipes would be
   expanded by *this* server's shell first.
 - Starts in the device's home directory unless `--cwd` is given.
+- **Scratch files go in `$LOOM_WORK`** (`$env:LOOM_WORK` on Windows): clones,
+  downloads, build output, anything that is yours rather than the user's. It
+  is deleted with loom-node when the device is removed, so nothing of yours is
+  left on someone else's machine. Write elsewhere only what the user asked for.
 - stdout and stderr come back as they are produced, and the exit code is the
   command's own.
 - No stdin and no terminal: anything interactive (prompts, `sudo` asking for a
