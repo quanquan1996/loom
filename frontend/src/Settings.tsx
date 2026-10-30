@@ -4,10 +4,12 @@ import { createPortal } from "react-dom"
 import type { AgentBackend, AgentInfo, Project } from "./api"
 import type { Appearance, Settings } from "./settings"
 import { Slider } from "./Slider"
+import { BossProfile } from "./Boss"
 
 /**
  * The gear at the foot of the sidebar: this device's appearance and text sizes, the
- * engine "+" starts a session on, and the archived sessions. Each choice takes
+ * engine "+" starts a session on, the boss profile the employees share, and
+ * the archived sessions. Each choice takes
  * effect as it is made; there is nothing to save.
  */
 export function SettingsDialog({
@@ -68,6 +70,8 @@ export function SettingsDialog({
               onChange={(backend) => onChange({ backend })}
             />
           </Row>
+
+          <BossProfile />
 
           <Archived sessions={archived} projects={projects} onOpen={onOpen} onUnarchive={onUnarchive} />
         </div>

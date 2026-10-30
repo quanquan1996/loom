@@ -282,7 +282,7 @@ says when it needs the user.
 - **The boss profile**, one for all employees: a sentence a line, with who
   heard it and when (`boss` in `employees.json`, `/api/boss`, `Boss.tsx`).
   A card's `boss` adds a line (or `replaces` one by id) at once, no one
-  asked; the user edits it on its page. Every wake-up and `status.md` carry
+  asked; the user edits it in Settings. Every wake-up and `status.md` carry
   it whole, a chat's system prompt has it as of its start and is told each
   change ahead of its next message (`Agent.tell/2`). Mirrored to
   `~/.loom/boss.md`, which Sleep is told to leave its facts in.

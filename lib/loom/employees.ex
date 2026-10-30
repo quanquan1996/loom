@@ -31,7 +31,7 @@ defmodule Loom.Employees do
     that hold whatever the job ("reply in Chinese", "no finance work on
     AWS"), a sentence each with who heard it and when. An employee adds one
     through its card's `boss` and it applies at once, to every employee, with
-    no one asked; the user adds, edits and deletes them on its page. Every
+    no one asked; the user adds, edits and deletes them in Settings. Every
     wake-up and `.employee/status.md` carry it whole; a chat is told what
     changed ahead of its next message. Rules for one employee's job stay with
     that employee. Mirrored to `~/.loom/boss.md` for Sleep, which leaves its
@@ -1272,7 +1272,7 @@ defmodule Loom.Employees do
   defp write_boss(boss) do
     File.write!(
       boss_path(),
-      "# The boss profile\n\nKept by Loom for the virtual employees; edit it on the employees' page, not here.\n\n" <>
+      "# The boss profile\n\nKept by Loom for the virtual employees; edit it in Loom's Settings, not here.\n\n" <>
         Enum.map_join(boss, "\n", &("- " <> &1["text"])) <> "\n"
     )
   rescue

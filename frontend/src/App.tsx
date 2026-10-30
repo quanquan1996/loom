@@ -15,7 +15,6 @@ import { Tasks } from "./Tasks"
 import { focused, isOpen, PROJECTS_SECTION, Sidebar, sidebarOrder } from "./Sidebar"
 import { isDream, scopeOf, Sleep, type SleepTab } from "./Sleep"
 import { EmployeePage, HireDialog, isEmployeeSession, type EmployeeTab } from "./Employees"
-import { BossProfile } from "./Boss"
 import { Terminal } from "./Terminal"
 // noVNC is only for the browser pane, so it loads when that is first opened.
 const Browser = lazy(() => import("./Browser").then((m) => ({ default: m.Browser })))
@@ -300,7 +299,7 @@ function App() {
   }
 
   // The main column shows the active session, or the Tasks page instead.
-  const [view, setView] = useState<"chat" | "tasks" | "boss">("chat")
+  const [view, setView] = useState<"chat" | "tasks">("chat")
 
   // An employee's page shows one of its sessions, or a page of its own: which
   // one is the tab, null for whichever session is the active one.
@@ -592,11 +591,6 @@ function App() {
         setView("tasks")
         setDrawerOpen(false)
       }}
-      bossOpen={view === "boss"}
-      onOpenBoss={() => {
-        setView("boss")
-        setDrawerOpen(false)
-      }}
       devices={devices}
       onUpsertDevice={upsertDevice}
       push={push}
@@ -682,11 +676,6 @@ function App() {
               showSidebarButton={narrow || !sidebarOpen}
               onToggleSidebar={() => (narrow ? setDrawerOpen(true) : setSidebarOpen(true))}
               onOpenSession={select}
-            />
-          ) : view === "boss" ? (
-            <BossProfile
-              showSidebarButton={narrow || !sidebarOpen}
-              onToggleSidebar={() => (narrow ? setDrawerOpen(true) : setSidebarOpen(true))}
             />
           ) : active && chatProps && activeEmployee ? (
             <EmployeePage
