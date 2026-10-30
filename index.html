@@ -141,6 +141,30 @@ html.zh h2{letter-spacing:-.01em;line-height:1.2}
 .tagrow{display:flex;gap:6px;flex-wrap:wrap;margin-top:16px}
 .tagrow span{font-family:var(--mono);font-size:11px;padding:3px 9px;border-radius:6px;background:#ffffff0a;color:var(--mute);border:1px solid var(--line)}
 
+/* reply + bell viz */
+.bell{border:1px solid var(--line);border-radius:16px;background:#ffffff05;padding:6px}
+.bell .hd{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--mute);padding:6px 10px 8px}
+.bell .hd svg{width:15px;height:15px}
+.bell .hd .dot{width:7px;height:7px;border-radius:50%;background:#ff453a;margin-left:-4px;margin-top:-8px}
+.nt{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;font-size:13px;opacity:0;transform:translateY(6px);transition:.5s}
+.nt.on{opacity:1;transform:none}
+.nt .pr{flex:none;width:24px;height:24px;border-radius:7px;display:grid;place-items:center;font:600 12px var(--mono)}
+.nt .pr.p0{background:#ff453a22;color:#ff6b61}.nt .pr.p3{background:#ffb54722;color:var(--a1)}.nt .pr.p7{background:#ffffff0d;color:var(--dim)}
+.nt .w{flex:1;min-width:0}.nt .w small{display:block;color:var(--dim);font-size:11px}
+.nt .tag{font-size:10.5px;color:var(--dim);font-family:var(--mono);white-space:nowrap}
+.ask{margin-top:18px;font-size:13px}
+.ask .bub{color:var(--fg);max-width:92%}
+.qcard{margin-top:10px;border:1px solid var(--line2);border-radius:18px;padding:12px;background:#ffffff06;overflow:hidden}
+.qcard .qh{display:flex;justify-content:space-between;font-size:11px;color:var(--dim);margin-bottom:8px}
+.qcard .qt{font-weight:600;margin-bottom:8px}
+.qcard .ops{display:flex;flex-wrap:wrap;gap:6px}
+.qcard .op{padding:6px 12px;border-radius:999px;border:1px solid var(--line2);color:var(--mute);font-size:12.5px;transition:.25s}
+.qcard .op.pk{background:var(--fg);color:#000;border-color:var(--fg)}
+.qcard .qp{transition:opacity .3s,transform .3s}.qcard .qp.out{opacity:0;transform:translateX(-14px)}
+.rcomp{margin-top:10px;border:1px solid #ffffff42;border-radius:22px;padding:9px 14px;font-size:12.5px;color:var(--dim);display:flex;gap:10px;align-items:flex-end;min-height:40px;background:#ffffff08;backdrop-filter:blur(4px)}
+.rcomp .tx{flex:1;white-space:pre-line}.rcomp .tx.has{color:var(--fg)}
+.rcomp .send{flex:none;width:24px;height:24px;border-radius:50%;background:var(--fg);color:#000;display:grid;place-items:center;font-size:12px}
+
 /* spotlight */
 .spot{display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:center}
 .spot.rev .txt{order:2}
@@ -250,6 +274,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
     <a class="brand" href="#"><img src="favicon.svg" alt="">Loom</a>
     <div class="links">
       <a href="#features"><span class="zh">功能</span><span class="en">Features</span></a>
+      <a href="#reply"><span class="zh">点选回复</span><span class="en">Tap to reply</span></a>
       <a href="#restart"><span class="zh">重启不断线</span><span class="en">Restart‑proof</span></a>
       <a href="#sleep"><span class="zh">睡眠</span><span class="en">Sleep</span></a>
       <a href="#employees"><span class="zh">虚拟员工</span><span class="en">Employees</span></a>
@@ -263,7 +288,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
 <header class="hero">
   <canvas id="threads"></canvas>
   <div class="wrap">
-    <span class="pill rv"><b>NEW</b><span class="zh">睡眠记忆整理 · 虚拟员工 · 重启不丢回合</span><span class="en">Sleep · Virtual employees · Restart‑proof turns</span></span>
+    <span class="pill rv"><b>NEW</b><span class="zh">点一下就回复 · 智能体的铃铛 · 草稿跨设备</span><span class="en">Tap‑to‑reply · The bell · Drafts on every device</span></span>
     <h1 class="rv">
       <span class="zh">把 AI 编程智能体<br><span class="grad">织进你的每一台设备</span></span>
       <span class="en">Weave your coding agents<br><span class="grad">into every device you own</span></span>
@@ -405,6 +430,37 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
   </div>
 </section>
 
+<section id="reply">
+  <div class="wrap spot rev">
+    <div class="txt">
+      <div class="eyebrow rv">Tap to reply · The bell</div>
+      <h2 class="rv"><span class="zh">在手机上，打字最慢。<br><span class="grad">那就点一下。</span></span><span class="en">On a phone, typing is the slow part.<br><span class="grad">So tap instead.</span></span></h2>
+      <p class="sub rv"><span class="zh">智能体能猜到你会怎么回答时，会在回复结尾附上几个选项，Loom 把它们显示成按钮。它自己有事找你时 —— 员工要加预算、睡眠写完晨报、定时任务跑出结果 —— 就摇一下侧边栏里的铃铛。</span><span class="en">When an agent can foresee your answer, it ends its reply with the options and Loom shows them as buttons. When it needs you on its own — an employee wants more budget, a sleep left its report, a task found something — it rings the bell in the sidebar.</span></p>
+      <div class="points rv">
+        <div><span><b><span class="zh">一次问几件事</span><span class="en">Several questions at once</span></b> — <span class="zh">一页一个问题，可单选可多选，选完写成编号行填进输入框</span><span class="en">a page each, single or multi‑pick, written into the composer as numbered lines</span></span></div>
+        <div><span><b><span class="zh">铃铛按 0–10 排优先级</span><span class="en">The bell, ranked 0–10</span></b> — <span class="zh">0–2 立即推送，3–5 合成晚上 8 点的一条摘要，6–10 安静放着；每个来源每天最多一条紧急</span><span class="en">0–2 push now, 3–5 wait for one 20:00 digest, 6–10 stay quiet; one urgent per source per day</span></span></div>
+        <div><span><b><span class="zh">草稿跟着会话走</span><span class="en">Drafts follow the session</span></b> — <span class="zh">没发出去的字存在本机和服务器上，换台设备接着写；一边发出，另一边自动清空</span><span class="en">unsent text is kept on the device and the server; send it on one, it empties on the others</span></span></div>
+      </div>
+    </div>
+    <div class="viz rv" id="qviz">
+      <div class="bell">
+        <div class="hd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/></svg><span class="dot"></span><span class="zh">铃铛</span><span class="en">Bell</span></div>
+        <div class="nt"><span class="pr p0">0</span><span class="w"><span class="zh">今日预算用完 92%，要加到 $80 吗？</span><span class="en">92% of today's budget spent — raise it to $80?</span><small><span class="zh">小研 · 虚拟员工</span><span class="en">Rae · employee</span></small></span><span class="tag">push</span></div>
+        <div class="nt"><span class="pr p3">3</span><span class="w"><span class="zh">晨报：3 条新记忆，1 个技能提议</span><span class="en">Morning report: 3 new memories, 1 skill proposal</span><small>Dream</small></span><span class="tag">20:00</span></div>
+        <div class="nt"><span class="pr p7">7</span><span class="w"><span class="zh">周报已生成</span><span class="en">Weekly report is ready</span><small><span class="zh">定时任务</span><span class="en">Task</span></small></span><span class="tag">quiet</span></div>
+      </div>
+      <div class="ask">
+        <div class="bub"><span class="zh">深色模式改好了，测试全过。两件事要你定：</span><span class="en">Dark mode is in, tests pass. Two things for you:</span></div>
+        <div class="qcard">
+          <div class="qh"><span id="qn">1/2</span><span id="qm"></span></div>
+          <div class="qp" id="qp"></div>
+        </div>
+        <div class="rcomp"><span class="tx" id="qtx"></span><span class="send">↑</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <section id="restart">
   <div class="wrap spot">
     <div class="txt">
@@ -528,19 +584,20 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
       <div>
         <div class="eyebrow">Built inside itself</div>
         <h2 style="font-size:clamp(28px,3.6vw,42px)"><span class="zh">Loom 是在 Loom 里<br><span class="grad">由智能体写出来的。</span></span><span class="en">Loom is built<br><span class="grad">by agents, inside Loom.</span></span></h2>
-        <p class="sub"><span class="zh">提需求、写代码、跑测试、部署、重启，再接回自己的回合，整个过程都在 Loom 的会话里完成。睡眠、虚拟员工、重启不断线、红色"!"重发，都是在手机上一句话提出来，当天就上线的。<b style="color:var(--fg)">这个页面也是。</b></span><span class="en">Ask, code, test, deploy, restart, and adopt its own turn back — all from a Loom session. Sleep, virtual employees, restart‑proof turns and the red‑"!" resend each went from one sentence on a phone to production the same day. <b style="color:var(--fg)">So did this page.</b></span></p>
+        <p class="sub"><span class="zh">提需求、写代码、跑测试、部署、重启，再接回自己的回合，整个过程都在 Loom 的会话里完成。睡眠、虚拟员工、重启不断线、点选回复、铃铛，都是在手机上一句话提出来，当天就上线的。<b style="color:var(--fg)">这个页面也是。</b></span><span class="en">Ask, code, test, deploy, restart, and adopt its own turn back — all from a Loom session. Sleep, virtual employees, restart‑proof turns, tap‑to‑reply and the bell each went from one sentence on a phone to production the same day. <b style="color:var(--fg)">So did this page.</b></span></p>
       </div>
       <div class="commits">
+        <div><span>2ae9253</span>Sidebar: the bell takes Search's place; Search is gone</div>
+        <div><span>cdd104d</span>The bell: notices by priority, posted by agents</div>
+        <div><span>01ffa05</span>Chat: several questions at once, a page each, picks as numbered lines</div>
+        <div><span>385027a</span>Chat: keep each session's unsent draft on this device and the server</div>
+        <div><span>c2408b1</span>Chat: choice card for suggested replies, glass composer and header</div>
         <div><span>0e12c21</span>Text size in Settings, a shaded sidebar foot, and an unread mark</div>
         <div><span>9534f2b</span>Messages that do not get through stay, with a red "!" to resend them</div>
         <div><span>8fe773b</span>Agent turns that carry on through a restart, and are taken back after it</div>
         <div><span>28c2e7e</span>Sleep, virtual employees, and Kiro CLI as a third backend</div>
-        <div><span>48e678a</span>Browser: a window of the phone's shape, and a stream of just that</div>
         <div><span>e999446</span>loom-node: native Windows devices</div>
-        <div><span>5021a07</span>Tasks page, after ChatGPT's</div>
-        <div><span>f6fab97</span>Phone theme measured from ChatGPT's iOS app</div>
-        <div><span>14a228b</span>Sessions can be pinned, and moved into or out of a project</div>
-        <div style="color:var(--dim)"><span style="color:var(--dim)">…</span>111 commits since 2026‑07‑29</div>
+        <div style="color:var(--dim)"><span style="color:var(--dim)">…</span>149 commits since 2026‑07‑29</div>
       </div>
     </div>
   </div>
@@ -628,9 +685,26 @@ runDemo();
 const io=new IntersectionObserver(es=>es.forEach(e=>{if(!e.isIntersecting)return;const t=e.target;t.classList.add('in');io.unobserve(t);
   t.querySelectorAll('.count').forEach(cn=>{const to=+cn.dataset.to;let v=0;const st=setInterval(()=>{v++;cn.textContent=v;if(v>=to)clearInterval(st)},60)});
   if(t.id==='rviz')restartAnim();
+  if(t.id==='qviz')replyAnim();
   if(t.id==='eviz'){t.querySelectorAll('.bar i').forEach(b=>b.style.width=b.dataset.w+'%');document.getElementById('ring').setAttribute('stroke-dasharray','37 100')}
 }),{threshold:.18});
 document.querySelectorAll('.rv').forEach((e,i)=>{e.style.transitionDelay=(i%4)*70+'ms';io.observe(e)});
+
+function replyAnim(){const v=document.getElementById('qviz'),qp=document.getElementById('qp'),qn=document.getElementById('qn'),qm=document.getElementById('qm'),tx=document.getElementById('qtx');
+ const Q=[{zh:'现在部署吗？',en:'Deploy now?',m:0,o:[['部署','Deploy'],['先给我看截图','Screenshot first'],['先不','Not yet']],p:[0]},
+          {zh:'顺便改哪些？',en:'Anything else?',m:1,o:[['字号','Text size'],['图标','Icons'],['登录页','Login page']],p:[0,2]}];
+ const T=[],at=(ms,f)=>T.push(setTimeout(f,ms));
+ v.querySelectorAll('.nt').forEach((n,i)=>at(300+i*450,()=>n.classList.add('on')));
+ function page(i){const q=Q[i],l=L();qn.textContent=(i+1)+'/2';qm.textContent=q.m?(l==='zh'?'可多选':'Pick any'):'';
+  qp.innerHTML='<div class="qt">'+q[l]+'</div><div class="ops">'+q.o.map(o=>'<span class="op">'+o[l==='zh'?0:1]+'</span>').join('')+'</div>'}
+ function cycle(){const l=L(),lines=[];tx.className='tx';tx.textContent=l==='zh'?'回复…':'Reply…';page(0);let t=600;
+  Q.forEach((q,i)=>{if(i)at(t,()=>{qp.classList.add('out');setTimeout(()=>{page(i);qp.classList.remove('out')},300)}),t+=500;
+   q.p.forEach(k=>{at(t+=700,()=>{qp.querySelectorAll('.op')[k].classList.add('pk')})});
+   at(t+=250,()=>{lines[i]=(i+1)+'. '+q.p.map(k=>q.o[k][L()==='zh'?0:1]).join(L()==='zh'?'、':', ');tx.className='tx has';tx.textContent=lines.join('\n')});t+=500});
+  at(t+3200,cycle)}
+ at(1700,cycle);
+ lb.addEventListener('click',()=>{T.forEach(clearTimeout);T.length=0;v.querySelectorAll('.nt').forEach(n=>n.classList.add('on'));cycle()});
+}
 
 function restartAnim(){const v=document.getElementById('rviz'),log=document.getElementById('rlog'),st=document.getElementById('rstate');
  const set=(s,w,ms)=>{v.querySelector(s).style.transitionDuration=ms+'ms';v.querySelector(s).style.width=w};
