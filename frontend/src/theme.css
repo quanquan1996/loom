@@ -1264,25 +1264,7 @@ pre.code,
   padding: 0.75rem;
 }
 
-/* ── Search, ChatGPT's: a panel over the page; on a phone, the whole screen ── */
-@media (max-width: 640px) {
-  .sidebar .search-btn {
-    display: grid;
-    place-items: center;
-    width: 2.5rem;
-    height: 2.5rem;
-    padding: 0;
-    border-radius: 50%;
-    border: 1px solid color-mix(in srgb, var(--fg) 18%, transparent);
-    color: var(--fg);
-  }
-
-  .sidebar .search-btn svg {
-    width: 20px;
-    height: 20px;
-  }
-}
-
+/* ── A panel over the page (the bell); on a phone, the whole screen ── */
 .search-sheet {
   position: fixed;
   inset: 0;
