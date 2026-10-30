@@ -1,7 +1,8 @@
 defmodule LoomWeb.EmployeeController do
   @moduledoc """
   Virtual employees (`Loom.Employees`), for their page: hiring and settings,
-  pause and wake, the day's budget, KPIs, and the reports they write.
+  pause and wake, the day's budget, KPIs, and the reports they write; and the
+  boss profile they share.
   """
   use LoomWeb, :controller
 
@@ -75,6 +76,31 @@ defmodule LoomWeb.EmployeeController do
       error -> reply(conn, error)
     end
   end
+
+  # GET /api/boss — the boss profile, all employees' one.
+  def boss(conn, _params), do: json(conn, %{boss: Employees.boss()})
+
+  # POST /api/boss — `text`.
+  def add_boss(conn, params), do: boss_reply(conn, Employees.add_boss(params["text"]))
+
+  # PATCH /api/boss/:id — `text`.
+  def update_boss(conn, %{"id" => id} = params),
+    do: boss_reply(conn, Employees.update_boss(id, params["text"]))
+
+  # DELETE /api/boss/:id
+  def delete_boss(conn, %{"id" => id}) do
+    case Employees.delete_boss(id) do
+      :ok -> json(conn, %{boss: Employees.boss()})
+      error -> boss_reply(conn, error)
+    end
+  end
+
+  defp boss_reply(conn, {:ok, _entry}), do: json(conn, %{boss: Employees.boss()})
+
+  defp boss_reply(conn, {:error, :not_found}),
+    do: conn |> put_status(:not_found) |> json(%{error: "no such line"})
+
+  defp boss_reply(conn, error), do: reply(conn, error)
 
   defp reply(conn, {:ok, employee}), do: json(conn, %{employee: employee})
 

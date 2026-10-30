@@ -27,6 +27,15 @@ defmodule Loom.Employees do
     notification, `urgent` a notification and the employee marked as blocked
     until a later turn says otherwise. Daily and weekly reports are files it
     writes under `reports/`, listed on its page.
+  - **The boss profile**, one for all of them: facts and rules about the user
+    that hold whatever the job ("reply in Chinese", "no finance work on
+    AWS"), a sentence each with who heard it and when. An employee adds one
+    through its card's `boss` and it applies at once, to every employee, with
+    no one asked; the user adds, edits and deletes them on its page. Every
+    wake-up and `.employee/status.md` carry it whole; a chat is told what
+    changed ahead of its next message. Rules for one employee's job stay with
+    that employee. Mirrored to `~/.loom/boss.md` for Sleep, which leaves its
+    facts there rather than storing them again.
 
   Truth is `~/.loom/employees.json`. What the agents should be able to read
   without asking — profile, KPIs, status — is mirrored into `.employee/` in
@@ -81,6 +90,9 @@ defmodule Loom.Employees do
   @editable ~w(name role persona language project_ids hours heartbeat_min min_gap_min
                max_turn_min budget_usd budget_turns daily_report weekly_report ask_first model)
 
+  @boss_kept 100
+  @boss_chars 300
+
   @kpi_statuses ~w(todo doing review done parked)
   @priorities ~w(high normal low)
 
@@ -128,6 +140,19 @@ defmodule Loom.Employees do
   def review_kpi(id, kpi_id, accept?, note, server \\ @name),
     do: GenServer.call(server, {:review_kpi, id, kpi_id, accept?, note})
 
+  @doc "The boss profile: `%{\"id\", \"text\", \"by\", \"by_name\", \"at\"}`, oldest first."
+  def boss(server \\ @name), do: GenServer.call(server, :boss)
+
+  @doc "The user adds to it themselves."
+  def add_boss(text, server \\ @name), do: GenServer.call(server, {:add_boss, text})
+
+  def update_boss(id, text, server \\ @name), do: GenServer.call(server, {:update_boss, id, text})
+
+  def delete_boss(id, server \\ @name), do: GenServer.call(server, {:delete_boss, id})
+
+  @doc "Its mirror, for Sleep to read."
+  def boss_path, do: Path.join(Agent.Store.home(), "boss.md")
+
   def path, do: Application.get_env(:loom, __MODULE__, [])[:path] || default_path()
   defp default_path, do: Path.join(Agent.Store.home(), "employees.json")
 
@@ -167,12 +192,14 @@ defmodule Loom.Employees do
     path = Keyword.get(opts, :path, path())
     Phoenix.PubSub.subscribe(Loom.PubSub, Agent.turns_topic())
     tick = Keyword.get(opts, :tick) || Application.get_env(:loom, __MODULE__, [])[:tick] || @tick
+    {employees, boss} = load(path)
 
     state = %{
       path: path,
       tick: tick,
       timer: nil,
-      employees: load(path),
+      employees: employees,
+      boss: boss,
       # Off under test, where the tick is driven by hand.
       run: Keyword.get(opts, :run, Application.get_env(:loom, __MODULE__, [])[:run] != false)
     }
@@ -186,6 +213,46 @@ defmodule Loom.Employees do
       state.employees |> Map.values() |> Enum.sort_by(& &1["created_at"]) |> Enum.map(&view/1)
 
     {:reply, views, state}
+  end
+
+  def handle_call(:boss, _from, state), do: {:reply, state.boss, state}
+
+  def handle_call({:add_boss, text}, _from, state) do
+    case boss_text(text) do
+      nil ->
+        {:reply, {:error, "a line of text"}, state}
+
+      text ->
+        {state, entry} = learn(state, %{"text" => text}, nil, nil)
+        {:reply, {:ok, entry}, state}
+    end
+  end
+
+  def handle_call({:update_boss, id, text}, _from, state) do
+    with %{} <- Enum.find(state.boss, &(&1["id"] == id)),
+         text when is_binary(text) <- boss_text(text) do
+      {state, entry} = learn(state, %{"text" => text, "replaces" => id}, nil, nil)
+      {:reply, {:ok, entry}, state}
+    else
+      nil -> {:reply, {:error, :not_found}, state}
+    end
+  end
+
+  def handle_call({:delete_boss, id}, _from, state) do
+    case Enum.find(state.boss, &(&1["id"] == id)) do
+      nil ->
+        {:reply, {:error, :not_found}, state}
+
+      old ->
+        state =
+          boss_changed(
+            %{state | boss: List.delete(state.boss, old)},
+            ["- removed: " <> old["text"]],
+            nil
+          )
+
+        {:reply, :ok, state}
+    end
   end
 
   def handle_call({:get, id}, _from, state) do
@@ -228,7 +295,7 @@ defmodule Loom.Employees do
         })
 
       File.mkdir_p!(workspace(id))
-      write_files(e)
+      write_files(e, state.boss)
 
       with {:ok, chat} <- start_session(e, "employee_chat"),
            {:ok, work} <- start_session(e, "employee_work") do
@@ -422,13 +489,13 @@ defmodule Loom.Employees do
   def run(state, id, now) do
     case state.employees[id] do
       nil -> state
-      e -> put(state, step(e, now))
+      e -> put(state, step(e, now, state.boss))
     end
   end
 
-  defp step(%{"paused" => true} = e, _now), do: e
+  defp step(%{"paused" => true} = e, _now, _boss), do: e
 
-  defp step(e, now) do
+  defp step(e, now, boss) do
     busy = working?(e)
 
     cond do
@@ -453,7 +520,7 @@ defmodule Loom.Employees do
         # still in the mailbox: its card decides what comes next, and what
         # the wake-up is told.
         e = settle(e, now)
-        if due(e, now) == reason and not working?(e), do: wake_up(e, reason, now), else: e
+        if due(e, now) == reason and not working?(e), do: wake_up(e, reason, now, boss), else: e
 
       true ->
         e
@@ -491,9 +558,9 @@ defmodule Loom.Employees do
     end
   end
 
-  defp wake_up(e, reason, now) do
+  defp wake_up(e, reason, now, boss) do
     with {:ok, e} <- e |> turn_over(now) |> ensure_sessions(),
-         prompt = Prompt.wake(e, reason, context(e, now)),
+         prompt = Prompt.wake(e, reason, context(e, boss, now)),
          {:ok, _} <-
            Agent.submit(e["work_session"], Prompt.display(e, reason, now, @offset),
              origin: "employee",
@@ -566,7 +633,7 @@ defmodule Loom.Employees do
          if(is_integer(tokens), do: tokens > @fresh_tokens, else: turns >= @fresh_turns))
   end
 
-  defp context(e, now) do
+  defp context(e, boss, now) do
     %{
       fresh: e["fresh"] == true,
       notices: open_notices(e),
@@ -578,7 +645,8 @@ defmodule Loom.Employees do
       spent_text: amount(e, spent(e, now)),
       cap: cap(e, now),
       projects: projects(e),
-      workspace: workspace(e["id"])
+      workspace: workspace(e["id"]),
+      boss: boss
     }
   end
 
@@ -591,7 +659,7 @@ defmodule Loom.Employees do
       end
 
     card = Card.parse(text)
-    e = e |> count_turn(now) |> apply_kpis(card) |> apply_added(card)
+    e = e |> count_turn(now) |> apply_kpis(card) |> apply_added(card) |> heard(card, kind)
 
     case kind do
       "employee_work" -> work_ended(e, card, summary, now)
@@ -738,6 +806,24 @@ defmodule Loom.Employees do
   end
 
   defp apply_added(e, _card), do: e
+
+  # What it learned about the boss, held on the record until `put/2` adds it
+  # to the profile: a turn's end is read where there is only the employee.
+  defp heard(e, %{"boss" => items}, kind) do
+    session = if kind == "employee_work", do: e["work_session"], else: e["chat_session"]
+
+    new =
+      for item <- items,
+          item = if(is_binary(item), do: %{"text" => item}, else: item),
+          is_map(item),
+          text = boss_text(item["text"]),
+          text != nil,
+          do: %{"text" => text, "replaces" => item["replaces"], "session" => session}
+
+    Map.update(e, "boss_new", new, &(&1 ++ new))
+  end
+
+  defp heard(e, _card, _kind), do: e
 
   # Kept for every backend, so the page can show it; the budget only where
   # there is no cost to go by.
@@ -1103,18 +1189,104 @@ defmodule Loom.Employees do
   end
 
   # Kept, written, mirrored for the agents, and told to the sidebar.
+  defp put(state, %{"boss_new" => [_ | _] = new} = e) do
+    state = put(state, Map.delete(e, "boss_new"))
+
+    Enum.reduce(new, state, fn item, state ->
+      {state, _entry} = learn(state, item, e, item["session"])
+      state
+    end)
+  end
+
   defp put(state, e) do
     old = state.employees[e["id"]]
+    e = Map.delete(e, "boss_new")
     state = %{state | employees: Map.put(state.employees, e["id"], e)}
 
     if old != e do
       save(state)
-      write_files(e)
+      write_files(e, state.boss)
       Phoenix.PubSub.broadcast(Loom.PubSub, Agent.lobby_topic(), {:employee_summary, view(e)})
     end
 
     state
   end
+
+  # ── The boss profile ────────────────────────────────────────────────────
+
+  # A line added, or put in the place of one (`replaces`), by an employee or
+  # (`e` nil) the user. The same line again is nothing new.
+  defp learn(state, item, e, session) do
+    now = now()
+    norm = &(&1 |> String.downcase() |> String.replace(~r/[\s[:punct:]。，、；：！？]+/u, ""))
+    old = item["replaces"] && Enum.find(state.boss, &(&1["id"] == item["replaces"]))
+
+    case Enum.find(state.boss, &(norm.(&1["text"]) == norm.(item["text"]))) do
+      %{} = same ->
+        {state, same}
+
+      nil ->
+        entry = %{
+          "id" =>
+            (old && old["id"]) ||
+              "b_" <> (:crypto.strong_rand_bytes(4) |> Base.url_encode64(padding: false)),
+          "text" => item["text"],
+          "by" => e && e["id"],
+          "by_name" => e && e["name"],
+          "at" => now
+        }
+
+        {boss, change} =
+          if old,
+            do:
+              {List.replace_at(state.boss, Enum.find_index(state.boss, &(&1 == old)), entry),
+               "- changed: " <> old["text"] <> " → " <> entry["text"]},
+            else: {Enum.take(state.boss ++ [entry], -@boss_kept), "- added: " <> entry["text"]}
+
+        {boss_changed(%{state | boss: boss}, [change], session), entry}
+    end
+  end
+
+  # Saved, mirrored into every employee's status and for Sleep, and told to
+  # the chats (but the one it was heard in), which see no wake-up.
+  defp boss_changed(state, changes, from) do
+    save(state)
+    Enum.each(Map.values(state.employees), &write_files(&1, state.boss))
+    write_boss(state.boss)
+
+    text =
+      "[Loom: the boss profile, shared by all employees, changed. Follow it from now on:]\n" <>
+        Enum.join(changes, "\n")
+
+    for {_, e} <- state.employees, s = e["chat_session"], is_binary(s), s != from do
+      try do
+        if Agent.exists?(s), do: Agent.tell(s, text)
+      catch
+        :exit, _ -> :ok
+      end
+    end
+
+    state
+  end
+
+  defp write_boss(boss) do
+    File.write!(
+      boss_path(),
+      "# The boss profile\n\nKept by Loom for the virtual employees; edit it on the employees' page, not here.\n\n" <>
+        Enum.map_join(boss, "\n", &("- " <> &1["text"])) <> "\n"
+    )
+  rescue
+    error -> Logger.warning("Loom.Employees: cannot write #{boss_path()}: #{inspect(error)}")
+  end
+
+  defp boss_text(text) when is_binary(text) do
+    case text |> String.trim() |> String.replace(~r/\s*\n\s*/, " ") do
+      "" -> nil
+      t -> String.slice(t, 0, @boss_chars)
+    end
+  end
+
+  defp boss_text(_), do: nil
 
   defp note(e, text), do: Map.update(e, "inbox", [text], &(&1 ++ [text]))
 
@@ -1162,17 +1334,17 @@ defmodule Loom.Employees do
 
   # Its system prompts, which a session reads as it starts (see
   # `Loom.Employees.Prompt.system/2`), and the mirror of where it stands.
-  defp write_files(e) do
+  defp write_files(e, boss) do
     File.mkdir_p!(Path.join(workspace(e["id"]), ".employee"))
 
     File.write!(
       Path.join(dir(e["id"]), "system_employee_work.md"),
-      Prompt.system_text(e, "employee_work")
+      Prompt.system_text(e, "employee_work", boss)
     )
 
     File.write!(
       Path.join(dir(e["id"]), "system_employee_chat.md"),
-      Prompt.system_text(e, "employee_chat")
+      Prompt.system_text(e, "employee_chat", boss)
     )
 
     now = now()
@@ -1188,7 +1360,8 @@ defmodule Loom.Employees do
         projects: projects(e),
         workspace: workspace(e["id"]),
         today: today(now),
-        week: week(now)
+        week: week(now),
+        boss: boss
       })
     )
   rescue
@@ -1197,15 +1370,15 @@ defmodule Loom.Employees do
 
   defp load(path) do
     with {:ok, body} <- File.read(path),
-         {:ok, %{"employees" => list}} when is_list(list) <- Jason.decode(body) do
-      Map.new(list, fn e -> {e["id"], Map.merge(@defaults, e)} end)
+         {:ok, %{"employees" => list} = all} when is_list(list) <- Jason.decode(body) do
+      {Map.new(list, fn e -> {e["id"], Map.merge(@defaults, e)} end), all["boss"] || []}
     else
       {:error, :enoent} ->
-        %{}
+        {%{}, []}
 
       other ->
         Logger.error("Loom.Employees cannot read #{path} (#{inspect(other)}); starting over")
-        %{}
+        {%{}, []}
     end
   end
 
@@ -1213,7 +1386,7 @@ defmodule Loom.Employees do
     File.mkdir_p!(Path.dirname(state.path))
     tmp = state.path <> ".tmp"
     list = state.employees |> Map.values() |> Enum.sort_by(& &1["created_at"])
-    File.write!(tmp, Jason.encode_to_iodata!(%{employees: list}, pretty: true))
+    File.write!(tmp, Jason.encode_to_iodata!(%{employees: list, boss: state.boss}, pretty: true))
     File.rename!(tmp, state.path)
     state
   end

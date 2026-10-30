@@ -6,7 +6,7 @@ defmodule Loom.Employees.Card do
       {"next": "sleep", "wake_at": "2026-10-29 09:00", "summary": "…",
        "kpis": [{"id": "k_…", "progress": 40, "status": "doing", "note": "…"}],
        "report": {"priority": 4, "text": "…", "key": "…", "needs": "read"},
-       "withdraw": ["a key"]}
+       "withdraw": ["a key"], "boss": ["a line for the boss profile"]}
       ```
 
   in its last message. The last such block wins; one that isn't JSON, or isn't
@@ -47,8 +47,9 @@ defmodule Loom.Employees.Card do
            (is_integer(r["priority"]) and r["priority"] in 0..10))
     end)
     |> keep("withdraw", &(is_list(&1) and Enum.all?(&1, fn k -> is_binary(k) end)))
+    |> keep("boss", &is_list/1)
     |> Map.take(
-      ~w(next wake_at sleep_minutes summary kpis kpi_add wake_now note_for_work report withdraw)
+      ~w(next wake_at sleep_minutes summary kpis kpi_add wake_now note_for_work report withdraw boss)
     )
   end
 

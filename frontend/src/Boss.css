@@ -1,0 +1,102 @@
+/* ── The boss profile, on the Tasks page's shell ──────────────────────────
+   One card holding the lines, as an iOS grouped list: a line each, its
+   source under it, hairlines between. */
+
+.boss-intro {
+  padding: 4px 4px 8px;
+  color: var(--task-dim);
+  font-size: 0.9375rem;
+  line-height: 1.45;
+}
+
+.boss-list {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 22px;
+  background: var(--task-card);
+}
+
+.boss-line {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 3px;
+  padding: 13px 18px;
+  border: 0;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.boss-line + .boss-line {
+  box-shadow: inset 0 1px 0 var(--task-rule);
+}
+
+button.boss-line:hover {
+  background: var(--task-card-hover);
+}
+
+button.boss-line:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.boss-text {
+  font-size: 1rem;
+  line-height: 1.4;
+}
+
+.boss-meta {
+  color: var(--task-dim);
+  font-size: 0.8125rem;
+}
+
+.boss-line.editing {
+  cursor: default;
+  gap: 10px;
+}
+
+.boss-line textarea {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--task-rule);
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  font-size: 1rem;
+  line-height: 1.4;
+  resize: vertical;
+  outline: none;
+}
+
+.boss-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.boss-spacer {
+  flex: 1 1 auto;
+}
+
+.boss-delete {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 4px;
+  border: 0;
+  background: transparent;
+  color: var(--red);
+  font: inherit;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.boss-delete svg {
+  width: 14px;
+  height: 14px;
+}

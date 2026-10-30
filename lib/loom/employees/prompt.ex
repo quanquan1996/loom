@@ -26,8 +26,17 @@ defmodule Loom.Employees.Prompt do
   end
 
   @doc false
-  def system_text(e, "employee_work"), do: common(e) <> work_rules() <> card_spec()
-  def system_text(e, _chat), do: common(e) <> chat_rules() <> chat_card_spec()
+  def system_text(e, kind, boss \\ [])
+  def system_text(e, "employee_work", _boss), do: common(e) <> work_rules() <> card_spec()
+
+  # A chat has no wake-ups to bring it the profile: it starts with it, and is
+  # told when it changes (`Loom.Employees`).
+  def system_text(e, _chat, boss),
+    do:
+      common(e) <>
+        chat_rules() <>
+        chat_card_spec() <>
+        "\n## The boss profile, as the chat began\n\n" <> boss(boss, 480) <> "\n"
 
   defp common(e) do
     """
@@ -78,6 +87,18 @@ defmodule Loom.Employees.Prompt do
     - **Budget.** Every turn costs; the day's budget is in every wake-up.
       Spend it on the KPIs. When it runs out Loom stops you until the boss
       approves more.
+    - **The boss profile.** What all employees know about the boss is in
+      every wake-up and in status.md: follow it. When the boss tells you
+      something about themselves, or a rule of theirs that holds whatever the
+      job (who and where they are, what may not be done where, which language
+      or model, what not to talk about), put it in your card's `boss`, a
+      sentence each in the boss's language. It applies at once, to every
+      employee; there is no one to ask. Only what the boss said, never your
+      guess, and never their private details or a quote of the conversation.
+      What is only for your job ("at most three items a batch") is not for the
+      profile: keep it in your own notes. Nothing already there or in your
+      CLAUDE.md; when what the boss said makes a line wrong, replace it by its
+      id: `{"text": "…", "replaces": "b_abc"}`.
     - **Honest progress.** Progress is what is actually done and checked, not
       what is planned. A KPI is done when its acceptance criteria are met; then
       set it to `review` for the boss to accept. Never call it `done` yourself.
@@ -138,7 +159,8 @@ defmodule Loom.Employees.Prompt do
      "kpis": [{"id": "k_abc", "progress": 40, "status": "doing", "note": "what is left"}],
      "report": {"priority": 4, "text": "what the boss should know or decide",
                 "key": "supplier-switch", "needs": "reply"},
-     "withdraw": ["build-failed"]}
+     "withdraw": ["build-failed"],
+     "boss": ["回复一律用中文"]}
     ```
 
     - `next`: `continue` to be woken again in a minute (only while a piece of
@@ -149,6 +171,7 @@ defmodule Loom.Employees.Prompt do
     - `kpis`: progress (0–100), status (`todo`, `doing`, `review`, `parked`)
       and a note, by KPI id. Only the ones that changed.
     - `report`, `withdraw`: see above. Leave them out when there is nothing to say.
+    - `boss`: lines for the boss profile (see the rules), rarely.
     """
   end
 
@@ -184,10 +207,12 @@ defmodule Loom.Employees.Prompt do
                   "due": "2026-11-01", "priority": "high"}],
      "kpis": [{"id": "k_abc", "status": "parked", "note": "…"}],
      "note_for_work": "what your next wake-up should know",
-     "wake_now": true}
+     "wake_now": true,
+     "boss": ["回复一律用中文"]}
     ```
 
-    `priority` is `high`, `normal` or `low`. No card when nothing changes.
+    `priority` is `high`, `normal` or `low`. `boss` is for the boss profile,
+    as the rules say. No card when nothing changes.
     """
   end
 
@@ -264,6 +289,10 @@ defmodule Loom.Employees.Prompt do
     - Daily report at #{e["daily_report"]}; weekly report on #{day(e["weekly_report"]["day"])} at #{e["weekly_report"]["time"]}
     - Budget today: #{Loom.Employees.amount(e, ctx.spent)} used of #{Loom.Employees.amount(e, ctx.cap)} — #{Loom.Employees.amount(e, max(ctx.cap - ctx.spent, 0))} left
     #{if e["persona"] not in [nil, ""], do: "\nHow the boss wants you to work:\n" <> e["persona"] <> "\n", else: ""}
+    ## The boss profile (shared by all employees)
+
+    #{boss(ctx[:boss] || [], ctx.offset)}
+
     ## Your projects
 
     #{projects(ctx.projects, ctx.workspace)}
@@ -290,6 +319,15 @@ defmodule Loom.Employees.Prompt do
             else: ""
           )
       end)
+  end
+
+  defp boss([], _offset), do: "Nothing yet."
+
+  defp boss(list, offset) do
+    Enum.map_join(list, "\n", fn b ->
+      from = if b["by_name"], do: "told #{b["by_name"]}", else: "written by the boss"
+      "- [#{b["id"]}] #{b["text"]} (#{day_month(b["at"], offset)}, #{from})"
+    end)
   end
 
   defp kpis([]), do: "None yet. Without KPIs, look after your projects lightly and sleep."
@@ -370,6 +408,16 @@ defmodule Loom.Employees.Prompt do
     |> DateTime.from_unix!()
     |> Calendar.strftime("%Y-%m-%d %H:%M (%A)")
   end
+
+  defp day_month(ms, offset) when is_integer(ms) do
+    ms
+    |> div(1000)
+    |> Kernel.+(offset * 60)
+    |> DateTime.from_unix!()
+    |> Calendar.strftime("%m-%d")
+  end
+
+  defp day_month(_ms, _offset), do: "?"
 
   defp clock(now, offset) do
     now

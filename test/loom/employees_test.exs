@@ -296,6 +296,78 @@ defmodule Loom.EmployeesTest do
     assert e["wake_at"] <= System.system_time(:millisecond)
   end
 
+  test "the boss profile: heard by one, followed by all, kept by the boss", %{
+    server: server,
+    dir: dir
+  } do
+    {:ok, a} = Employees.create(%{"name" => "钱多多"}, server)
+    {:ok, b} = Employees.create(%{"name" => "狄仁杰"}, server)
+
+    # Told once, in one chat; job rules stay out because the employee leaves them out.
+    {:ok, _} = Agent.submit(a["chat_session"], "以后回复都用中文")
+    BackendStub.await_turn()
+    end_turn(a["chat_session"], card(%{"boss" => ["回复一律用中文", "  "]}), server)
+
+    assert [%{"text" => "回复一律用中文", "by_name" => "钱多多", "id" => id} = line] =
+             Employees.boss(server)
+
+    assert is_integer(line["at"])
+    assert File.read!(Path.join(dir, "boss.md")) =~ "回复一律用中文"
+
+    # The same line again is nothing new.
+    {:ok, _} = Agent.submit(a["chat_session"], "记住了吗")
+    BackendStub.await_turn()
+    end_turn(a["chat_session"], card(%{"boss" => ["回复一律用中文。"]}), server)
+    assert [_] = Employees.boss(server)
+
+    # The other one wakes with it; its chat is told ahead of the next message.
+    {:ok, _} = Employees.wake(b["id"], nil, server)
+    text = BackendStub.await_turn()
+    assert text =~ "## The boss profile"
+    assert text =~ "回复一律用中文 ("
+    assert text =~ "told 钱多多"
+    end_turn(b["work_session"], card(%{}), server)
+
+    {:ok, _} = Agent.submit(b["chat_session"], "hi")
+    assert BackendStub.await_turn() =~ "added: 回复一律用中文"
+
+    # Someone hired later has it from the start.
+    {:ok, c} = Employees.create(%{"name" => "姬大力"}, server)
+    assert File.read!(Path.join(Employees.dir(c["id"]), "system_employee_chat.md")) =~ "回复一律用中文"
+
+    assert File.read!(Path.join([Employees.workspace(c["id"]), ".employee", "status.md"])) =~
+             "回复一律用中文"
+
+    # The boss changes, adds, deletes; the next wake-up has it so.
+    {:ok, _} = Employees.update_boss(id, "回复用简体中文", server)
+    {:ok, _} = Employees.add_boss("默认用 Opus", server)
+
+    assert [%{"id" => ^id, "text" => "回复用简体中文", "by" => nil}, %{"text" => "默认用 Opus"} = opus] =
+             Employees.boss(server)
+
+    :ok = Employees.delete_boss(opus["id"], server)
+    {:ok, _} = Employees.wake(c["id"], nil, server)
+    text = BackendStub.await_turn()
+    assert text =~ "回复用简体中文"
+    refute text =~ "默认用 Opus"
+
+    # A line replaced by the employee keeps its place.
+    end_turn(
+      c["work_session"],
+      card(%{"boss" => [%{"text" => "回复用中文，术语可留英文", "replaces" => id}]}),
+      server
+    )
+
+    assert [%{"id" => ^id, "text" => "回复用中文，术语可留英文", "by_name" => "姬大力"}] = Employees.boss(server)
+
+    # And it survives a restart.
+    assert [%{"id" => ^id}] =
+             Path.join(dir, "employees.json")
+             |> File.read!()
+             |> Jason.decode!()
+             |> Map.get("boss")
+  end
+
   test "spent, it stops and waits for the boss; what they approve counts for today",
        %{server: server} do
     {:ok, e} = Employees.create(%{"name" => "小码", "budget_usd" => 50}, server)

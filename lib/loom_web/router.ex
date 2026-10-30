@@ -75,6 +75,10 @@ defmodule LoomWeb.Router do
     post "/employees/:id/kpis/:kpi/review", EmployeeController, :review_kpi
     get "/employees/:id/reports", EmployeeController, :reports
     get "/employees/:id/reports/:file", EmployeeController, :report
+    get "/boss", EmployeeController, :boss
+    post "/boss", EmployeeController, :add_boss
+    patch "/boss/:id", EmployeeController, :update_boss
+    delete "/boss/:id", EmployeeController, :delete_boss
 
     get "/projects", ProjectController, :index
     post "/projects", ProjectController, :create

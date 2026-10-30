@@ -42,6 +42,7 @@ defmodule Loom.Dream.Prompt do
     - Never invent. Every memory you add or change must trace back to something the user said or something that happened in a session. If you are generalising, say so.
     - Don't delete what fell out of use: move it to `archive/` inside the memory directory and drop it from the index. Delete only what is now known to be wrong.
     - Use absolute dates (YYYY-MM-DD), never "yesterday".
+    - What the user's virtual employees know about the user is their boss profile, `#{Loom.Employees.boss_path()}` (read-only here). It lives there: don't store its lines again in memory, nor propose them for CLAUDE.md.
 
     ## Phase 1 — Orient
 

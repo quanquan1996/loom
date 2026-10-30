@@ -947,6 +947,29 @@ export async function employeeReport(id: string, file: string): Promise<string> 
   return text
 }
 
+// ── The boss profile, all employees' one ─────────────────────────────────
+
+/** A fact or rule about the user, a sentence; `by_name` the employee who heard it, null when the user wrote it. */
+export type BossLine = { id: string; text: string; by: string | null; by_name: string | null; at: number }
+
+const boss = async (call: Promise<{ boss: BossLine[] }>) => (await call).boss
+
+export function bossProfile(): Promise<BossLine[]> {
+  return boss(apiCall("/api/boss", { method: "GET" }))
+}
+
+export function addBossLine(text: string): Promise<BossLine[]> {
+  return boss(apiCall("/api/boss", { method: "POST", body: JSON.stringify({ text }) }))
+}
+
+export function updateBossLine(id: string, text: string): Promise<BossLine[]> {
+  return boss(apiCall(`/api/boss/${id}`, { method: "PATCH", body: JSON.stringify({ text }) }))
+}
+
+export function deleteBossLine(id: string): Promise<BossLine[]> {
+  return boss(apiCall(`/api/boss/${id}`, { method: "DELETE" }))
+}
+
 // ── The bell (`Loom.Notices`) ────────────────────────────────────────────
 
 /** What an agent wants the user to see, 0 (most urgent) to 10. */

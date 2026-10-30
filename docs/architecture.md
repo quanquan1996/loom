@@ -279,6 +279,13 @@ says when it needs the user.
   rules have it keep. Until that file exists the old session is asked to
   write it first. The page shows `past_work` above today as one thread, a
   day at a time (`EarlierDays` in `Chat.tsx`).
+- **The boss profile**, one for all employees: a sentence a line, with who
+  heard it and when (`boss` in `employees.json`, `/api/boss`, `Boss.tsx`).
+  A card's `boss` adds a line (or `replaces` one by id) at once, no one
+  asked; the user edits it on its page. Every wake-up and `status.md` carry
+  it whole, a chat's system prompt has it as of its start and is told each
+  change ahead of its next message (`Agent.tell/2`). Mirrored to
+  `~/.loom/boss.md`, which Sleep is told to leave its facts in.
 - **Permissions are soft**: the projects and their workspaces are named in
   the prompt, with what to ask first. Same Unix user as every agent.
 - **Truth is `~/.loom/employees.json`.** Pushed on the lobby as `employee`
@@ -397,7 +404,8 @@ tool card's `block_id`, the same pattern as text.
 ~/.loom/cron.json                    scheduled prompts (§2.5)
 ~/.loom/projects.json                projects (§2.7)
 ~/.loom/projects/<id>/workspace/…    a project's workspace
-~/.loom/employees.json               virtual employees (§2.9)
+~/.loom/employees.json               virtual employees and the boss profile (§2.9)
+~/.loom/boss.md                      the boss profile, mirrored for Sleep
 ~/.loom/employees/<id>/…             an employee's system prompts and workspace
 ```
 

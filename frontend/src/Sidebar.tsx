@@ -9,6 +9,7 @@ import {
   FolderOpen,
   FolderPlus,
   Globe,
+  IdCard,
   Keyboard,
   KeyboardOff,
   MonitorSmartphone,
@@ -110,6 +111,9 @@ type Props = {
   // The Tasks page, and whether it is the one showing.
   tasksOpen: boolean
   onOpenTasks: () => void
+  // The boss profile, all employees' one: a page of its own, as Tasks is.
+  bossOpen: boolean
+  onOpenBoss: () => void
   devices: Device[]
   onUpsertDevice: (device: Device) => void
   push: Push
@@ -156,6 +160,8 @@ export function Sidebar({
   onEditProject,
   tasksOpen,
   onOpenTasks,
+  bossOpen,
+  onOpenBoss,
   devices,
   onUpsertDevice,
   push,
@@ -376,6 +382,10 @@ export function Sidebar({
                 </div>
               )
             })}
+            <div className={"emp-row" + (bossOpen ? " active" : "")} role="button" onClick={onOpenBoss}>
+              <IdCard className="emp-row-icon" />
+              <span className="emp-row-name">Boss profile</span>
+            </div>
             <button className="project-row project-new-row" onClick={onHire}>
               <UserPlus className="project-icon" />
               <span className="session-label">Hire an employee</span>
