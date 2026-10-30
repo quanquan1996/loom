@@ -43,7 +43,7 @@ defmodule Loom.Nodes do
 
   @name __MODULE__
   @persisted ~w(id name token_hash created_at os arch hostname version last_seen_at)a
-  @install_ttl :timer.hours(1)
+  @install_ttl :timer.hours(24)
   @name_format ~r/^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$/
 
   def start_link(opts) do

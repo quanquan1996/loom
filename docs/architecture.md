@@ -534,7 +534,7 @@ agent ──zsh──> loom-node exec mac -- '…'      CLI, on this host
 ```
 
 - **Registering a device.** The Devices dialog at the foot of the sidebar
-  registers a name and returns a one-time install code, valid for an hour. The
+  registers a name and returns a one-time install code, valid for a day. The
   user runs `curl …/node/install/<code> | sh` on the device, or
   `irm …/node/install/<code>/ps1 | iex` in PowerShell on Windows. Fetching
   either

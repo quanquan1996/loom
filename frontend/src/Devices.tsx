@@ -17,7 +17,7 @@ import {
  *
  * Who is online comes from the lobby channel, so the dots change while the
  * dialog is open. The install command is shown once, right after it is made:
- * the code in it works one time, for an hour, and the token it hands the
+ * the code in it works one time, for a day, and the token it hands the
  * device exists nowhere else.
  */
 export function DevicesDialog({
@@ -229,7 +229,7 @@ function InstallBox({ code, onDone }: { code: string; onDone: () => void }) {
 
   return (
     <div className="install-box">
-      <div className="install-hint">Run one of these in a terminal on the device — it works once, within an hour:</div>
+      <div className="install-hint">Run one of these in a terminal on the device — it works once, within a day:</div>
       {installCommands(code).map(({ system, command }) => (
         <div key={system} className="install-option">
           <div className="install-system">
