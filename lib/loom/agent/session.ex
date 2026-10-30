@@ -158,10 +158,34 @@ defmodule Loom.Agent.Session do
   never pushed to the backend. That also avoids inventing an answer to "who wins
   when the backend renames it too".
   """
-  def rename(id, title), do: GenServer.call(via(id), {:rename, title})
+  def rename(id, title), do: GenServer.call(via(id), {:rename, title, "user"})
+
+  @doc """
+  Rename it as the `loom-tidy` skill does: a title for telling sessions apart,
+  which the next tidying may write again. One the user gave (`rename/2`) it
+  never replaces; see `LoomWeb.TidyController`.
+  """
+  def retitle(id, title), do: GenServer.call(via(id), {:rename, title, "tidy"})
 
   @doc "Pin the session to the top of the sidebar, or unpin it. Local to loom."
   def pin(id, pinned?), do: GenServer.call(via(id), {:pin, pinned?})
+
+  @doc """
+  Archive the session, or bring it back. Local to loom, and only for the
+  sidebar: the session lives on as before — restored at boot, read by Dream,
+  reachable from the bell. The page keeps archived ones out of its lists until
+  the session is active again (`last_active_at` past `archived_at`): writing
+  in one brings it back without anyone clearing the mark.
+  """
+  def archive(id, archived?), do: GenServer.call(via(id), {:archive, archived?})
+
+  @doc """
+  Begin a session with what it should know, without a turn: `display` is shown
+  as a message (origin "tidy"), and `prompt` goes to the backend ahead of the
+  next message, as a project move does. How a merge of sessions starts; see
+  `LoomWeb.TidyController`.
+  """
+  def seed(id, display, prompt), do: GenServer.call(via(id), {:seed, display, prompt})
 
   @doc """
   Record that the user has read the session up to `seq`. Local to loom, and
@@ -241,6 +265,7 @@ defmodule Loom.Agent.Session do
           kind: Keyword.get(opts, :kind),
           employee_id: Keyword.get(opts, :employee),
           title: Keyword.get(opts, :title),
+          title_by: Keyword.get(opts, :title_by, if(Keyword.get(opts, :title), do: "user")),
           created_at: now,
           last_active_at: now,
           logs: logs,
@@ -364,6 +389,7 @@ defmodule Loom.Agent.Session do
           handle: handle,
           project_id: meta[:project_id],
           pinned: meta[:pinned] == true,
+          archived_at: if(is_integer(meta[:archived_at]), do: meta[:archived_at]),
           kind: if(is_binary(meta[:kind]), do: meta[:kind]),
           employee_id: if(is_binary(meta[:employee_id]), do: meta[:employee_id]),
           seen_seq: if(is_integer(meta[:seen_seq]), do: meta[:seen_seq], else: 0),
@@ -371,6 +397,7 @@ defmodule Loom.Agent.Session do
           effort: if(meta[:effort] in Backend.efforts(backend), do: meta[:effort]),
           notice: restored_notice(meta),
           title: meta[:title],
+          title_by: if(meta[:title_by] in ["auto", "user", "tidy"], do: meta[:title_by]),
           created_at: meta[:created_at],
           last_active_at: last_active(transcript) || meta[:created_at],
           transcript: transcript,
@@ -483,6 +510,8 @@ defmodule Loom.Agent.Session do
       project_id: nil,
       # Shown above everything else in the sidebar.
       pinned: false,
+      # When the user archived it, or nil. See `archive/2`.
+      archived_at: nil,
       # nil for a conversation; "dream" for a project's sleep session, which
       # the sidebar keeps out of its lists. See `Loom.Dream`.
       kind: nil,
@@ -503,6 +532,9 @@ defmodule Loom.Agent.Session do
       # Set while the first message waits to be filed into a project.
       classifying: nil,
       title: nil,
+      # Who gave it: "auto" (the first message), "user", "tidy" (`retitle/2`),
+      # or nil for a session from before this was kept.
+      title_by: nil,
       created_at: nil,
       # When the last message went either way; orders the sidebar. Derived from
       # the transcript on restore rather than stored.
@@ -578,13 +610,13 @@ defmodule Loom.Agent.Session do
     end
   end
 
-  def handle_call({:rename, title}, _from, state) do
+  def handle_call({:rename, title, by}, _from, state) do
     title = title |> to_string() |> String.trim() |> String.slice(0, @title_limit)
 
     if title == "" do
       {:reply, {:error, :empty}, state}
     else
-      state = emit(%{state | title: title}, :renamed, %{title: title})
+      state = emit(%{state | title: title, title_by: by}, :renamed, %{title: title})
       persist_meta(state)
       {:reply, :ok, state}
     end
@@ -594,6 +626,36 @@ defmodule Loom.Agent.Session do
     state = %{state | pinned: pinned? == true}
     persist_meta(state)
     {:reply, :ok, state}
+  end
+
+  def handle_call({:archive, archived?}, _from, state) do
+    at = if archived? == true, do: System.system_time(:millisecond)
+    state = %{state | archived_at: at}
+    persist_meta(state)
+    {:reply, :ok, state}
+  end
+
+  def handle_call({:seed, display, prompt}, _from, state) do
+    if state.turns > 0 or state.status in [:starting, :running] do
+      {:reply, {:error, :busy}, state}
+    else
+      state =
+        emit(state, :user, %{
+          text: display,
+          files: [],
+          origin: "tidy",
+          client_msg_id: nil,
+          status: :sent
+        })
+
+      state = %{
+        state
+        | notice: if(state.notice, do: state.notice <> "\n\n" <> prompt, else: prompt)
+      }
+
+      persist_meta(state)
+      {:reply, :ok, state}
+    end
   end
 
   def handle_call({:seen, seq}, _from, state) when is_integer(seq) do
@@ -1239,6 +1301,7 @@ defmodule Loom.Agent.Session do
       backend: state.backend,
       project_id: state.project_id,
       pinned: state.pinned,
+      archived_at: state.archived_at,
       kind: state.kind,
       employee_id: state.employee_id,
       seen_seq: state.seen_seq,
@@ -1248,6 +1311,7 @@ defmodule Loom.Agent.Session do
       # Pending in `notice` until sent, which counts as told.
       replies_told: true,
       title: state.title,
+      title_by: state.title_by,
       created_at: state.created_at,
       status: state.status,
       seq: state.seq,
@@ -1325,7 +1389,7 @@ defmodule Loom.Agent.Session do
       |> String.trim()
       |> String.slice(0, @title_limit)
 
-    if title == "", do: state, else: %{state | title: title}
+    if title == "", do: state, else: %{state | title: title, title_by: "auto"}
   end
 
   defp maybe_title(state, _text), do: state
@@ -1337,12 +1401,14 @@ defmodule Loom.Agent.Session do
       backend_label: Backend.label(state.backend),
       project_id: state.project_id,
       pinned: state.pinned,
+      archived_at: state.archived_at,
       kind: state.kind,
       employee_id: state.employee_id,
       seen_seq: state.seen_seq,
       reply_seq: state.reply_seq,
       effort: state.effort,
       title: state.title,
+      title_by: state.title_by,
       created_at: state.created_at,
       last_active_at: state.last_active_at,
       status: state.status,

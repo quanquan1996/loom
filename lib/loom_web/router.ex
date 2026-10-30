@@ -137,6 +137,18 @@ defmodule LoomWeb.Router do
     post "/act", NoticeController, :act
   end
 
+  # `loom-session`, which an agent runs to tidy the user's sessions; see
+  # `LoomWeb.TidyController`. Same key and header as `loom-notice`.
+  scope "/api/tidy", LoomWeb do
+    pipe_through :node_cli
+
+    get "/list", TidyController, :list
+    get "/read", TidyController, :read
+    post "/archive", TidyController, :archive
+    post "/merge", TidyController, :merge
+    post "/retitle", TidyController, :retitle
+  end
+
   # A device joining: the install script (its one-time code is the credential)
   # and the binary it downloads. See `LoomWeb.NodeInstallController`.
   scope "/node", LoomWeb do

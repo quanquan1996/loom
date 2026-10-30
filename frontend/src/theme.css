@@ -995,6 +995,78 @@ pre.code,
   font-variant-numeric: tabular-nums;
 }
 
+/* Archived: a heading that folds, then a row per session. */
+.settings-row.archived {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.archived-head {
+  position: relative;
+  padding: 0 24px 0 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.archived-head:disabled {
+  cursor: default;
+}
+
+.archived-fold {
+  position: absolute;
+  top: 2px;
+  right: 0;
+  width: 1rem;
+  height: 1rem;
+  color: var(--fg-dim);
+}
+
+.archived-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.archived-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.archived-open {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px 0;
+  border: 0;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  font-size: 0.875rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.archived-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.archived-project {
+  flex: 0 0 auto;
+  color: var(--fg-dim);
+  font-size: 0.8125rem;
+}
+
 @media (max-width: 640px) {
   .settings-row {
     flex-direction: column;

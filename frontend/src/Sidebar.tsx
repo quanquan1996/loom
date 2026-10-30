@@ -128,6 +128,7 @@ type Props = {
   onRename: (id: string) => void
   onPin: (id: string, pinned: boolean) => Promise<void>
   onMove: (id: string, projectId: string | null) => Promise<void>
+  onArchive: (id: string, archived: boolean) => Promise<void>
   onCollapse: () => void
   browserOpen: boolean
   onToggleBrowser: () => void
@@ -169,6 +170,7 @@ export function Sidebar({
   onRename,
   onPin,
   onMove,
+  onArchive,
   onCollapse,
   browserOpen,
   onToggleBrowser,
@@ -411,6 +413,7 @@ export function Sidebar({
           onRename={() => onRename(menuFor.id)}
           onPin={(on) => onPin(menuFor.id, on)}
           onMove={(projectId) => onMove(menuFor.id, projectId)}
+          onArchive={(on) => onArchive(menuFor.id, on)}
           onDelete={() => onDelete(menuFor.id)}
           onClose={() => setMenu(null)}
         />

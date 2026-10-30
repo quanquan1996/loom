@@ -145,6 +145,9 @@ export type AgentInfo = {
   project_id?: string | null
   // Shown above everything else in the sidebar.
   pinned?: boolean
+  // When the user archived it (ms), or null. Only the page reads it; see
+  // `isArchived`.
+  archived_at?: number | null
   // "dream" for a scope's sleep session, which the lists leave out and the
   // moon opens; see `Sleep.tsx`. "employee_chat" and "employee_work" for a
   // virtual employee's, opened from its page; see `Employees.tsx`. Older
@@ -227,12 +230,25 @@ export const EFFORTS: Record<AgentBackend, string[]> = {
 }
 
 /**
- * Pin or unpin a session, or move it into a project (null: out of any). A
+ * Archived, and not used since: out of the lists, in Settings → Archived.
+ * Writing in one (or a task writing in it) brings it back by itself.
+ */
+export const isArchived = (s: AgentInfo) =>
+  s.archived_at != null && (s.last_active_at ?? 0) <= s.archived_at
+
+/**
+ * Pin or unpin a session, archive it, or move it into a project (null: out of any). A
  * move is refused mid-turn; the server says so.
  */
 export function updateAgent(
   id: string,
-  attrs: { pinned?: boolean; project_id?: string | null; seen_seq?: number; effort?: string | null },
+  attrs: {
+    pinned?: boolean
+    archived?: boolean
+    project_id?: string | null
+    seen_seq?: number
+    effort?: string | null
+  },
 ): Promise<AgentInfo> {
   return apiCall(`/api/agents/${id}`, { method: "PATCH", body: JSON.stringify(attrs) })
 }

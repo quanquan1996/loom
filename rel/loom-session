@@ -1,0 +1,113 @@
+#!/usr/bin/env python3
+"""loom-session: tidy the user's Loom sessions, from a Loom session.
+
+  loom-session list [--project ID|home | --all] [--archived]
+  loom-session read ID [--full]
+  loom-session archive ID...
+  loom-session unarchive ID...
+  loom-session merge --title T --summary-file F ID...
+  loom-session retitle ID TITLE
+
+Only the sidebar's Recents can be tidied; nothing is deleted. Archiving hides
+a session from the lists and nothing else. See the loom-tidy skill.
+"""
+import argparse, json, os, sys, time, urllib.error, urllib.parse, urllib.request
+
+
+def endpoint():
+    path = os.environ.get("LOOM_CLI") or os.path.join(
+        os.environ.get("LOOM_HOME") or os.path.expanduser("~/.loom"), "node-cli.json")
+    try:
+        with open(path) as f:
+            e = json.load(f)
+    except OSError as err:
+        sys.exit(f"loom-session: cannot read {path} (is Loom running on this host?): {err}")
+    return e["url"].rstrip("/"), e["key"]
+
+
+def call(method, route, body=None, query=None):
+    session = os.environ.get("LOOM_SESSION_ID")
+    if not session:
+        sys.exit("loom-session: LOOM_SESSION_ID is not set; run this from a session Loom started")
+    url, key = endpoint()
+    qs = "?" + urllib.parse.urlencode(query) if query else ""
+    req = urllib.request.Request(
+        f"{url}/api/tidy/{route}{qs}", method=method,
+        data=json.dumps(body).encode() if body is not None else None,
+        headers={"x-loom-key": key, "x-loom-session": session, "content-type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=60) as r:
+            return json.load(r)
+    except urllib.error.HTTPError as err:
+        try:
+            msg = json.load(err).get("error")
+        except Exception:
+            msg = err.reason
+        sys.exit(f"loom-session: {msg}")
+    except urllib.error.URLError as err:
+        sys.exit(f"loom-session: cannot reach Loom at {url}: {err.reason}")
+
+
+def age(ms):
+    if not ms:
+        return "?"
+    d = (time.time() * 1000 - ms) / 86_400_000
+    return f"{d * 24:.0f}h" if d < 1 else f"{d:.0f}d"
+
+
+def main():
+    p = argparse.ArgumentParser(prog="loom-session", description=__doc__,
+                                formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = p.add_subparsers(dest="cmd", required=True)
+    ls = sub.add_parser("list", help="sessions in Recents (default: this session's project)")
+    ls.add_argument("--project", help="a project id, or home")
+    ls.add_argument("--all", action="store_true", help="every project and home")
+    ls.add_argument("--archived", action="store_true", help="the archived ones instead")
+    rd = sub.add_parser("read", help="a session's conversation, without tool calls")
+    rd.add_argument("id")
+    rd.add_argument("--full", action="store_true", help="every reply, not only each turn's last")
+    for name in ("archive", "unarchive"):
+        sub.add_parser(name).add_argument("ids", nargs="+")
+    mg = sub.add_parser("merge", help="a new session that begins with SUMMARY; the sources are archived")
+    mg.add_argument("--title", required=True)
+    mg.add_argument("--summary-file", required=True, help="the summary, markdown; - for stdin")
+    mg.add_argument("ids", nargs="+")
+    rt = sub.add_parser("retitle", help="a title to tell it apart by (never over one the user gave)")
+    rt.add_argument("id")
+    rt.add_argument("title", nargs="+")
+    a = p.parse_args()
+
+    if a.cmd == "list":
+        q = {"all": "1"} if a.all else ({"project": a.project} if a.project else {})
+        if a.archived:
+            q["archived"] = "1"
+        rows = call("GET", "list", query=q)["sessions"]
+        if not rows:
+            print("none")
+        for s in rows:
+            marks = "".join([" (you)" if s["you"] else "", " [open notice]" if s["open_notice"] else "",
+                             f" [{s['status']}]" if s["status"] in ("starting", "running") else ""])
+            first = (s.get("first") or "").replace("\n", " ")[:100]
+            by = {"auto": "title=first message", "user": "title=the user's", "tidy": "title=tidied"}.get(s.get("title_by"), "")
+            print(f"{s['id']}  {s['title']!r} ({by})  project={s['project_id'] or 'home'}  {s['turns']} turns  "
+                  f"{s['kb']}KB  active {age(s['last_active_at'])} ago  made {age(s['created_at'])} ago{marks}")
+            print(f"    first: {first}")
+    elif a.cmd == "read":
+        r = call("GET", "read", query={"id": a.id, **({"full": "1"} if a.full else {})})
+        print(f"# {r['title']} ({r['id']})\n")
+        for m in r["messages"]:
+            print(f"## {m['role']}\n{m['text']}\n")
+    elif a.cmd in ("archive", "unarchive"):
+        call("POST", "archive", {"ids": a.ids, "archived": a.cmd == "archive"})
+        print(f"{a.cmd}d: {' '.join(a.ids)}")
+    elif a.cmd == "retitle":
+        r = call("POST", "retitle", {"id": a.id, "title": " ".join(a.title)})
+        print(f"{r['id']}: {r['title']}")
+    else:
+        summary = sys.stdin.read() if a.summary_file == "-" else open(a.summary_file).read()
+        r = call("POST", "merge", {"title": a.title, "summary": summary, "ids": a.ids})
+        print(f"merged into {r['id']}; archived: {' '.join(a.ids)}")
+
+
+if __name__ == "__main__":
+    main()

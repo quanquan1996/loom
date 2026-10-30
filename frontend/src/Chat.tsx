@@ -7,6 +7,7 @@ import {
   ChevronRight,
   Clock as ClockIcon,
   Ellipsis,
+  Merge,
   Moon,
   PanelLeft,
   Plus,
@@ -906,19 +907,22 @@ function ItemView({ item, sessionId, onAnswer }: ItemProps) {
       return (
         <div className={"bubble user" + (item.pending ? " pending" : "") + (item.failed ? " failed" : "")}>
           {item.failed && item.clientMsgId && <UnsentMark id={item.clientMsgId} reason={item.failed} />}
-          {item.text.trim() !== "" && <Rich text={item.text} />}
+          {/* A merge's summary is the agent's writing, not the user's words: markdown. */}
+          {item.text.trim() !== "" &&
+            (item.origin === "tidy" ? <Markdown text={item.text} /> : <Rich text={item.text} />)}
           {item.files.length > 0 && <SentFiles sessionId={sessionId} files={item.files} />}
           {item.queued && <span className="tag">queued</span>}
           {item.origin === "phone" && <span className="tag">phone</span>}
           {item.origin === "cron" && <span className="tag"><ClockIcon /> cron</span>}
           {item.origin === "dream" && <span className="tag"><Moon /> dream</span>}
+          {item.origin === "tidy" && <span className="tag"><Merge /> merged</span>}
           {item.at && <Clock at={item.at} />}
         </div>
       )
 
     case "assistant":
-      // The only place markdown is rendered. Tool output and the user's own
-      // words are shown verbatim — see `markdown.tsx`.
+      // Where markdown is rendered (and a merge's summary, above). Tool output
+      // and the user's own words are shown verbatim — see `markdown.tsx`.
       return (
         <div className={"bubble assistant" + (item.streaming ? " live" : "")}>
           <Markdown text={item.text} />

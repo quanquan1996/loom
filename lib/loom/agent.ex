@@ -101,7 +101,10 @@ defmodule Loom.Agent do
   defdelegate interrupt(id), to: Session
   defdelegate drop_queued(id, index), to: Session
   defdelegate rename(id, title), to: Session
+  defdelegate retitle(id, title), to: Session
   defdelegate pin(id, pinned?), to: Session
+  defdelegate archive(id, archived?), to: Session
+  defdelegate seed(id, display, prompt), to: Session
   defdelegate seen(id, seq), to: Session
   defdelegate set_effort(id, effort), to: Session
   defdelegate move(id, project_id), to: Session

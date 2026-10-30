@@ -52,10 +52,13 @@ for skills in "$HOME/.claude/skills" "$HOME/.codex/skills"; do
   done
 done
 
-# loom-notice: what agents post to the bell with (the loom-notify skill).
+# loom-notice: what agents post to the bell with (the loom-notify skill);
+# loom-session: what they tidy sessions with (the loom-tidy skill).
 mkdir -p "$HOME/.local/bin"
-cp rel/loom-notice "$HOME/.local/bin/.loom-notice.new"
-mv "$HOME/.local/bin/.loom-notice.new" "$HOME/.local/bin/loom-notice"
+for cli in loom-notice loom-session; do
+  cp "rel/$cli" "$HOME/.local/bin/.$cli.new"
+  mv "$HOME/.local/bin/.$cli.new" "$HOME/.local/bin/$cli"
+done
 
 mix release --path "$next" --overwrite
 

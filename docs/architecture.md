@@ -326,6 +326,31 @@ for 3–5.
 - **Sleep** posts its night with the same command, and sleeps in a new
   session each night (`past` keeps the old ones, answerable still).
 
+### 2.11 Tidying sessions
+
+Making the right session quick to pick on a phone: the `loom-tidy` skill
+(and `loom-retitle` inside it) proposes titles, archives and merges, and acts
+once the user confirms. The agent runs `loom-session` (`rel/loom-session`,
+installed like `loom-notice`), calling `/api/tidy/*` (`TidyController`).
+
+- **Nothing is deleted.** Archiving sets `archived_at` and nothing else: the
+  session runs, restores, is read by Dream and reached from the bell as
+  before. Only the page reads the mark: archived sessions leave Recents and
+  the project lists for Settings → Archived, until the session is active
+  again (`last_active_at` past `archived_at`), so writing in one brings it
+  back with no request.
+- **Merge** starts a new session in the same project, on the backend of the
+  most recent source, with the summary shown as its first message (`origin:
+  "tidy"`, rendered as markdown) and given to the backend ahead of the next
+  message (`Session.seed/3`, the `notice` slot); the sources are archived.
+- **Titles** record who gave them (`title_by`: auto, user, tidy; inferred for
+  older sessions). A retitle never replaces the user's.
+- **What may be tidied is a whitelist in code**: Recents only — no `kind`, no
+  employee, not pinned. Employee, Dream and bell sessions are never listed and
+  always refused, as is any kind added later. Archive and merge also refuse a
+  session mid-turn, the caller, one with an open notice, and a merge across
+  projects.
+
 ## 3. Client protocol
 
 ```

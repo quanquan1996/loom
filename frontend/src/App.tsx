@@ -29,6 +29,7 @@ import {
   checkAuth,
   renameAgent,
   updateAgent,
+  isArchived,
   getToken,
   listSessions,
   onUnauthorized,
@@ -102,10 +103,16 @@ function App() {
   )
   // The sleep sessions stay out of every list; the moons open them. See Sleep.tsx.
   // A virtual employee's two sessions likewise; its page opens them.
-  // And the bell's chat, which lives in the bell.
-  const sessions = useMemo(
+  // And the bell's chat, which lives in the bell. What is left is the
+  // user's, and the archived of those are in Settings instead.
+  const ordinary = useMemo(
     () => everything.filter((s) => !isDream(s) && !isEmployeeSession(s) && s.kind !== "bell"),
     [everything],
+  )
+  const sessions = useMemo(() => ordinary.filter((s) => !isArchived(s)), [ordinary])
+  const archived = useMemo(
+    () => ordinary.filter(isArchived).sort((a, b) => (b.archived_at ?? 0) - (a.archived_at ?? 0)),
+    [ordinary],
   )
   // Newest first: each night sleeps in a session of its own, and the moon
   // opens the latest.
@@ -593,6 +600,7 @@ function App() {
       onDelete={remove}
       onRename={setRenaming}
       onPin={async (id, pinned) => upsert(await updateAgent(id, { pinned }))}
+      onArchive={async (id, archived) => upsert(await updateAgent(id, { archived }))}
       onMove={async (id, projectId) => {
         upsert(await updateAgent(id, { project_id: projectId }))
         if (projectId) reveal(projectId)
@@ -887,7 +895,18 @@ function App() {
         />
       )}
       {settingsOpen && (
-        <SettingsDialog settings={settings} onChange={changeSettings} onClose={() => setSettingsOpen(false)} />
+        <SettingsDialog
+          settings={settings}
+          onChange={changeSettings}
+          onClose={() => setSettingsOpen(false)}
+          archived={archived}
+          projects={projects}
+          onOpen={(id) => {
+            setSettingsOpen(false)
+            select(id)
+          }}
+          onUnarchive={async (id) => upsert(await updateAgent(id, { archived: false }))}
+        />
       )}
       <WhichKey pending={pending} keymap={keymap} groups={{ "Space n": "new session" }} />
       {help && (

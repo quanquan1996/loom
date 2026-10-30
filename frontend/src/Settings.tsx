@@ -1,23 +1,31 @@
-import { Moon, Sun, X } from "lucide-react"
-import { useEffect, type ReactNode } from "react"
+import { ArchiveRestore, ChevronDown, ChevronRight, Moon, Sun, X } from "lucide-react"
+import { useEffect, useState, type ReactNode } from "react"
 import { createPortal } from "react-dom"
-import type { AgentBackend } from "./api"
+import type { AgentBackend, AgentInfo, Project } from "./api"
 import type { Appearance, Settings } from "./settings"
 import { Slider } from "./Slider"
 
 /**
- * The gear at the foot of the sidebar: this device's appearance and text sizes, and the
- * engine "+" starts a session on. Each choice takes effect as it is made;
- * there is nothing to save.
+ * The gear at the foot of the sidebar: this device's appearance and text sizes, the
+ * engine "+" starts a session on, and the archived sessions. Each choice takes
+ * effect as it is made; there is nothing to save.
  */
 export function SettingsDialog({
   settings,
   onChange,
   onClose,
+  archived,
+  projects,
+  onOpen,
+  onUnarchive,
 }: {
   settings: Settings
   onChange: (patch: Partial<Settings>) => void
   onClose: () => void
+  archived: AgentInfo[]
+  projects: Project[]
+  onOpen: (id: string) => void
+  onUnarchive: (id: string) => Promise<void>
 }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose()
@@ -60,6 +68,8 @@ export function SettingsDialog({
               onChange={(backend) => onChange({ backend })}
             />
           </Row>
+
+          <Archived sessions={archived} projects={projects} onOpen={onOpen} onUnarchive={onUnarchive} />
         </div>
       </div>
     </div>,
@@ -136,6 +146,51 @@ function TextSizes({
           )
         })}
       </div>
+    </div>
+  )
+}
+
+/**
+ * The archived sessions: out of the sidebar's lists, nothing else changed.
+ * Folded; open, a row each — tap to open it, or bring it back.
+ */
+function Archived({
+  sessions,
+  projects,
+  onOpen,
+  onUnarchive,
+}: {
+  sessions: AgentInfo[]
+  projects: Project[]
+  onOpen: (id: string) => void
+  onUnarchive: (id: string) => Promise<void>
+}) {
+  const [open, setOpen] = useState(false)
+  const name = (id?: string | null) => (id ? (projects.find((p) => p.id === id)?.name ?? "") : "")
+  return (
+    <div className="settings-row archived">
+      <button className="settings-text archived-head" onClick={() => setOpen((o) => !o)} disabled={!sessions.length}>
+        <span className="settings-label">Archived</span>
+        <span className="settings-hint">
+          {sessions.length ? `${sessions.length}, hidden from the lists. Writing in one brings it back.` : "None."}
+        </span>
+        {sessions.length > 0 && (open ? <ChevronDown className="archived-fold" /> : <ChevronRight className="archived-fold" />)}
+      </button>
+      {open && sessions.length > 0 && (
+        <div className="archived-list">
+          {sessions.map((s) => (
+            <div className="archived-item" key={s.id}>
+              <button className="archived-open" onClick={() => onOpen(s.id)}>
+                <span className="archived-title">{s.title || "Untitled"}</span>
+                {s.project_id && <span className="archived-project">{name(s.project_id)}</span>}
+              </button>
+              <button className="icon-btn" title="Unarchive" onClick={() => void onUnarchive(s.id)}>
+                <ArchiveRestore />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

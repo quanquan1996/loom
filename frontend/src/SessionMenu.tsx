@@ -1,11 +1,11 @@
-import { Check, ChevronLeft, ChevronRight, Folder, FolderInput, FolderMinus, Pencil, Pin, PinOff, Trash2 } from "lucide-react"
+import { Archive, ArchiveRestore, Check, ChevronLeft, ChevronRight, Folder, FolderInput, FolderMinus, Pencil, Pin, PinOff, Trash2 } from "lucide-react"
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react"
 import { createPortal } from "react-dom"
-import type { AgentInfo, Project } from "./api"
+import { isArchived, type AgentInfo, type Project } from "./api"
 
 /**
  * What can be done to one session, from the `…` on its row: rename, pin,
- * move into a project (or out of one), delete. ChatGPT's menu, minus what
+ * move into a project (or out of one), archive, delete. ChatGPT's menu, minus what
  * Loom has no use for.
  *
  * In a portal, placed by the button it opened from: the session list scrolls
@@ -22,6 +22,7 @@ export function SessionMenu({
   onRename,
   onPin,
   onMove,
+  onArchive,
   onDelete,
   onClose,
 }: {
@@ -31,6 +32,7 @@ export function SessionMenu({
   onRename: () => void
   onPin: (pinned: boolean) => Promise<void>
   onMove: (projectId: string | null) => Promise<void>
+  onArchive: (archived: boolean) => Promise<void>
   onDelete: () => void
   onClose: () => void
 }) {
@@ -81,6 +83,7 @@ export function SessionMenu({
 
   const busy = session.status === "starting" || session.status === "running"
   const current = projects.find((p) => p.id === session.project_id) ?? null
+  const archived = isArchived(session)
 
   return createPortal(
     <div
@@ -122,6 +125,9 @@ export function SessionMenu({
             <ChevronRight className="session-menu-more" />
           </button>
           <div className="session-menu-sep" />
+          <button role="menuitem" onClick={() => run(() => onArchive(!archived))}>
+            {archived ? <ArchiveRestore /> : <Archive />} {archived ? "Unarchive" : "Archive"}
+          </button>
           <button
             role="menuitem"
             className="danger"
