@@ -331,7 +331,8 @@ function App() {
   }
   const stillOpen = (ids: string[]) =>
     ids.map((id) => notices.find((n) => n.id === id)).filter((n): n is Notice => n?.status === "open")
-  const banner = flow && (
+  // Gone once nothing is left to go on to.
+  const banner = flow && stillOpen(flow).length > 0 && (
     <NextBar
       left={stillOpen(flow).length}
       onNext={() => {

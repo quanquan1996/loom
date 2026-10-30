@@ -159,12 +159,10 @@ export function NextBar({ left, onNext, onClose }: { left: number; onNext: () =>
   return (
     <div className="bell-next">
       <Bell className="bell-mark" />
-      <span className="bell-next-text">{left > 0 ? `From the bell · ${left} more` : "From the bell · that was the last"}</span>
-      {left > 0 && (
-        <button className="bell-btn pri" onClick={onNext}>
-          Next
-        </button>
-      )}
+      <span className="bell-next-text">{left} more in the bell</span>
+      <button className="bell-btn pri" onClick={onNext}>
+        Next
+      </button>
       <button className="icon-btn" onClick={onClose} title="Done going through">
         <X />
       </button>
