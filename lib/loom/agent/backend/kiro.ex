@@ -234,6 +234,12 @@ defmodule Loom.Agent.Backend.Kiro do
       model: handle.model
     }
 
+    # A virtual employee on a workstation: every tool call is checked first.
+    agent =
+      if Loom.Agent.Guard.guarded?(handle.loom_id),
+        do: Map.put(agent, :hooks, Loom.Agent.Guard.kiro_hooks()),
+        else: agent
+
     path = agent_path(handle.loom_id)
     File.mkdir_p!(Path.dirname(path))
     # Owner-only: the MCP servers' env can hold keys, as it may in ~/.claude.json.

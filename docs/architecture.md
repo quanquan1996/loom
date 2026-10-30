@@ -279,6 +279,15 @@ says when it needs the user.
   rules have it keep. Until that file exists the old session is asked to
   write it first. The page shows `past_work` above today as one thread, a
   day at a time (`EarlierDays` in `Chat.tsx`).
+- **A workstation** (`workstation`, a device id; Settings → Advanced): the
+  sessions stay here, but each has rules in `~/.loom/guards/<session>.json`
+  (`Loom.Agent.Guard`), and its backend then installs `rel/loom-guard` as the
+  hook before every tool call (Claude Code `--settings` PreToolUse, Kiro
+  agent `hooks.preToolUse`). Allowed: `loom-node` to that device, our CLIs,
+  the employee's own notes and memory, its skills; refused (exit 2) is
+  logged to `blocked.jsonl` and shown in Updates (`Session.note/2`, a
+  `loom_note` event). Offline: not woken, status `offline`, one priority-4
+  notice past a heartbeat, withdrawn when back. No workstation, no rules.
 - **The boss profile**, one for all employees: a sentence a line, with who
   heard it and when (`boss` in `employees.json`, `/api/boss`, `Boss.tsx`).
   A card's `boss` adds a line (or `replaces` one by id) at once, no one

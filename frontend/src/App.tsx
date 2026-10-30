@@ -692,6 +692,7 @@ function App() {
                 select(sessions[0]?.id ?? "")
               }}
               projects={projects}
+              devices={devices}
               chat={chatProps}
             />
           ) : active && chatProps && isDream(active) ? (

@@ -194,6 +194,9 @@ defmodule Loom.Agent.Session do
   """
   def tell(id, text), do: GenServer.call(via(id), {:tell, text})
 
+  @doc "A line from Loom in the conversation, for the user, not the agent."
+  def note(id, text), do: GenServer.call(via(id), {:note, text})
+
   @doc """
   Record that a tidying looked at it now (`tidied_at`), so the next one can
   start with what is new since. Local to loom.
@@ -678,6 +681,10 @@ defmodule Loom.Agent.Session do
       persist_meta(state)
       {:reply, :ok, state}
     end
+  end
+
+  def handle_call({:note, text}, _from, state) do
+    {:reply, :ok, emit(state, :loom_note, %{text: text})}
   end
 
   def handle_call({:tell, text}, _from, state) do

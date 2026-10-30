@@ -53,9 +53,10 @@ for skills in "$HOME/.claude/skills" "$HOME/.codex/skills"; do
 done
 
 # loom-notice: what agents post to the bell with (the loom-notify skill);
-# loom-session: what they tidy sessions with (the loom-tidy skill).
+# loom-session: what they tidy sessions with (the loom-tidy skill);
+# loom-guard: the hook that keeps an employee on its workstation.
 mkdir -p "$HOME/.local/bin"
-for cli in loom-notice loom-session; do
+for cli in loom-notice loom-session loom-guard; do
   cp "rel/$cli" "$HOME/.local/bin/.$cli.new"
   mv "$HOME/.local/bin/.$cli.new" "$HOME/.local/bin/$cli"
 done

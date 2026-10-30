@@ -106,6 +106,18 @@ defmodule Loom.Agent do
   defdelegate archive(id, archived?), to: Session
   defdelegate seed(id, display, prompt, origin \\ "tidy"), to: Session
   defdelegate tell(id, text), to: Session
+  defdelegate note(id, text), to: Session
+
+  @doc "Let one session's backend go, as `reload_backends/0` does for all."
+  def reload_backend(id) do
+    case Registry.lookup(Loom.Agent.Registry, id) do
+      [{pid, _}] -> send(pid, :reload_backend)
+      [] -> :ok
+    end
+
+    :ok
+  end
+
   defdelegate tidied(id), to: Session
   defdelegate seen(id, seq), to: Session
   defdelegate set_effort(id, effort), to: Session

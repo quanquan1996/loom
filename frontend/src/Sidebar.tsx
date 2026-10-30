@@ -370,7 +370,10 @@ export function Sidebar({
                   title={`${e.role ? `${e.name} — ${e.role}` : e.name}\n${status.label} · ${short(e, e.spent_today)} of ${short(e, e.cap_today)}${e.budget_unit === "turns" ? " turns" : ""}`}
                 >
                   <Avatar employee={e} size="sm" />
-                  <span className="emp-row-name">{e.name}</span>
+                  <span className="emp-row-name">
+                    {e.name}
+                    {e.workstation && <span className="emp-row-station"> · {e.workstation_name}</span>}
+                  </span>
                   <StatusIcon status={e.status} />
                   <BudgetRing employee={e} />
                 </div>
@@ -510,7 +513,12 @@ export function Sidebar({
         </div>
       )}
       {devicesOpen && (
-        <DevicesDialog devices={devices} onUpsert={onUpsertDevice} onClose={() => setDevicesOpen(false)} />
+        <DevicesDialog
+          devices={devices}
+          employees={employees}
+          onUpsert={onUpsertDevice}
+          onClose={() => setDevicesOpen(false)}
+        />
       )}
     </aside>
   )

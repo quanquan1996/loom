@@ -2,7 +2,9 @@ import {
   AlarmClock,
   Check,
   CircleAlert,
+  ChevronDown,
   ChevronLeft,
+  ChevronRight,
   FileText,
   Hourglass,
   ListChecks,
@@ -15,6 +17,7 @@ import {
   Settings as SettingsIcon,
   Siren,
   Undo2,
+  Unplug,
   Wallet,
   X,
 } from "lucide-react"
@@ -39,6 +42,7 @@ import {
   wakeEmployee,
   type AgentBackend,
   type AgentInfo,
+  type Device,
   type Employee,
   type EmployeeReport,
   type EmployeeSettings,
@@ -73,6 +77,7 @@ export const STATUS: Record<Employee["status"], { label: string; tone: string }>
   paused: { label: "Paused", tone: "dim" },
   approval: { label: "Budget reached", tone: "amber" },
   blocked: { label: "Needs you", tone: "red" },
+  offline: { label: "Workstation offline", tone: "dim" },
 }
 
 /** A round initial on a neutral disc, the same for everyone, like the rest of the sidebar. */
@@ -91,6 +96,7 @@ const STATUS_ICON: Record<Employee["status"], ComponentType<{ className?: string
   paused: Pause,
   approval: Hourglass,
   blocked: CircleAlert,
+  offline: Unplug,
 }
 
 const LOUD: Employee["status"][] = ["working", "approval", "blocked"]
@@ -151,6 +157,7 @@ export function EmployeePage({
   onUpsert,
   onDeleted,
   projects,
+  devices,
   chat,
 }: {
   employee: Employee
@@ -163,6 +170,7 @@ export function EmployeePage({
   onUpsert: (employee: Employee) => void
   onDeleted: () => void
   projects: Project[]
+  devices: Device[]
   chat: ChatProps
 }) {
   // Updates are read once they are on screen, and again as they grow.
@@ -210,7 +218,13 @@ export function EmployeePage({
           {tab === "kpis" && <KpiPane employee={employee} onUpsert={onUpsert} />}
           {tab === "reports" && <ReportsPane employee={employee} />}
           {tab === "settings" && (
-            <SettingsPane employee={employee} projects={projects} onUpsert={onUpsert} onDeleted={onDeleted} />
+            <SettingsPane
+              employee={employee}
+              projects={projects}
+              devices={devices}
+              onUpsert={onUpsert}
+              onDeleted={onDeleted}
+            />
           )}
         </div>
       </div>
@@ -686,14 +700,18 @@ const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"
 function SettingsPane({
   employee: e,
   projects,
+  devices,
   onUpsert,
   onDeleted,
 }: {
   employee: Employee
   projects: Project[]
+  devices: Device[]
   onUpsert: (e: Employee) => void
   onDeleted: () => void
 }) {
+  // Folded unless in use: most never need it.
+  const [advanced, setAdvanced] = useState(e.workstation !== null)
   const [draft, setDraft] = useState<EmployeeSettings>(() => editable(e))
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -819,6 +837,38 @@ function SettingsPane({
       <h2 className="emp-section">Workspace</h2>
       <code className="project-path">{e.workspace}</code>
 
+      <button type="button" className="emp-section emp-advanced" onClick={() => setAdvanced((a) => !a)}>
+        Advanced {advanced ? <ChevronDown /> : <ChevronRight />}
+      </button>
+      {advanced && (
+        <>
+          <div className="emp-form-row">
+            <label>
+              <span>Workstation</span>
+              <select
+                value={draft.workstation ?? ""}
+                onChange={(ev) => setDraft((d) => ({ ...d, workstation: ev.target.value || null }))}
+              >
+                <option value="">This server</option>
+                {devices.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}
+                    {d.online ? "" : " (offline)"}
+                  </option>
+                ))}
+                {e.workstation && !devices.some((d) => d.id === e.workstation) && (
+                  <option value={e.workstation}>{e.workstation_name ?? "?"} (removed)</option>
+                )}
+              </select>
+            </label>
+          </div>
+          <small className="emp-dim">
+            Its chats and memory stay on this server; what it does — commands, files, browsing, the web — happens on
+            the workstation. While that is offline it does not work, and costs nothing.
+          </small>
+        </>
+      )}
+
       {error && <div className="device-error">{error}</div>}
       <div className="confirm-actions emp-settings-actions">
         <button type="button" className="text-btn danger project-delete" onClick={() => setAsking(true)}>
@@ -861,6 +911,7 @@ const editable = (e: Employee): EmployeeSettings => ({
   weekly_report: e.weekly_report,
   ask_first: e.ask_first,
   model: e.model,
+  workstation: e.workstation,
 })
 
 /** Who it is and what it may touch: shared by hiring and settings. */
