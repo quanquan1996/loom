@@ -84,7 +84,8 @@ that machine as you:
   so it works behind NAT and home routers.
 - **Safe defaults.** Each device has its own token, stored only as a hash;
   removing the device revokes it, and loom-node uninstalls itself from that
-  machine (at once, or when it next comes online), logs and scratch files included, which makes lending a
+  machine (at once, or when it next comes online), logs and scratch files included
+  — a copy of the activity log is left on the owner's desktop first. This makes lending a
   friend's or a client's computer to an agent a reversible thing. Commands are time-limited, and everything a
   device runs is logged on that device.
 - The sidebar shows which devices are online, live.

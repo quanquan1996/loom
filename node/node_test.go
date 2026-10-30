@@ -83,10 +83,14 @@ func TestSelfUninstallLeavesNothing(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("INVOCATION_ID", "")
-	for _, p := range []string{configPath(), stateDir("log"), stateDir("work", "repo", "a.txt")} {
+	for _, p := range []string{configPath(), stateDir("work", "repo", "a.txt")} {
 		os.MkdirAll(filepath.Dir(p), 0o700)
 		os.WriteFile(p, []byte("x"), 0o600)
 	}
+	os.MkdirAll(stateDir(), 0o700)
+	os.WriteFile(stateDir("log.1"), []byte("older\n"), 0o600)
+	os.WriteFile(stateDir("log"), []byte("newer\n"), 0o600)
+	os.MkdirAll(filepath.Join(home, "Desktop"), 0o700)
 
 	if code := selfUninstall(); code != 0 {
 		t.Fatalf("exit %d", code)
@@ -95,5 +99,14 @@ func TestSelfUninstallLeavesNothing(t *testing.T) {
 		if _, err := os.Stat(p); !os.IsNotExist(err) {
 			t.Errorf("%s is still there", p)
 		}
+	}
+
+	// The activity log is left on the desktop, oldest first.
+	saved, _ := filepath.Glob(filepath.Join(home, "Desktop", "loom-node-activity-*.log"))
+	if len(saved) != 1 {
+		t.Fatalf("want one activity log on the desktop, got %v", saved)
+	}
+	if b, _ := os.ReadFile(saved[0]); string(b) != "older\nnewer\n" {
+		t.Errorf("activity log is %q", b)
 	}
 }
