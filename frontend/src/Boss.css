@@ -1,0 +1,121 @@
+/* ── The boss profile: a row in Settings, and a page of its own there ─── */
+
+.boss-page {
+  display: flex;
+  flex-direction: column;
+  padding: 12px 0 4px;
+}
+
+.boss-intro {
+  padding-bottom: 8px;
+}
+
+.boss-line + .boss-line {
+  border-top: 1px solid color-mix(in srgb, var(--fg) 8%, transparent);
+}
+
+.boss-line {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  padding: 8px 0;
+  border: 0;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.boss-text {
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.boss-meta {
+  color: var(--fg-dim);
+  font-size: 0.75rem;
+}
+
+.boss-error {
+  padding: 4px 0;
+  color: var(--red);
+  font-size: 0.8125rem;
+}
+
+.boss-line.editing {
+  gap: 8px;
+  cursor: default;
+}
+
+.boss-line textarea,
+.boss-add input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid color-mix(in srgb, var(--fg) 12%, transparent);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  outline: none;
+}
+
+.boss-line textarea {
+  resize: vertical;
+}
+
+.boss-actions,
+.boss-add {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.boss-add {
+  padding-top: 6px;
+}
+
+.boss-spacer {
+  flex: 1 1 auto;
+}
+
+.boss-delete,
+.boss-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 12px;
+  border: 1px solid color-mix(in srgb, var(--fg) 12%, transparent);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.boss-delete {
+  padding: 4px 0;
+  border: 0;
+  color: var(--red);
+}
+
+.boss-delete svg {
+  width: 14px;
+  height: 14px;
+}
+
+.boss-button.strong {
+  border-color: transparent;
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.boss-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}

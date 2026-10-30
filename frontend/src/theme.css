@@ -995,6 +995,25 @@ pre.code,
   font-variant-numeric: tabular-nums;
 }
 
+/* A page opened from a row: its title is the way back. */
+.settings-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: -6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  cursor: pointer;
+}
+
+.settings-back svg {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
 /* Archived: a heading that folds, then a row per session. */
 .settings-row.archived {
   flex-direction: column;

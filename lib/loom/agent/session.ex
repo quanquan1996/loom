@@ -188,6 +188,12 @@ defmodule Loom.Agent.Session do
   def seed(id, display, prompt), do: GenServer.call(via(id), {:seed, display, prompt})
 
   @doc """
+  Something the agent should know, sent ahead of its next message and not
+  shown: how an employee's chat hears that the boss profile changed.
+  """
+  def tell(id, text), do: GenServer.call(via(id), {:tell, text})
+
+  @doc """
   Record that a tidying looked at it now (`tidied_at`), so the next one can
   start with what is new since. Local to loom.
   """
@@ -671,6 +677,12 @@ defmodule Loom.Agent.Session do
       persist_meta(state)
       {:reply, :ok, state}
     end
+  end
+
+  def handle_call({:tell, text}, _from, state) do
+    state = %{state | notice: if(state.notice, do: state.notice <> "\n\n" <> text, else: text)}
+    persist_meta(state)
+    {:reply, :ok, state}
   end
 
   def handle_call({:seen, seq}, _from, state) when is_integer(seq) do
