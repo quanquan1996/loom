@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"time"
 )
 
 // Installing makes the daemon a per-user login service — launchd on macOS, a
@@ -244,9 +243,6 @@ func runUninstall(args []string) int {
 // scratch space all go, so nothing is left on someone else's machine. Stopping
 // the service kills this process on macOS and under systemd, so that is last.
 func selfUninstall() int {
-	// The log of what loom ran here is deleted with everything else, so leave a
-	// copy on the owner's desktop first — their record of what was done.
-	saveLogToDesktop()
 	os.RemoveAll(filepath.Dir(configPath()))
 	if runtime.GOOS != "windows" { // there the daemon's own log is open; see removeBinaries
 		os.RemoveAll(stateDir())
@@ -273,34 +269,6 @@ func selfUninstall() int {
 		removeRunKey()
 	}
 	return 0
-}
-
-// saveLogToDesktop writes the activity log (log.1 then log, oldest first) to a
-// file on the owner's desktop before the originals are deleted. Best-effort:
-// no log, no desktop, or a write that fails just means no copy is left.
-func saveLogToDesktop() {
-	var buf []byte
-	for _, name := range []string{"log.1", "log"} {
-		if b, err := os.ReadFile(stateDir(name)); err == nil {
-			buf = append(buf, b...)
-		}
-	}
-	if len(buf) == 0 {
-		return
-	}
-
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return
-	}
-	dir := filepath.Join(home, "Desktop")
-	if st, err := os.Stat(dir); err != nil || !st.IsDir() {
-		dir = home // no Desktop (a headless or non-English profile): the home folder
-	}
-
-	host, _ := os.Hostname()
-	name := fmt.Sprintf("loom-node-activity-%s-%s.log", host, time.Now().Format("2006-01-02"))
-	os.WriteFile(filepath.Join(dir, name), buf, 0o644)
 }
 
 // ── Windows ─────────────────────────────────────────────────────────────

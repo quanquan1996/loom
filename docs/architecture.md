@@ -554,9 +554,7 @@ agent ──zsh──> loom-node exec mac -- '…'      CLI, on this host
   and binaries, takes away its service, and stops (on Windows a detached `cmd`
   deletes `loom-noded.exe` once it has exited). Its config, its logs and
   `~/.local/state/loom-node/work` (`$LOOM_WORK`, agents' scratch space on a
-  device) go with it, so nothing is left behind — except a copy of the activity
-  log, which it writes to the owner's desktop first (`loom-node-activity-*.log`)
-  so they keep a record of what was run. A daemon that does not say
+  device) go with it, so nothing is left behind. A daemon that does not say
   `"uninstall": "1"` when it joins predates this, and is refused as before.
 - **How the CLI gets in.** The CLI's routes, `/api/node/*`, share a port with
   everything Cloudflare forwards. They require the key from
