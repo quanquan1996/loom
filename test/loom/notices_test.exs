@@ -87,7 +87,8 @@ defmodule Loom.NoticesTest do
     assert {:error, _} = Notices.reply(n["id"], "  ", s)
     {:ok, m} = Notices.reply(n["id"], "换，先签一个季度", s)
     assert m["status"] == "done" and m["answer"] == "换，先签一个季度"
-    assert_received {:submitted, "a_7", "换，先签一个季度"}
+    # Quoted, so the session knows what it answers.
+    assert_received {:submitted, "a_7", "↩ 要不要换？\n\n换，先签一个季度"}
     {:ok, d} = post(s, %{summary: "日报", priority: 7}, %{kind: "session", id: "a_8", name: "q"})
     assert {:ok, %{"status" => "done", "note" => "Dismissed"}} = Notices.dismiss(d["id"], s)
   end
@@ -134,6 +135,53 @@ defmodule Loom.NoticesTest do
     assert {:error, _} = post(s, %{summary: "x", priority: 11})
     assert {:error, _} = post(s, %{summary: " ", priority: 3})
     assert {:error, _} = post(s, %{summary: "x", priority: 3, needs: "maybe"})
+  end
+
+  test "detail and options: kept tidy", %{s: s} do
+    many = for i <- 1..12, do: "选项 #{i}"
+
+    {:ok, n} =
+      post(s, %{
+        summary: "换供应商？",
+        priority: 4,
+        detail: "  B 便宜 20%，但交期长一周。  ",
+        options: ["换成 B", " ", "换成 B", 3 | many]
+      })
+
+    assert n["detail"] == "B 便宜 20%，但交期长一周。"
+    assert n["options"] == ["换成 B" | Enum.take(many, 9)]
+    {:ok, m} = post(s, %{summary: "x", priority: 7, detail: "", options: "nope"})
+    assert m["detail"] == nil and m["options"] == []
+  end
+
+  test "later: out of the digest until then, then back with a notification",
+       %{s: s, set: set} do
+    {:ok, n} = post(s, %{summary: "要不要换？", priority: 4, needs: "reply", session: "a_9"})
+    assert {:error, _} = Notices.later(n["id"], @ten - 1, s)
+    assert {:error, _} = Notices.later(n["id"], @ten + 8 * 24 * @hour, s)
+    # Until 21:00.
+    {:ok, l} = Notices.later(n["id"], @ten + 11 * @hour, s)
+    assert l["later_until"] == @ten + 11 * @hour and l["status"] == "open"
+
+    # 20:05: no digest for it.
+    set.(@ten + 10 * @hour + 300_000)
+    send(s, :tick)
+    _ = Notices.list(s)
+    refute_received {:notified, _, _, _}
+
+    # 21:00: back.
+    set.(@ten + 11 * @hour)
+    send(s, :tick)
+    [back] = Notices.list(s)
+    assert back["later_until"] == nil
+    assert_received {:notified, "钱多多 · reminder", "要不要换？", "a_9"}
+  end
+
+  test "put off, it comes back at once if the source makes it more urgent", %{s: s} do
+    {:ok, n} = post(s, %{summary: "止损", priority: 5, key: "stop"})
+    {:ok, _} = Notices.later(n["id"], @ten + @hour, s)
+    {:ok, m} = post(s, %{summary: "止损，马上", priority: 2, key: "stop"})
+    assert m["later_until"] == nil
   end
 
   test "a 2 at night waits for 07:00; 20:00 sends one digest", %{s: s, set: set} do

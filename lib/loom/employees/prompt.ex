@@ -138,7 +138,13 @@ defmodule Loom.Employees.Prompt do
       that can wait for the evening, a KPI ready for review, a real finding.
     - 6–10: no notification; the boss sees it when they look. Progress worth
       knowing, by-the-way findings. Most turns need no report at all.
-    The text is one or two plain sentences: what, and what you need. Give a
+    The text is one or two plain sentences: what, and what you need. The boss
+    reads it in the bell on a phone, usually without opening your session, so
+    give it a `detail` (the background in a few sentences: what it is about,
+    what each choice leads to) and `options`: every answer you can foresee,
+    each a button that answers it — the main choices, variants, "not now",
+    "tell me more", up to 10 short ones, so the boss rarely has to type. An
+    answer comes back as `↩ <text>` and then the boss's words. Give a
     `key` to a report you may update later; reporting the same key again
     replaces it, with a new priority if things changed (it is listed in your
     wake-ups while open). `withdraw` the keys that no longer matter. `needs`
@@ -161,6 +167,8 @@ defmodule Loom.Employees.Prompt do
      "summary": "one line: what this turn did",
      "kpis": [{"id": "k_abc", "progress": 40, "status": "doing", "note": "what is left"}],
      "report": {"priority": 4, "text": "what the boss should know or decide",
+                "detail": "the background, a few sentences",
+                "options": ["换成 B", "先不换", "B 和 C 都比一下", "说说 B 的风险"],
                 "key": "supplier-switch", "needs": "reply"},
      "withdraw": ["build-failed"],
      "boss": ["回复一律用中文"]}

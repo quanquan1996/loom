@@ -37,6 +37,9 @@
 }
 
 .chat-header {
+  /* Its own layer above the glass, so the glass never lands on it. */
+  position: relative;
+  z-index: 1;
   flex: 0 0 auto;
   display: flex;
   align-items: center;
@@ -1797,4 +1800,25 @@ h3.md-h {
   margin-top: 6px;
   color: var(--fg-dim);
   font-size: 0.75rem;
+}
+
+/* A notice opened from the bell: its turn starts here, below the header,
+   and the message that started it lights up for a moment. */
+.focus-mark {
+  scroll-margin-top: calc(var(--top-h, 0px) + 8px);
+}
+
+.focus-mark + * {
+  animation: focus-flash 2.4s ease-out;
+  border-radius: 12px;
+}
+
+@keyframes focus-flash {
+  0%,
+  40% {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--fg) 28%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 3px transparent;
+  }
 }

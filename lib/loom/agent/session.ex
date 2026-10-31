@@ -236,6 +236,9 @@ defmodule Loom.Agent.Session do
   @doc "Session metadata without the transcript."
   def info(id), do: GenServer.call(via(id), :info)
 
+  @doc "The `seq` of the message that started the latest turn, or nil."
+  def turn_seq(id), do: GenServer.call(via(id), :turn_seq)
+
   def topic(id), do: "agent:#{id}"
   def via(id), do: {:via, Registry, {Loom.Agent.Registry, id}}
 
@@ -746,6 +749,9 @@ defmodule Loom.Agent.Session do
   end
 
   def handle_call(:info, _from, state), do: {:reply, meta(state), state}
+
+  def handle_call(:turn_seq, _from, state),
+    do: {:reply, Enum.find_value(state.transcript, &(&1.kind == :user && &1.seq)), state}
 
   defp take(text, opts, state) do
     text = to_string(text)

@@ -100,6 +100,7 @@ defmodule LoomWeb.Router do
     post "/notices/:id/answer", NoticeController, :answer
     post "/notices/:id/reply", NoticeController, :respond
     post "/notices/:id/dismiss", NoticeController, :dismiss
+    post "/notices/:id/later", NoticeController, :later
     post "/notices/session", NoticeController, :session
     get "/todos", NoticeController, :todos
     post "/todos", NoticeController, :add_todo

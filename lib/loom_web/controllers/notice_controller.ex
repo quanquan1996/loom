@@ -33,6 +33,9 @@ defmodule LoomWeb.NoticeController do
   # POST /api/notices/:id/dismiss
   def dismiss(conn, %{"id" => id}), do: reply(conn, Notices.dismiss(id))
 
+  # POST /api/notices/:id/later — `until`, ms.
+  def later(conn, %{"id" => id} = params), do: reply(conn, Notices.later(id, params["until"]))
+
   # GET /api/todos
   def todos(conn, _params), do: json(conn, %{todos: Notices.todos()})
 
@@ -62,11 +65,14 @@ defmodule LoomWeb.NoticeController do
 
   # ── loom-notice ─────────────────────────────────────────────────────────
 
-  # POST /api/notice/post — `summary`, `priority`, and optionally `key`, `needs`.
+  # POST /api/notice/post — `summary`, `priority`, and optionally `key`,
+  # `needs`, `detail`, `options`.
   def post(conn, params) do
     with {:ok, session, source} <- source(conn) do
       attrs =
-        params |> Map.take(["summary", "priority", "key", "needs"]) |> Map.put("session", session)
+        params
+        |> Map.take(["summary", "priority", "key", "needs", "detail", "options"])
+        |> Map.put("session", session)
 
       reply(conn, Notices.post(source, attrs))
     else

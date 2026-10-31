@@ -124,6 +124,7 @@ defmodule Loom.Agent do
   defdelegate move(id, project_id), to: Session
   defdelegate attach(id, since_seq \\ 0), to: Session
   defdelegate info(id), to: Session
+  defdelegate turn_seq(id), to: Session
   defdelegate topic(id), to: Session
 
   @doc """
