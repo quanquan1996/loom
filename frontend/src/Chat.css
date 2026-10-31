@@ -40,24 +40,6 @@
   pointer-events: none;
 }
 
-/* An app opened from the iOS home screen (`.ios-app`, set in index.html) gets
-   a blur from iOS itself over the top of the screen, the header with it; no
-   glass of ours, and no strip of solid colour along the top edge, stops it.
-   What does is a header that is itself fixed to the top edge and solid all
-   the way up through the status bar: WebKit then takes the status bar's colour
-   from it (LocalFrameView::fixedContainerEdges) instead of blurring. So there,
-   on a phone, the header is opaque. */
-@media (max-width: 640px) {
-  .ios-app .chat:not(.bare) > .chat-top {
-    position: fixed;
-    background: var(--bg);
-  }
-
-  .ios-app .chat:not(.bare) > .chat-glass {
-    display: none;
-  }
-}
-
 .chat-header {
   flex: 0 0 auto;
   display: flex;
