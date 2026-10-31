@@ -328,6 +328,18 @@
   word-break: break-word;
 }
 
+/* Your message and, under it, its copy button. */
+.user-turn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  max-width: 100%;
+}
+
+.user-turn > .msg-copy {
+  margin: 2px -4px 0 0;
+}
+
 .bubble.user {
   align-self: flex-end;
   background: var(--bg-card);
@@ -1522,6 +1534,63 @@ h3.md-h {
 .cron-error {
   color: var(--red);
   font-size: 0.846rem;
+}
+
+/* Copy a whole message, from just under it. Quiet until the message is pointed at, where there is a
+   pointer; always there, dimly, on a phone. */
+.msg-copy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  margin-left: 4px;
+  padding: 0;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--fg-dim);
+  vertical-align: middle;
+  cursor: pointer;
+}
+
+.bubble.assistant > .msg-copy {
+  display: flex;
+  margin: 2px 0 0 -4px;
+}
+
+.msg-copy svg {
+  width: 14px;
+  height: 14px;
+}
+
+.msg-copy:hover {
+  background: var(--bg-card);
+  color: var(--fg);
+}
+
+@media (hover: hover) {
+  .msg-copy {
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+
+  .bubble:hover > .msg-copy,
+  .user-turn:hover > .msg-copy,
+  .msg-copy:focus-visible {
+    opacity: 1;
+  }
+}
+
+/* Inline code copies on a tap; a flash of inverted colours says it did. */
+.md-code {
+  cursor: copy;
+  transition: background 0.15s;
+}
+
+.md-code.copied {
+  background: var(--fg);
+  color: var(--bg);
 }
 
 /* A message's time, quiet enough to read past. */

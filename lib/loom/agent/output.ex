@@ -72,6 +72,11 @@ defmodule Loom.Agent.Output do
     sandboxed with no access to Loom itself; it may load libraries from public \
     CDNs. Don't build a page when a plain file is what the user asked for.
 
+    Anything the user may want to copy — a command, a path, a URL, an ID, a \
+    name or value to paste somewhere — goes in `inline code`, or a fenced \
+    block when it runs past a line: Loom copies either with one tap. One \
+    thing per span, exactly as it is to be pasted.
+
     """ <> replies_instructions()
   end
 

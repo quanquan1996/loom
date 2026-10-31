@@ -179,7 +179,7 @@ function Inline({ token }: { token: Token }): ReactNode {
       return (token as Tokens.Escape).text
 
     case "codespan":
-      return <code>{(token as Tokens.Codespan).text}</code>
+      return <CodeSpan text={(token as Tokens.Codespan).text} />
 
     case "strong":
       return <strong>{inline((token as Tokens.Strong).tokens)}</strong>
@@ -263,11 +263,10 @@ function safeHref(href: string): string | null {
 }
 
 /**
- * Copies a fenced block whole. On a phone, selecting a command by hand fights
- * the sidebar's edge swipe and the block's own horizontal scroll, so this is
- * the way to take one away.
+ * Put `text` on the clipboard; `copied` stays true for a moment after, for the
+ * tick that says it worked.
  */
-function CopyButton({ text }: { text: string }) {
+export function useCopy(text: string) {
   const [copied, setCopied] = useState(false)
 
   useEffect(() => {
@@ -281,11 +280,21 @@ function CopyButton({ text }: { text: string }) {
       await navigator.clipboard.writeText(text)
       setCopied(true)
     } catch {
-      // No clipboard (an http origin, or permission refused): the block is
+      // No clipboard (an http origin, or permission refused): the text is
       // still selectable by hand.
     }
   }
 
+  return { copied, copy }
+}
+
+/**
+ * Copies a fenced block whole. On a phone, selecting a command by hand fights
+ * the sidebar's edge swipe and the block's own horizontal scroll, so this is
+ * the way to take one away.
+ */
+function CopyButton({ text }: { text: string }) {
+  const { copied, copy } = useCopy(text)
   return (
     <button
       type="button"
@@ -293,6 +302,48 @@ function CopyButton({ text }: { text: string }) {
       onClick={copy}
       title={copied ? "Copied" : "Copy"}
       aria-label={copied ? "Copied" : "Copy code"}
+    >
+      {copied ? <Check /> : <Copy />}
+    </button>
+  )
+}
+
+/**
+ * Inline code copies itself on a tap: it is where a path, an ID or a short
+ * command sits, and a one-word selection on a phone is the fiddliest of all.
+ * Not while text is selected, so dragging across it still selects.
+ */
+function CodeSpan({ text }: { text: string }) {
+  const { copied, copy } = useCopy(text)
+  return (
+    <code
+      className={"md-code" + (copied ? " copied" : "")}
+      title={copied ? "Copied" : "Tap to copy"}
+      onClick={(e) => {
+        if (window.getSelection()?.toString()) return
+        // Inside a link the tap is for the copy, not the navigation.
+        e.preventDefault()
+        void copy()
+      }}
+    >
+      {text}
+    </code>
+  )
+}
+
+/**
+ * A whole message's text, from the button under it. The markdown as written,
+ * which pastes cleanly into a chat, a doc or an editor.
+ */
+export function MessageCopy({ text }: { text: string }) {
+  const { copied, copy } = useCopy(text)
+  return (
+    <button
+      type="button"
+      className="msg-copy"
+      onClick={copy}
+      title={copied ? "Copied" : "Copy"}
+      aria-label={copied ? "Copied" : "Copy message"}
     >
       {copied ? <Check /> : <Copy />}
     </button>

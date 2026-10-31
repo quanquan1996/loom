@@ -50,7 +50,7 @@ import { itemForAttachment, itemForOutput, itemForPath, type CanvasItem } from "
 import { BackendIcon } from "./BackendIcon"
 import { formatBytes } from "./format"
 import { isComposing } from "./ime"
-import { Markdown, OutputLink } from "./markdown"
+import { Markdown, MessageCopy, OutputLink } from "./markdown"
 import { useNarrow } from "./useNarrow"
 import { useAgent } from "./useAgent"
 import { useDraft } from "./useDraft"
@@ -950,20 +950,25 @@ function ItemView({ item, sessionId, onAnswer }: ItemProps) {
   switch (item.kind) {
     case "user":
       return (
-        <div className={"bubble user" + (item.pending ? " pending" : "") + (item.failed ? " failed" : "")}>
-          {item.failed && item.clientMsgId && <UnsentMark id={item.clientMsgId} reason={item.failed} />}
-          {/* A merge's summary is the agent's writing, not the user's words: markdown. */}
-          {item.text.trim() !== "" &&
-            (item.origin === "tidy" || item.origin === "handoff" ? <Markdown text={item.text} /> : <Rich text={item.text} />)}
-          {item.files.length > 0 && <SentFiles sessionId={sessionId} files={item.files} />}
-          {item.uploads && item.uploads.length > 0 && <LocalFiles files={item.uploads} sending={!item.failed} />}
-          {item.queued && <span className="tag">queued</span>}
-          {item.origin === "phone" && <span className="tag">phone</span>}
-          {item.origin === "cron" && <span className="tag"><ClockIcon /> cron</span>}
-          {item.origin === "dream" && <span className="tag"><Moon /> dream</span>}
-          {item.origin === "tidy" && <span className="tag"><Merge /> merged</span>}
-          {item.origin === "handoff" && <span className="tag"><Forward /> handed off</span>}
-          {item.at && <Clock at={item.at} />}
+        // The copy button sits under the bubble rather than in it, where it
+        // would push the time onto a line of its own on a phone.
+        <div className="user-turn">
+          <div className={"bubble user" + (item.pending ? " pending" : "") + (item.failed ? " failed" : "")}>
+            {item.failed && item.clientMsgId && <UnsentMark id={item.clientMsgId} reason={item.failed} />}
+            {/* A merge's summary is the agent's writing, not the user's words: markdown. */}
+            {item.text.trim() !== "" &&
+              (item.origin === "tidy" || item.origin === "handoff" ? <Markdown text={item.text} /> : <Rich text={item.text} />)}
+            {item.files.length > 0 && <SentFiles sessionId={sessionId} files={item.files} />}
+            {item.uploads && item.uploads.length > 0 && <LocalFiles files={item.uploads} sending={!item.failed} />}
+            {item.queued && <span className="tag">queued</span>}
+            {item.origin === "phone" && <span className="tag">phone</span>}
+            {item.origin === "cron" && <span className="tag"><ClockIcon /> cron</span>}
+            {item.origin === "dream" && <span className="tag"><Moon /> dream</span>}
+            {item.origin === "tidy" && <span className="tag"><Merge /> merged</span>}
+            {item.origin === "handoff" && <span className="tag"><Forward /> handed off</span>}
+            {item.at && <Clock at={item.at} />}
+          </div>
+          {item.text.trim() !== "" && !item.pending && <MessageCopy text={item.text} />}
         </div>
       )
 
@@ -973,6 +978,7 @@ function ItemView({ item, sessionId, onAnswer }: ItemProps) {
       return (
         <div className={"bubble assistant" + (item.streaming ? " live" : "")}>
           <Markdown text={item.text} />
+          {!item.streaming && item.text.trim() !== "" && <MessageCopy text={item.text} />}
         </div>
       )
 
