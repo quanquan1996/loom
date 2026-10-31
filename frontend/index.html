@@ -16,44 +16,17 @@
     <meta name="theme-color" media="(max-width: 640px)" content="#000000" />
     <meta name="theme-color" content="#212121" />
     <meta name="apple-mobile-web-app-title" content="loom" />
-    <!-- Opened from the home screen: an opaque status bar, the page below it.
-         Not black-translucent, under which iOS 27 lays a blur over the top of
-         the app that nothing on the page can turn off — our header with it.
-         iOS reads this when the app is added to the home screen. -->
-    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+    <!-- Opened from the home screen: the page runs on under the status bar,
+         so the conversation scrolls behind the header's glass all the way up
+         instead of stopping at an opaque strip. The header pads past it. -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>loom</title>
-    <!-- iOS 26+ lays a blur over the top of a home-screen app, our header with
-         it, unless WebKit finds a fixed, full-width surface with a solid
-         background at the middle of the top edge (LocalFrameView::
-         fixedContainerEdges): then the status bar takes its colour. So the
-         status bar's own strip is painted in the page's colour, above the
-         drawer's transparent fixed layer that would otherwise be found there.
-         Switched on from script: iOS no longer reliably reports
-         `display-mode: standalone`. After HKUDS/nanobot#5942. -->
-    <style>
-      .ios-edge { display: none; }
-      /* DIAGNOSTIC, temporary: blue on any iOS, red once navigator.standalone. */
-      @supports (-webkit-touch-callout: none) {
-        .ios-edge { display: block; position: fixed; inset: 0 0 auto; height: max(11px, env(safe-area-inset-top)); z-index: 100; pointer-events: none; background-color: #0050ff; }
-      }
-      .ios-app .ios-edge { background-color: #ff0000 !important; }
-      .ios-app .ios-edge {
-        display: block;
-        position: fixed;
-        inset: 0 0 auto;
-        /* More than 10px, or WebKit passes it over as a border. */
-        height: max(11px, env(safe-area-inset-top));
-        z-index: 100;
-        pointer-events: none;
-        background-color: inherit;
-      }
-    </style>
+    <!-- An app opened from the iOS home screen; see `.ios-app` in Chat.css. -->
     <script>
       if (navigator.standalone === true) document.documentElement.classList.add("ios-app")
     </script>
   </head>
   <body>
-    <div class="ios-edge" aria-hidden="true"></div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
