@@ -62,6 +62,8 @@ func runInstall(args []string) int {
 	switch runtime.GOOS {
 	case "darwin":
 		err = installLaunchd(exe)
+	case "android":
+		err = installTermux(exe)
 	case "linux":
 		err = installSystemd(exe)
 	case "windows":
@@ -219,6 +221,68 @@ func installDetached(exe string) error {
 	return nil
 }
 
+// ── Android / Termux ──────────────────────────────────────────────────────
+
+// Termux has no systemd or launchd. Termux:Boot (a companion app) runs any
+// script in ~/.termux/boot/ at device startup — the only startup hook a
+// per-user process gets. So installing writes a boot script that holds a
+// wake-lock (or Android idles the CPU and drops the socket) and keeps the
+// daemon up in a restart loop, then runs that same script now so the device is
+// online before the next reboot.
+func bootScriptPath() string {
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, ".termux", "boot", "loom-node")
+}
+
+func installTermux(exe string) error {
+	dir := stateDir()
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return err
+	}
+	logPath := filepath.Join(dir, "daemon.log")
+
+	// A supervisor loop: termux-wake-lock keeps the CPU alive (absent when
+	// termux-api is not installed — harmless), and the daemon is relaunched if
+	// Android kills it.
+	script := fmt.Sprintf(`#!/data/data/com.termux/files/usr/bin/sh
+# loom-node, started by Termux:Boot. See loom's Devices.
+termux-wake-lock 2>/dev/null || true
+while true; do
+  '%s' daemon >>'%s' 2>&1
+  sleep 5
+done
+`, exe, logPath)
+
+	if err := os.MkdirAll(filepath.Dir(bootScriptPath()), 0o700); err != nil {
+		return err
+	}
+	if err := os.WriteFile(bootScriptPath(), []byte(script), 0o755); err != nil {
+		return err
+	}
+
+	// A reinstall must replace the running supervisor and daemon, not stack a
+	// second one on top; the binary at exe has already been overwritten.
+	exec.Command("pkill", "-f", bootScriptPath()).Run()
+	exec.Command("pkill", "-x", "loom-node").Run()
+
+	cmd := exec.Command("sh", bootScriptPath())
+	detach(cmd)
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+
+	fmt.Println("installed", bootScriptPath())
+	fmt.Println("loom-node is running; logs in", logPath)
+	fmt.Println("install the Termux:Boot app from F-Droid and open it once, so loom-node comes back after a reboot")
+	return nil
+}
+
+func stopTermux() {
+	exec.Command("pkill", "-f", bootScriptPath()).Run()
+	exec.Command("pkill", "-x", "loom-node").Run()
+	os.Remove(bootScriptPath())
+}
+
 // ── uninstall ───────────────────────────────────────────────────────────
 
 func runUninstall(args []string) int {
@@ -226,6 +290,8 @@ func runUninstall(args []string) int {
 	case "darwin":
 		exec.Command("launchctl", "bootout", fmt.Sprintf("gui/%d/%s", os.Getuid(), launchdLabel)).Run()
 		os.Remove(plistPath())
+	case "android":
+		stopTermux()
 	case "linux":
 		exec.Command("systemctl", "--user", "disable", "--now", systemdUnit).Run()
 		os.Remove(unitPath())
@@ -258,6 +324,11 @@ func selfUninstall() int {
 		home, _ := os.UserHomeDir()
 		os.Remove(filepath.Join(home, "Library", "Logs", "loom-node.log"))
 		exec.Command("launchctl", "bootout", fmt.Sprintf("gui/%d/%s", os.Getuid(), launchdLabel)).Run()
+	case "android":
+		// Kill the Termux:Boot supervisor and drop its script, so it does not
+		// relaunch us; our own process then exits on return, unsupervised.
+		os.Remove(bootScriptPath())
+		exec.Command("pkill", "-f", bootScriptPath()).Run()
 	case "linux":
 		if os.Getenv("INVOCATION_ID") != "" {
 			exec.Command("systemctl", "--user", "disable", systemdUnit).Run()

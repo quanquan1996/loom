@@ -577,12 +577,31 @@ export function deviceInstallCode(id: string): Promise<{ code: string }> {
  * What to paste into a terminal on the device, per kind of system. One code:
  * whichever is run first uses it up.
  */
+/**
+ * Where devices join loom. Defaults to the domain the dashboard is served on,
+ * but a deployment can send joins to a separate hostname — so the main domain
+ * is not printed in any install link — by setting VITE_NODE_JOIN_ORIGIN at
+ * build time. The host a device joins through is the one it keeps dialling.
+ */
+const joinOrigin = (import.meta.env.VITE_NODE_JOIN_ORIGIN as string | undefined) || window.location.origin
+
 export function installCommands(code: string): { system: string; command: string }[] {
-  const url = `${window.location.origin}/node/install/${code}`
+  const url = `${joinOrigin}/node/install/${code}`
   return [
     { system: "macOS, Linux, WSL", command: `curl -fsSL ${url} | sh` },
     { system: "Windows PowerShell", command: `irm ${url}/ps1 | iex` },
   ]
+}
+
+/**
+ * Android is an app, not a terminal: install the Loom Node app, open it, and
+ * paste the install URL into it — the app writes the token and keeps the node
+ * alive with a foreground service (no Termux). Both URLs carry the same
+ * one-time code, so this device's APK download dies with the code (~a day);
+ * use one install method or the other.
+ */
+export function androidInstall(code: string): { appUrl: string; pasteUrl: string } {
+  return { appUrl: `${joinOrigin}/node/app/${code}`, pasteUrl: `${joinOrigin}/node/install/${code}` }
 }
 
 // ── Projects (see Loom.Projects) ──────────────────────────────────────────

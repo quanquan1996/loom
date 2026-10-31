@@ -29,6 +29,16 @@ mix assets.deploy
 # without Go still deploys; it just cannot hand out devices.
 if command -v go >/dev/null 2>&1; then
   make -C node -j4
+  # The Android app (one APK, no Termux), served at GET /node/app/:code. Needs a
+  # JDK + Android SDK + host-arch aapt2/zipalign; a host without them still
+  # deploys, Android devices just won't get the app.
+  if command -v aapt2 >/dev/null 2>&1 && [ -x node/android/build.sh ]; then
+    # Same join origin the frontend bakes in, so the app accepts a bare code.
+    LOOM_JOIN_ORIGIN=$(sed -n 's/^VITE_NODE_JOIN_ORIGIN=//p' frontend/.env.production.local 2>/dev/null) \
+      sh node/android/build.sh && cp node/android/build/loom-node.apk priv/node/loom-node.apk
+  else
+    echo "deploy: no Android build toolchain; skipping the Android app" >&2
+  fi
   case "$(uname -m)" in aarch64|arm64) arch=arm64 ;; *) arch=amd64 ;; esac
   mkdir -p "$HOME/.local/bin"
   # Renamed into place, so a CLI call already running keeps its binary.

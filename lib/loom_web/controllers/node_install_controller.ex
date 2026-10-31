@@ -15,7 +15,7 @@ defmodule LoomWeb.NodeInstallController do
   """
   use LoomWeb, :controller
 
-  @targets ~w(darwin-arm64 darwin-amd64 linux-arm64 linux-amd64 windows-arm64 windows-amd64)
+  @targets ~w(darwin-arm64 darwin-amd64 linux-arm64 linux-amd64 windows-arm64 windows-amd64 android-arm64)
 
   @used_up "this install link is used up or expired; make a new one in Devices"
 
@@ -68,6 +68,29 @@ defmodule LoomWeb.NodeInstallController do
 
   def download(conn, _params), do: send_resp(conn, 404, "no such target\n")
 
+  # The Android app (one APK, no Termux). Bound to a device's install code and
+  # thus as short-lived as it (~a day): the code lets the device download the
+  # app, and the app redeems that same code for the token. Checked without
+  # consuming it, so the app can still redeem it afterwards.
+  def app(conn, %{"code" => code}) do
+    path = Application.app_dir(:loom, "priv/node/loom-node.apk")
+
+    cond do
+      not Loom.Nodes.valid_code?(code) ->
+        send_resp(conn, 404, @used_up)
+
+      not File.regular?(path) ->
+        send_resp(conn, 404, "the Android app was not built on this host\n")
+
+      true ->
+        conn
+        |> put_resp_content_type("application/vnd.android.package-archive")
+        |> put_resp_header("content-disposition", ~s(attachment; filename="loom-node.apk"))
+        |> put_resp_header("cache-control", "no-store")
+        |> send_file(200, path)
+    end
+  end
+
   # The origin the device reached us on, which is the one it should keep
   # dialling. Cloudflare or CloudFront terminates TLS, so the scheme is in a
   # header — CloudFront's own, as it rewrites X-Forwarded-Proto to the scheme
@@ -94,21 +117,28 @@ defmodule LoomWeb.NodeInstallController do
     URL='#{origin}'
     TOKEN='#{token}'
 
-    os=$(uname -s | tr '[:upper:]' '[:lower:]')
-    case "$os" in
-      darwin|linux) ;;
-      mingw*|msys*|cygwin*)
-        echo "loom-node: on Windows, make a new install command in Devices and run its PowerShell line" >&2
-        exit 1 ;;
-      *) echo "loom-node: $os is not supported" >&2; exit 1 ;;
-    esac
-    case "$(uname -m)" in
-      x86_64|amd64) arch=amd64 ;;
-      arm64|aarch64) arch=arm64 ;;
-      *) echo "loom-node: $(uname -m) is not supported" >&2; exit 1 ;;
-    esac
-
-    bin="$HOME/.local/bin"
+    # Termux (Android) is a Linux kernel with an Android userland, so uname
+    # says "Linux"; $PREFIX gives it away. Its own bin is already on PATH.
+    if [ -n "${PREFIX:-}" ] && [ "${PREFIX#*com.termux}" != "${PREFIX}" ]; then
+      os=android
+      arch=arm64
+      bin="$PREFIX/bin"
+    else
+      os=$(uname -s | tr '[:upper:]' '[:lower:]')
+      case "$os" in
+        darwin|linux) ;;
+        mingw*|msys*|cygwin*)
+          echo "loom-node: on Windows, make a new install command in Devices and run its PowerShell line" >&2
+          exit 1 ;;
+        *) echo "loom-node: $os is not supported" >&2; exit 1 ;;
+      esac
+      case "$(uname -m)" in
+        x86_64|amd64) arch=amd64 ;;
+        arm64|aarch64) arch=arm64 ;;
+        *) echo "loom-node: $(uname -m) is not supported" >&2; exit 1 ;;
+      esac
+      bin="$HOME/.local/bin"
+    fi
     mkdir -p "$bin"
     tmp="$bin/.loom-node.$$"
     trap 'rm -f "$tmp"' EXIT

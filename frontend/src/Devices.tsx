@@ -3,6 +3,7 @@ import { useEffect, useState } from "react"
 import { createPortal } from "react-dom"
 import { isComposing } from "./ime"
 import {
+  androidInstall,
   createDevice,
   deleteDevice,
   deviceInstallCode,
@@ -225,32 +226,82 @@ function DeviceRow({
 
 function InstallBox({ code, onDone }: { code: string; onDone: () => void }) {
   const [copied, setCopied] = useState<string | null>(null)
+  const [tab, setTab] = useState<"unix" | "windows" | "android">("unix")
 
-  const copy = async (command: string) => {
+  const copy = async (text: string) => {
     try {
-      await navigator.clipboard.writeText(command)
-      setCopied(command)
+      await navigator.clipboard.writeText(text)
+      setCopied(text)
     } catch {
       // No clipboard (an http origin): the text is selectable instead.
     }
   }
 
+  const [unix, windows] = installCommands(code)
+  const android = androidInstall(code)
+
+  const tabs = [
+    { key: "unix", label: "Mac · Linux" },
+    { key: "windows", label: "Windows" },
+    { key: "android", label: "Android" },
+  ] as const
+
+  // One copyable code/command block with its own Copy button.
+  const block = (text: string) => (
+    <>
+      <div className="install-system">
+        <span />
+        <button className="text-btn" onClick={() => copy(text)}>
+          {copied === text ? "Copied" : "Copy"}
+        </button>
+      </div>
+      <code className="install-command" onClick={(e) => selectAll(e.currentTarget)}>
+        {text}
+      </code>
+    </>
+  )
+
   return (
     <div className="install-box">
-      <div className="install-hint">Run one of these in a terminal on the device — it works once, within a day:</div>
-      {installCommands(code).map(({ system, command }) => (
-        <div key={system} className="install-option">
-          <div className="install-system">
-            <span>{system}</span>
-            <button className="text-btn" onClick={() => copy(command)}>
-              {copied === command ? "Copied" : "Copy"}
-            </button>
+      <div className="install-tabs">
+        {tabs.map((t) => (
+          <button
+            key={t.key}
+            className={`install-tab${tab === t.key ? " active" : ""}`}
+            onClick={() => setTab(t.key)}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "unix" && (
+        <>
+          <div className="install-hint">Run in a terminal — works once, within 2 minutes:</div>
+          {block(unix.command)}
+        </>
+      )}
+
+      {tab === "windows" && (
+        <>
+          <div className="install-hint">Run in PowerShell — works once, within 2 minutes:</div>
+          {block(windows.command)}
+        </>
+      )}
+
+      {tab === "android" && (
+        <>
+          <div className="install-hint">
+            Install the{" "}
+            <a href={android.appUrl} target="_blank" rel="noreferrer">
+              Loom Node app
+            </a>
+            , open it, and enter this code:
           </div>
-          <code className="install-command" onClick={(e) => selectAll(e.currentTarget)}>
-            {command}
-          </code>
-        </div>
-      ))}
+          {block(code)}
+        </>
+      )}
+
       <div className="install-actions">
         <button className="text-btn" onClick={onDone}>
           Done

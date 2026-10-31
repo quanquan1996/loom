@@ -162,6 +162,7 @@ defmodule LoomWeb.Router do
     get "/install/:code", NodeInstallController, :script
     get "/install/:code/ps1", NodeInstallController, :powershell
     get "/download/:target", NodeInstallController, :download
+    get "/app/:code", NodeInstallController, :app
   end
 
   # The user taking over loom's browser; see `LoomWeb.VncSocket`. Checks the

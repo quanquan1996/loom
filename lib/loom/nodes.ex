@@ -43,7 +43,7 @@ defmodule Loom.Nodes do
 
   @name __MODULE__
   @persisted ~w(id name token_hash created_at os arch hostname version last_seen_at)a
-  @install_ttl :timer.hours(24)
+  @install_ttl :timer.minutes(2)
   @name_format ~r/^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$/
 
   def start_link(opts) do
@@ -73,6 +73,9 @@ defmodule Loom.Nodes do
   The previous token, if any, is dead from here on.
   """
   def redeem(code, server \\ @name), do: GenServer.call(server, {:redeem, code})
+
+  @doc "Whether an install code is still live, without consuming it (the APK download checks this)."
+  def valid_code?(code, server \\ @name), do: GenServer.call(server, {:valid_code?, code})
 
   @doc """
   The device a token belongs to: `{:ok, id}`, `{:wipe, name}` for a removed
@@ -231,6 +234,18 @@ defmodule Loom.Nodes do
       error ->
         {:reply, error, state}
     end
+  end
+
+  def handle_call({:valid_code?, code}, _from, state) do
+    now_ms = System.monotonic_time(:millisecond)
+
+    valid =
+      case Map.get(state.codes, code) do
+        {_id, expires} -> expires > now_ms
+        _ -> false
+      end
+
+    {:reply, valid, state}
   end
 
   def handle_call({:redeem, code}, _from, state) do
@@ -401,12 +416,22 @@ defmodule Loom.Nodes do
   defp same_name?(_a, _b), do: false
 
   defp new_code(id, state) do
-    code = random(16)
-    expires = System.monotonic_time(:millisecond) + @install_ttl
     now_ms = System.monotonic_time(:millisecond)
     # Expired codes go whenever a new one is made; there are only ever a few.
     codes = for {c, {_, e} = v} <- state.codes, e > now_ms, into: %{}, do: {c, v}
-    {code, %{state | codes: Map.put(codes, code, {id, expires})}}
+    # Short enough to read off a screen and type on a phone (the install URL is
+    # on a separate, unguessable host, and the code lives only @install_ttl), so
+    # a few digits, picked clear of any live code.
+    code = Stream.repeatedly(&short_code/0) |> Enum.find(&(not Map.has_key?(codes, &1)))
+    {code, %{state | codes: Map.put(codes, code, {id, now_ms + @install_ttl})}}
+  end
+
+  defp short_code do
+    :crypto.strong_rand_bytes(4)
+    |> :binary.decode_unsigned()
+    |> rem(1_000_000)
+    |> Integer.to_string()
+    |> String.pad_leading(6, "0")
   end
 
   defp hash(token), do: :crypto.hash(:sha256, token) |> Base.encode16(case: :lower)

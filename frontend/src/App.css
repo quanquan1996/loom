@@ -426,6 +426,34 @@
   margin-bottom: 6px;
 }
 
+.install-hint a {
+  color: var(--blue);
+}
+
+.install-tabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.install-tab {
+  padding: 5px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg-card);
+  color: var(--fg-dim);
+  font: inherit;
+  font-size: 0.846rem;
+  cursor: pointer;
+}
+
+.install-tab.active {
+  background: var(--blue);
+  color: var(--bg);
+  border-color: var(--blue);
+}
+
 .install-command {
   display: block;
   padding: 8px;

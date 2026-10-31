@@ -4,7 +4,7 @@
 
 VERSION := $(shell git describe --always --dirty 2>/dev/null || echo dev)
 OUT     := ../priv/node
-TARGETS := darwin-arm64 darwin-amd64 linux-arm64 linux-amd64 windows-arm64 windows-amd64
+TARGETS := darwin-arm64 darwin-amd64 linux-arm64 linux-amd64 windows-arm64 windows-amd64 android-arm64
 FLAGS   := -trimpath -ldflags "-s -w -X main.version=$(VERSION)"
 
 all: $(TARGETS)

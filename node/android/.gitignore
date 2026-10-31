@@ -1,0 +1,5 @@
+# Build artifacts and secrets — never commit these.
+build/
+lib/
+# Generated at build time from $LOOM_JOIN_ORIGIN (may contain a private host).
+res/values/config.xml

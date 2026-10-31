@@ -1,0 +1,92 @@
+# Loom Node — Android app
+
+An Android phone or tablet joins Loom by installing **one APK**, not by setting
+up Termux. The app embeds the `loom-node` daemon and keeps it alive with a
+foreground service, so the device becomes a Loom node that agents can run
+commands on — the same device fabric as a Mac/Windows/Linux node.
+
+Written from scratch (not a fork of an existing agent): four small Java files,
+a manifest, and a gradle-free build script.
+
+## How it works
+
+- **Embedded daemon.** `loom-node` is cross-compiled `CGO_ENABLED=0 GOOS=android
+  GOARCH=arm64` (pure Go, no NDK) and packed into the APK as
+  `lib/arm64-v8a/libloomnode.so`. An app may exec a binary only out of its
+  extracted native-library dir (the one spot not under the W^X exec ban), so the
+  app launches `libloomnode.so daemon` from `applicationInfo.nativeLibraryDir`
+  with `HOME` pointed at its private files dir (Go's `os.UserHomeDir()` honours
+  `$HOME`, so the daemon's config/state land in the sandbox).
+- **Keep-alive.** `NodeService` is a foreground service (type `dataSync`) with a
+  partial wake-lock that supervises the daemon in a restart loop — the
+  legitimate background pattern. `BootReceiver` restarts it after a reboot or an
+  app update. On first connect the app shows the standard *ignore battery
+  optimisation* dialog (one tap), which a plain app may do and Termux cannot.
+- **DNS.** A CGO-free `GOOS=android` build has no `/etc/resolv.conf` and no
+  system-property resolver, so Go's pure resolver falls back to `[::1]:53` and
+  every lookup fails. `node/dns_android.go` points `net.DefaultResolver` at the
+  `getprop net.dnsN` servers, else public resolvers. Without this the daemon
+  cannot resolve Loom's host even though `curl` can.
+
+## Files
+
+- `MainActivity` — enter the install code (or paste the full install
+  URL / the whole curl line), fetch the token, start the service, then ask for
+  the battery-optimisation exemption. Starts the service **before** the dialog:
+  the dialog backgrounds the activity, and Android 14 forbids starting a
+  foreground service from the background.
+- `NodeService` — the foreground service + supervisor loop.
+- `BootReceiver` — restart on boot / app-replace, only if configured.
+- `Config` — the paths, shared with the daemon.
+
+## Onboarding
+
+Make an install command in Loom's **Devices**; the one-time code is short-lived.
+Three ways to use it, all carrying the same code:
+
+- **curl** (macOS/Linux/WSL): `curl -fsSL <loom>/node/install/<code> | sh`
+- **PowerShell** (Windows): `irm <loom>/node/install/<code>/ps1 | iex`
+- **Android**: install this app, open it, type the `<code>`. The app downloads
+  from `<loom>/node/app/<code>` (served only while the code is live) and redeems
+  `<loom>/node/install/<code>` for the token.
+
+The app accepts a bare code when a join origin is baked in at build time (see
+below); otherwise paste a full install URL.
+
+## Build
+
+`sh build.sh` → `build/loom-node.apk`. Gradle-free:
+aapt2 → javac → d8 → zipalign → apksigner. Needs a JDK, the Android SDK
+(platform-34, build-tools 34.0.0) at `$ANDROID_HOME`, and host-arch
+`aapt2`/`zipalign`. On arm64 the SDK ships only x86_64 aapt2/zipalign, so install
+the distro's (`apt install aapt zipalign`); d8/apksigner are JVM wrappers.
+
+- `$LOOM_JOIN_ORIGIN` (optional) is baked into `R.string.join_origin` so the app
+  accepts a bare code; leave it empty to require a full URL. `build/loom.jks` is
+  a self-signed key generated on first build. `build/`, `lib/`, and the generated
+  `res/values/config.xml` are git-ignored (artifacts + signing key + a possibly
+  private host).
+
+`rel/deploy.sh` runs this when a toolchain is present and serves the APK at
+`GET /node/app/:code`; a host without the toolchain still deploys.
+
+## Field notes (what actually bit us)
+
+- **OEM battery managers are a wall by design.** An unprivileged app (and Termux
+  even more so) cannot add itself to the autostart/battery whitelist — that is
+  the anti-"rogue app" mechanism. The app does what it can (foreground service +
+  wake-lock + the battery-opt dialog); the rest is one-time manual grants:
+  - **ColorOS / OnePlus:** Battery → allow background / unrestricted; App
+    management → allow auto-launch; **lock the app in Recents** (swiping it away
+    kills even a foreground service); then don't swipe it away.
+  - **HarmonyOS / Huawei:** Settings → Apps → **App launch management** → turn
+    off "manage automatically" → enable **auto-launch, secondary launch, run in
+    background**; lock in Recents. This proprietary manager resists even ADB.
+- **Doze cuts background network on screen-off** unless the app holds the
+  battery-optimisation exemption; a partial wake-lock keeps the CPU but not the
+  network. Grant the exemption or the node drops ~a minute after lock.
+- **Limits that are not bugs:** `FLAG_SECURE` screens (banking/pay) read back
+  black to screenshots; a locked screen cannot be unlocked by a non-privileged
+  app; there is no way to auto-answer a runtime-permission dialog.
+- iOS cannot be a node: no persistent background execution and no global
+  accessibility for third-party apps.
