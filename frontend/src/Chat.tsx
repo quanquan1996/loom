@@ -12,6 +12,7 @@ import {
   Moon,
   PanelLeft,
   Plus,
+  RotateCw,
   Square,
   SquareTerminal,
   X,
@@ -573,7 +574,7 @@ function readAnswers(
 
 /**
  * The terminals and the canvas on a phone, folded into one `…`: the header has
- * room for the title or for four buttons, not both.
+ * room for the title or for four buttons, not both. And a reload.
  */
 function PaneMenu({
   terminalOpen,
@@ -634,6 +635,12 @@ function PaneMenu({
             <button role="menuitem" onClick={() => pick(onToggleCanvas)}>
               <AppWindow />
               {canvasOpen ? "Hide canvas" : "Canvas"}
+            </button>
+            <div className="session-menu-sep" />
+            {/* A home-screen app has no reload of its own. */}
+            <button role="menuitem" onClick={() => location.reload()}>
+              <RotateCw />
+              Reload
             </button>
           </div>,
           document.body,

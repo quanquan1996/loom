@@ -52,8 +52,16 @@ function probeOnResume(s: Socket) {
   let probing = false
 
   const probe = () => {
-    // Not connected is phoenix.js's own case: it reconnects on visibility.
-    if (probing || !s.isConnected()) return
+    // Not connected: phoenix.js reconnects on visibility only after an
+    // unclean close. Its own `pagehide` closes cleanly and waits for a
+    // `pageshow`, which iOS does not always send a PWA it brings back — and
+    // then nothing ever reconnects. `connect()` is a no-op while a connection
+    // is up or on its way; not after a logout, which dropped this socket.
+    if (!s.isConnected()) {
+      if (s === socket) s.connect()
+      return
+    }
+    if (probing) return
     probing = true
     let answered = false
     s.ping(() => {
