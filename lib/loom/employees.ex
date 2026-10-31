@@ -1329,7 +1329,7 @@ defmodule Loom.Employees do
     text =
       if e["workstation"],
         do:
-          "[Loom: your workstation is now #{e["workstation_name"]}. Everything you do happens there, through loom-node; on this server, only your own notes. See .employee/status.md.]",
+          "[Loom: your workstation is now #{e["workstation_name"]}. You have the run of it, through loom-node; on this server, only your own notes and looking things up (web search and fetch, MCP tools). See .employee/status.md.]",
         else: "[Loom: you no longer have a workstation; you work on this server again.]"
 
     for s <- [e["chat_session"], e["work_session"]], is_binary(s) do
