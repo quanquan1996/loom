@@ -990,6 +990,14 @@ export type Notice = {
   note: string | null
   // "approve", "reject", or what the user wrote back from the bell.
   answer?: string
+  // The background, beyond the one line.
+  detail?: string | null
+  // The answers its source foresees, each a button.
+  options?: string[]
+  // The `seq` of the message that started the turn it came from.
+  anchor?: number | null
+  // Put off until then (ms); back in the list after.
+  later_until?: number | null
   created_at: number
   updated_at: number
   done_at?: number
@@ -1005,6 +1013,11 @@ export function readNotice(id: string): Promise<Notice> {
 /** Answered in the bell: the text goes to its session as the user's. */
 export function replyNotice(id: string, text: string): Promise<Notice> {
   return notice(apiCall(`/api/notices/${id}/reply`, { method: "POST", body: JSON.stringify({ text }) }))
+}
+
+/** Put off until `until` (ms): out of the list until then, then notified again. */
+export function laterNotice(id: string, until: number): Promise<Notice> {
+  return notice(apiCall(`/api/notices/${id}/later`, { method: "POST", body: JSON.stringify({ until }) }))
 }
 
 /** Settled by hand: nothing more to do about it. */

@@ -16,6 +16,16 @@ defmodule Loom.Notices do
   - **One urgent a day per source.** A second one the same day is posted as a
     3, with a note saying why: the agents decide how urgent things are, but
     one that cries wolf cannot keep waking the user.
+  - **Enough to act on, in the card.** Beside its one-line `summary`, a
+    notice may carry a `detail` (the background, a few sentences) and
+    `options`, the answers it foresees, up to ten: each is a button that
+    answers it, so the user rarely has to type. It remembers the message that
+    started the turn it came from (`anchor`, a `seq`), which opening it
+    scrolls to. A reply from the bell reaches the session with the notice
+    quoted, so the agent knows what it answers.
+  - **Later**, for the urgent and important ones: the user puts it off to a
+    time they pick; it leaves the list until then, and comes back with a
+    notification.
   - **A key per source** makes a notice something to update rather than
     repeat: posting the same key again replaces the open one.
   - **Done** is the user's: answering in its session (any message they type
@@ -51,6 +61,11 @@ defmodule Loom.Notices do
   @kept :timer.hours(24 * 30)
   @needs ~w(read reply approve)
   @summary_max 200
+  @detail_max 1200
+  @options_max 10
+  @option_max 80
+  # Later is for a while, not for good.
+  @later_max :timer.hours(24 * 7)
 
   def start_link(opts) do
     GenServer.start_link(__MODULE__, opts, name: Keyword.get(opts, :name, @name))
@@ -66,7 +81,8 @@ defmodule Loom.Notices do
   `summary` and `priority`, and may have `key`, `needs` (`read`, `reply` or
   `approve`; `read` by default) and `session`, the session it points to.
   """
-  def post(source, attrs, server \\ @name), do: GenServer.call(server, {:post, source, attrs})
+  def post(source, attrs, server \\ @name),
+    do: GenServer.call(server, {:post, source, with_anchor(attrs)})
 
   @doc "The source takes back its open notice with `key`."
   def withdraw(source_id, key, server \\ @name),
@@ -83,6 +99,9 @@ defmodule Loom.Notices do
 
   @doc "The user answered it in the bell: `text` goes to its session as theirs."
   def reply(id, text, server \\ @name), do: GenServer.call(server, {:reply, id, text})
+
+  @doc "Put off until `until` (ms), when it comes back with a notification."
+  def later(id, until, server \\ @name), do: GenServer.call(server, {:later, id, until})
 
   @doc "Settled by hand, without an answer."
   def dismiss(id, server \\ @name), do: GenServer.call(server, {:dismiss, id})
@@ -289,10 +308,30 @@ defmodule Loom.Notices do
         {:reply, {:error, "an empty reply"}, state}
 
       %{"status" => "open", "session" => session} = n when is_binary(session) ->
-        state.submit.(session, text)
+        state.submit.(session, "↩ #{n["summary"]}\n\n#{text}")
         n = Map.put(n, "answer", text)
         state = settle(put_in(state.notices[id], n), n, "done", "Answered in the bell")
         {:reply, {:ok, view(state.notices[id])}, changed(state)}
+
+      nil ->
+        {:reply, {:error, :not_found}, state}
+
+      n ->
+        {:reply, {:ok, view(n)}, state}
+    end
+  end
+
+  def handle_call({:later, id, until}, _from, state) do
+    now = state.clock.()
+
+    case state.notices[id] do
+      _ when not (is_integer(until) and until > now and until - now <= @later_max) ->
+        {:reply, {:error, "later is a time within a week"}, state}
+
+      %{"status" => "open"} = n ->
+        n = Map.merge(n, %{"later_until" => until, "updated_at" => now})
+        state = put_in(state.notices[id], n)
+        {:reply, {:ok, view(n)}, changed(state)}
 
       nil ->
         {:reply, {:error, :not_found}, state}
@@ -338,7 +377,7 @@ defmodule Loom.Notices do
   @impl true
   def handle_info(:tick, state) do
     Process.send_after(self(), :tick, state.tick)
-    {:noreply, state |> expire() |> digest() |> catch_up() |> changed()}
+    {:noreply, state |> expire() |> due_again() |> digest() |> catch_up() |> changed()}
   end
 
   defp do_update_todo(state, id, attrs) do
@@ -405,7 +444,10 @@ defmodule Loom.Notices do
            "priority" => priority,
            "key" => blank_to_nil(attrs["key"]),
            "needs" => attrs["needs"] || "read",
-           "session" => blank_to_nil(attrs["session"])
+           "session" => blank_to_nil(attrs["session"]),
+           "detail" => detail(attrs["detail"]),
+           "options" => options(attrs["options"]),
+           "anchor" => if(is_integer(attrs["anchor"]), do: attrs["anchor"])
          }}
     end
   end
@@ -433,8 +475,10 @@ defmodule Loom.Notices do
         "held" => false
       })
 
-    # A notification when it is new or has become more urgent than it was.
+    # A notification when it is new or has become more urgent than it was;
+    # more urgent, it is not put off any longer.
     rose? = old == nil or priority < old["priority"]
+    n = if rose?, do: Map.delete(n, "later_until"), else: n
     n = if rose?, do: alert(state, n, now), else: Map.put(n, "held", old["held"] || false)
     {n, put_in(state.notices[n["id"]], n)}
   end
@@ -503,13 +547,29 @@ defmodule Loom.Notices do
     end)
   end
 
+  # Put off, and the time has come: back in the list, with a notification.
+  defp due_again(state) do
+    now = state.clock.()
+
+    state
+    |> open()
+    |> Enum.filter(&(is_integer(&1["later_until"]) and &1["later_until"] <= now))
+    |> Enum.reduce(state, fn n, state ->
+      state.notify.("#{n["source"]["name"]} · reminder", n["summary"], n["session"])
+      put_in(state.notices[n["id"]], Map.merge(n, %{"later_until" => nil, "updated_at" => now}))
+    end)
+  end
+
+  defp later?(n, now), do: is_integer(n["later_until"]) and n["later_until"] > now
+
   # 20:00: one notification for all the important ones still open.
   defp digest(state) do
     now = state.clock.()
     today = day(now)
 
     if hour(now) >= @digest_hour and state.marks["digest"] != today do
-      open = state |> open() |> Enum.filter(&(&1["priority"] in 3..5))
+      open =
+        state |> open() |> Enum.filter(&(&1["priority"] in 3..5 and not later?(&1, now)))
 
       if open != [] do
         body = open |> Enum.map(&"#{&1["source"]["name"]}: #{&1["summary"]}") |> Enum.join(" · ")
@@ -669,6 +729,43 @@ defmodule Loom.Notices do
     )
 
     File.rename!(tmp, state.path)
+  end
+
+  defp detail(v) when is_binary(v) do
+    case String.trim(v) do
+      "" ->
+        nil
+
+      d ->
+        if String.length(d) > @detail_max, do: String.slice(d, 0, @detail_max - 1) <> "…", else: d
+    end
+  end
+
+  defp detail(_), do: nil
+
+  defp options(list) when is_list(list) do
+    list
+    |> Enum.filter(&is_binary/1)
+    |> Enum.map(&(&1 |> String.trim() |> String.slice(0, @option_max)))
+    |> Enum.reject(&(&1 == ""))
+    |> Enum.uniq()
+    |> Enum.take(@options_max)
+  end
+
+  defp options(_), do: []
+
+  # The message that started the turn the notice comes from, unless given.
+  defp with_anchor(attrs) do
+    attrs = Map.new(attrs, fn {k, v} -> {to_string(k), v} end)
+    session = attrs["session"]
+
+    if is_integer(attrs["anchor"]) or not is_binary(session) do
+      attrs
+    else
+      Map.put(attrs, "anchor", Agent.turn_seq(session))
+    end
+  catch
+    :exit, _ -> attrs
   end
 
   defp blank_to_nil(v) when is_binary(v),

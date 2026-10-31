@@ -788,6 +788,8 @@ defmodule Loom.Employees do
 
     Loom.Notices.post(%{kind: "employee", id: e["id"], name: e["name"]}, %{
       summary: report["text"],
+      detail: report["detail"],
+      options: report["options"],
       priority: p,
       key: report["key"],
       needs: report["needs"] || if(p <= 2, do: "reply", else: "read"),

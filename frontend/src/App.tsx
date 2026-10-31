@@ -314,6 +314,7 @@ function App() {
   }
 
   const select = (id: string) => {
+    setFocusId(null)
     setEmployeeTab(null)
     setActiveId(id)
     setView("chat")
@@ -333,11 +334,17 @@ function App() {
     select(id)
   }
 
-  // The bell. Opening a notice goes to where it is answered.
+  // The bell. Opening a notice goes to where it is answered: the turn it came
+  // from, with the notice under it.
   const [bellOpen, setBellOpen] = useState(false)
+  const [focusId, setFocusId] = useState<string | null>(null)
+  const focusNotice = focusId ? notices.find((n) => n.id === focusId) : undefined
   const openNotice = (n: Notice) => {
     if (n.status === "open" && n.needs === "read") readNotice(n.id).then(upsertNotice, () => {})
-    if (n.session) select(n.session)
+    if (n.session) {
+      select(n.session)
+      setFocusId(n.id)
+    }
     setBellOpen(false)
   }
 
@@ -650,6 +657,7 @@ function App() {
       setFilesRev((n) => n + 1)
       refreshCanvas(active.id, outputs)
     },
+    focus: focusNotice ? { notice: focusNotice, onAnswered: upsertNotice } : null,
   }
 
   return (

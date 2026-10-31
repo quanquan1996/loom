@@ -464,3 +464,74 @@
     height: 100%;
   }
 }
+
+/* ── What a card carries to be answered where it is ──────────────────── */
+
+.bell-band.later::before {
+  background: transparent;
+  border: 1.5px solid var(--fg-dim);
+  box-sizing: border-box;
+}
+
+/* The background: a few lines, the rest on a tap. */
+.bell-detail {
+  margin-top: 4px;
+  color: var(--fg-dim);
+  font-size: 0.85rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.bell-detail.open {
+  display: block;
+}
+
+/* The answers its source foresees: pills, as many as it gave. */
+.bell-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 9px;
+}
+
+.bell-option {
+  padding: 6px 12px;
+  border: 1px solid color-mix(in srgb, var(--fg) 22%, transparent);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  font-size: 0.85rem;
+  line-height: 1.3;
+  text-align: left;
+  cursor: pointer;
+}
+
+.bell-option:hover {
+  background: color-mix(in srgb, var(--fg) 7%, transparent);
+}
+
+.bell-option:disabled {
+  opacity: 0.5;
+}
+
+.bell-acts {
+  flex-wrap: wrap;
+}
+
+.bell-btn.bell-icon {
+  padding: 5px 8px;
+}
+
+/* Under the turn it came from, in the conversation. */
+.bell-card.inline {
+  margin: 12px 0;
+  cursor: default;
+  border: 1px solid color-mix(in srgb, var(--fg) 14%, transparent);
+}

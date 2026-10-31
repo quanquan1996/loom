@@ -12,17 +12,20 @@ what decides when — and whether — they are interrupted. Choose it honestly.
 ## The command
 
 ```sh
-loom-notice post --priority N [--key KEY] [--needs read|reply|approve] "summary"
+loom-notice post --priority N [--key KEY] [--needs read|reply|approve] \
+                 [--detail "background"] [--option "an answer"]... "summary"
 loom-notice list                 # your notices still open
 loom-notice withdraw KEY         # take one back
 ```
 
 It works only in a session Loom started (it reads `LOOM_SESSION_ID`). The
-notice links to your session: the user taps it and lands here, so whatever
-they need to act on must be in this session's reply, not only in the notice.
+notice links to your session: the user taps it and lands at the start of the
+turn it came from. But most of the time they act from the bell without
+opening it — so the notice itself must carry what they need (below).
 
 A virtual employee reports through its work card's `report` instead (same
-priorities, same `key`, `needs`, and `withdraw`); the command works too.
+priorities, same `key`, `needs`, `detail`, `options`, and `withdraw`); the
+command works too.
 
 ## Choosing the priority
 
@@ -53,6 +56,29 @@ One or two plain sentences, in the user's language: **what**, and **what you
 need from them**, with the deadline if there is one. No markdown, no links —
 the bell shows plain text. "要部署侧栏改动（2b98e02），需要你批准；今天不批就上不了线"
 beats "Deployment update".
+
+## Enough to act on, without opening it
+
+The user reads the bell on a phone, often hours later, without the
+conversation in mind. Write each notice so it stands alone:
+
+- `--detail`: the background in a few plain sentences — what this is about,
+  what you found or did, what each choice leads to. Someone who has not read
+  your session must be able to decide from it. Up to ~1000 characters.
+- `--option` (repeat it): the answers you foresee, each a button that
+  answers the notice in the user's words, so they need not type. **Cover the
+  whole range**, not just the two you expect: the main choices, variants of
+  them ("do it, but only X"), "not now / wait until …", "tell me more about …",
+  "do it your way". Up to 10, short (a few words each). If there is any answer
+  you can foresee, it should be a button — the user should rarely find none
+  of them fits.
+- For `--needs approve`, Approve / Reject are there already; options add the
+  in-between answers ("approve, but deploy tonight").
+- A tapped option or a typed reply reaches your session as
+  `↩ <the summary>` followed by the answer, so you know what it answers.
+
+The user may also put an urgent or important notice off until later; it
+comes back to them by itself. Don't re-post it meanwhile.
 
 ## Keeping it right
 

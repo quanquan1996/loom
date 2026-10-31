@@ -173,6 +173,9 @@ defmodule Loom.EmployeesTest do
 
     assert [n] = Loom.Notices.open_of(e["id"])
     assert n["priority"] == 3 and n["needs"] == "reply" and n["session"] == e["work_session"]
+    # Opening it lands on the wake-up that started the turn.
+    {:ok, %{events: events}} = Agent.attach(e["work_session"])
+    assert %{kind: :user} = Enum.find(events, &(&1.seq == n["anchor"]))
     {:ok, e2} = Employees.get(e["id"], server)
     assert e2["attention"]["level"] == "important"
 

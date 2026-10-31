@@ -32,6 +32,7 @@ import {
 } from "react"
 import { createPortal } from "react-dom"
 import { EffortButton } from "./Effort"
+import { Card as NoticeCard } from "./Notices"
 import {
   applySnapshot,
   buildTimeline,
@@ -70,6 +71,7 @@ import {
   outputUrl,
   type AgentFile,
   type AgentInfo,
+  type Notice,
   type OutputFile,
 } from "./api"
 import "./Chat.css"
@@ -103,6 +105,9 @@ type Props = {
   // Whether the chat is what is on screen: not under the phone's drawer or a
   // pane over it.
   reading?: boolean
+  // A notice from the bell that was opened here: the conversation goes to the
+  // turn it came from, and shows it under that turn to be answered.
+  focus?: { notice: Notice; onAnswered: (n: Notice) => void } | null
 }
 
 // How a card or link deep in the transcript opens something in the canvas.
@@ -131,6 +136,7 @@ export function Chat({
   bare = false,
   onSeen,
   reading = true,
+  focus,
 }: Props) {
   const { transcript, joinError, submit, resend, discard, interrupt, dropQueued, rename, draft: remoteDraft } = useAgent(
     session.id,
@@ -311,6 +317,15 @@ export function Chat({
             onAnswer={submit}
             onAtEnd={setAtEnd}
             tail={<Working status={transcript.status} queued={transcript.queue.length} />}
+            focus={
+              focus && focus.notice.session === session.id
+                ? {
+                    id: focus.notice.id,
+                    key: focus.notice.anchor != null ? `e${focus.notice.anchor}` : null,
+                    node: <NoticeCard n={focus.notice} onAnswered={focus.onAnswered} />,
+                  }
+                : null
+            }
             after={
               replies && {
                 key: replies.key,
@@ -656,6 +671,7 @@ function Timeline({
   after,
   tail,
   before,
+  focus,
 }: {
   items: TimelineItem[]
   sessionId: string
@@ -668,6 +684,9 @@ function Timeline({
   after?: { key: string; node: ReactNode } | null
   // After everything: whether the agent is at work.
   tail?: ReactNode
+  // Scrolled to and marked: the message with `key` (the start of a turn), and
+  // `node` shown at that turn's end; at the end when it is not here.
+  focus?: { id: string; key: string | null; node: ReactNode } | null
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const pinnedRef = useRef(true)
@@ -683,7 +702,18 @@ function Timeline({
   // The scroll height before more was rendered above, so the reader stays on
   // the line they were reading instead of jumping with the new content.
   const growFromRef = useRef<number | null>(null)
-  const hidden = Math.max(0, items.length - shown)
+  // The focus: where it starts, and the last item of its turn.
+  const focusAt = focus?.key ? items.findIndex((i) => i.key === focus.key) : -1
+  const focusEnd = (() => {
+    if (!focus) return -1
+    if (focusAt < 0) return items.length - 1
+    const next = items.findIndex((i, n) => n > focusAt && i.kind === "user")
+    return next < 0 ? items.length - 1 : next - 1
+  })()
+  const focusMarkRef = useRef<HTMLDivElement>(null)
+  // Each focus is gone to once; after that the reader scrolls as they like.
+  const focusedRef = useRef<string | null>(null)
+  const hidden = Math.max(0, items.length - Math.max(shown, focusAt >= 0 ? items.length - focusAt : 0))
   const visible = hidden > 0 ? items.slice(hidden) : items
 
   const showMore = () => {
@@ -726,6 +756,17 @@ function Timeline({
     const el = ref.current
     if (el && pinnedRef.current) el.scrollTop = el.scrollHeight
   }, [items])
+
+  useLayoutEffect(() => {
+    if (!focus || focusedRef.current === focus.id || focusAt < 0) return
+    const mark = focusMarkRef.current
+    if (!mark) return
+    focusedRef.current = focus.id
+    pinnedRef.current = false
+    setPinned(false)
+    onAtEnd(false)
+    mark.scrollIntoView({ block: "start" })
+  }, [focus?.id, focusAt])
 
   const toBottom = () => {
     const el = ref.current
@@ -776,10 +817,12 @@ function Timeline({
             <div className="empty">Send a message to start.</div>
           )}
 
-          {visible.map((item) => (
+          {visible.map((item, n) => (
             <Fragment key={item.key}>
+              {n + hidden === focusAt && <div className="focus-mark" ref={focusMarkRef} />}
               <Item item={item} sessionId={sessionId} onAnswer={onAnswer} />
               {after?.key === item.key && after.node}
+              {n + hidden === focusEnd && focus?.node}
             </Fragment>
           ))}
           {tail}

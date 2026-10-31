@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """loom-notice: post to the user's bell in Loom, from a Loom session.
 
-  loom-notice post --priority N [--key KEY] [--needs read|reply|approve] SUMMARY
+  loom-notice post --priority N [--key KEY] [--needs read|reply|approve]
+                   [--detail TEXT] [--option ANSWER]... SUMMARY
   loom-notice withdraw KEY
   loom-notice list                       your notices still open
   loom-notice todos                      the user's to-do list
@@ -70,6 +71,9 @@ def main():
     post.add_argument("--priority", "-p", type=int, required=True, help="0 most urgent … 10")
     post.add_argument("--key", "-k", help="to update or withdraw it later")
     post.add_argument("--needs", choices=["read", "reply", "approve"])
+    post.add_argument("--detail", "-d", help="the background, a few sentences")
+    post.add_argument("--option", "-o", action="append", default=[],
+                      help="an answer the user can tap; repeat, up to 10")
     post.add_argument("summary", nargs="+")
     w = sub.add_parser("withdraw", help="take back your open notice with KEY")
     w.add_argument("key")
@@ -88,6 +92,8 @@ def main():
 
     if a.cmd == "post":
         body = {"summary": " ".join(a.summary), "priority": a.priority}
+        if a.detail: body["detail"] = a.detail
+        if a.option: body["options"] = a.option
         if a.key: body["key"] = a.key
         if a.needs: body["needs"] = a.needs
         show(call("POST", "post", body)["notice"])
