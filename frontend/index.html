@@ -21,8 +21,33 @@
          instead of stopping at an opaque strip. The header pads past it. -->
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>loom</title>
+    <!-- iOS 27 lays a blur over the top of a home-screen app, our header with
+         it, unless a full-width fixed surface with a solid background sits at
+         the top edge: then the status bar takes that colour instead. 11px, over
+         WebKit's 10px thin-border cut-off; the background clipped to its empty
+         text, so it paints nothing over the header. Only in an installed iOS
+         app. After HKUDS/nanobot#5942. -->
+    <style>
+      .ios-edge { display: none; }
+      @supports (-webkit-touch-callout: none) and (background-clip: text) {
+        @media (display-mode: standalone) {
+          .ios-edge {
+            display: block;
+            position: fixed;
+            inset: 0 0 auto;
+            height: 11px;
+            z-index: 100;
+            pointer-events: none;
+            background-color: inherit;
+            -webkit-background-clip: text;
+            background-clip: text;
+          }
+        }
+      }
+    </style>
   </head>
   <body>
+    <div class="ios-edge" aria-hidden="true"></div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
