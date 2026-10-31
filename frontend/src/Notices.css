@@ -354,7 +354,7 @@
   min-height: 0;
 }
 
-.bell-chat .chat.bare .chat-glass {
+.bell-chat .chat.bare .chat-top::before {
   display: none;
 }
 

@@ -315,7 +315,7 @@ pre.code {
 
 /* ChatGPT's round buttons in a phone's header, in iOS's glass: see-through,
    with a faint rim of light. Not blurred themselves: the header's glass
-   (.chat-glass) already is, and a backdrop-filter nested over another
+   (.chat-top::before) already is, and a backdrop-filter nested over another
    one makes iOS Safari blur the buttons' own icons and the title with them. */
 .chat-header .icon-btn.glass,
 .chat-header .chip.button.pane-more {
@@ -1516,12 +1516,5 @@ pre.code,
   .ios-app .side-column,
   .ios-app .search-panel {
     padding-top: var(--ios-top);
-  }
-
-  /* The header now sits low in its glass: frosted all the way to its foot,
-     fading only in the 16px below, or the page shows through its buttons. */
-  .ios-app .chat-glass {
-    -webkit-mask-image: linear-gradient(#000 calc(100% - 16px), transparent);
-    mask-image: linear-gradient(#000 calc(100% - 16px), transparent);
   }
 }

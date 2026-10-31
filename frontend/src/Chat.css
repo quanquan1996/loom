@@ -18,20 +18,16 @@
   top: 0;
   left: 0;
   right: 0;
+  isolation: isolate;
 }
 
-/* The header's glass: very clear frosted glass, mostly blur, a breath of the
-   page's colour, fading out at its lower edge rather than ending on a line.
-   A layer of its own under `.chat-top`, not a pseudo-element inside it: there,
-   iOS Safari blurred the header's own title and buttons along with the page
-   beneath. */
-.chat-glass {
+.chat-top::before {
+  content: "";
   position: absolute;
-  z-index: 2;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: calc(var(--top-h, 0px) + 16px);
+  z-index: -1;
+  inset: 0 0 -16px;
+  /* Very clear frosted glass: mostly blur, a breath of the page's colour,
+     fading out at its lower edge rather than ending on a line. */
   background: color-mix(in srgb, var(--bg) 22%, transparent);
   -webkit-backdrop-filter: blur(18px) saturate(1.8);
   backdrop-filter: blur(18px) saturate(1.8);
@@ -41,6 +37,9 @@
 }
 
 .chat-header {
+  /* Its own layer above the glass, so the glass never lands on it. */
+  position: relative;
+  z-index: 1;
   flex: 0 0 auto;
   display: flex;
   align-items: center;
@@ -1537,8 +1536,8 @@ h3.md-h {
   font-size: 0.846rem;
 }
 
-/* Copy a whole message, from just under it. Quiet until the message is pointed at, where there is a
-   pointer; always there, dimly, on a phone. */
+/* Copy a whole message, from just under it. Quiet until the message is
+   pointed at, where there is a pointer; always there, dimly, on a phone. */
 .msg-copy {
   display: inline-flex;
   align-items: center;
