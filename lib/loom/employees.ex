@@ -11,7 +11,7 @@ defmodule Loom.Employees do
     employee's own workspace, so they share Claude Code's memory and files.
   - **A heartbeat, not a loop.** A tick every minute wakes an employee whose
     time has come: the hour it asked for, its heartbeat, the user's "wake
-    now", the daily or weekly report. Each wake-up is one turn, which ends with
+    now", the weekly report. Each wake-up is one turn, which ends with
     a work card (`Loom.Employees.Card`): when to wake next, KPI progress, and
     whether there is something to report. No card is a sleep until the next
     heartbeat.
@@ -32,8 +32,10 @@ defmodule Loom.Employees do
     heartbeat, the user is told once; back online, it carries on.
   - **Reports** go three ways: `info` is only written down, `important` is a
     notification, `urgent` a notification and the employee marked as blocked
-    until a later turn says otherwise. Daily and weekly reports are files it
-    writes under `reports/`, listed on its page.
+    until a later turn says otherwise. Weekly reports are files it writes
+    under `reports/`, listed on its page; there is no daily one (the boss
+    reviews employees when they choose, and is not told every evening).
+    Daily ones written before stay listed.
   - **The boss profile**, one for all of them: facts and rules about the user
     that hold whatever the job ("reply in Chinese", "no finance work on
     AWS"), a sentence each with who heard it and when. An employee adds one
@@ -78,7 +80,6 @@ defmodule Loom.Employees do
     "budget_usd" => 50,
     # For a backend that reports no cost (Codex, Kiro): turns a day instead.
     "budget_turns" => 40,
-    "daily_report" => "18:00",
     "weekly_report" => %{"day" => 5, "time" => "18:00"},
     "ask_first" => [
       "deploying anything",
@@ -98,8 +99,12 @@ defmodule Loom.Employees do
   @models %{"claude_code" => "opus", "kiro" => "claude-opus-5.5", "codex" => ""}
 
   @editable ~w(name role persona language project_ids hours heartbeat_min min_gap_min
-               max_turn_min budget_usd budget_turns daily_report weekly_report ask_first model
+               max_turn_min budget_usd budget_turns weekly_report ask_first model
                workstation)
+
+  # Settings no longer kept: the daily report (2026-10-31).
+  @dropped ~w(daily_report last_daily)
+  @daily_gone "The boss dropped the daily report (2026-10-31): Loom no longer wakes you for one, and you write none. The boss reviews your work when they choose. The weekly report, your worklog and reports to the bell stay as they were. Take the daily report out of your notes (HANDOFF.md)."
 
   @boss_kept 100
   @boss_chars 300
@@ -171,7 +176,7 @@ defmodule Loom.Employees do
   def dir(id), do: Path.join([Agent.Store.home(), "employees", id])
   def workspace(id), do: Path.join(dir(id), "workspace")
 
-  @doc "Its daily and weekly reports, newest first: `%{file:, kind:, title:, mtime:, size:}`."
+  @doc "Its reports (weekly, and daily ones from before), newest first: `%{file:, kind:, title:, mtime:, size:}`."
   def reports(id) do
     Path.wildcard(Path.join([workspace(id), "reports", "*.md"]))
     |> Enum.map(fn path ->
@@ -300,8 +305,6 @@ defmodule Loom.Employees do
           # The first wake-up is right away: it introduces itself and looks around.
           "wake_at" => now,
           "wake_reason" => "first day",
-          # Hired after today's report time: today's report is not owed.
-          "last_daily" => if(past_today?(settings["daily_report"], now), do: today(now)),
           "last_weekly" => nil
         })
 
@@ -574,7 +577,6 @@ defmodule Loom.Employees do
   defp due(e, now) do
     cond do
       report_due?(e, :weekly, now) -> :weekly_report
-      report_due?(e, :daily, now) -> :daily_report
       is_integer(e["wake_at"]) and now >= e["wake_at"] and in_hours?(e, now) -> :wake
       true -> nil
     end
@@ -616,7 +618,6 @@ defmodule Loom.Employees do
     :exit, _ -> []
   end
 
-  defp mark_report(e, :daily_report, now), do: Map.put(e, "last_daily", today(now))
   defp mark_report(e, :weekly_report, now), do: Map.put(e, "last_weekly", week(now))
   defp mark_report(e, _reason, _now), do: e
 
@@ -740,10 +741,10 @@ defmodule Loom.Employees do
     # place of the last. Without one, an important report stays until the
     # boss has seen it; an urgent one was answered, or is moot, once the
     # employee has worked again.
-    # Not from a daily or weekly report's turn: those are read on its page,
-    # and a bell rung every evening by every employee is one nobody hears.
+    # Not from a weekly report's turn: those are read on its page, and a
+    # bell rung by every employee at once is one nobody hears.
     report =
-      if e["turn_reason"] in ["daily_report", "weekly_report"],
+      if e["turn_reason"] == "weekly_report",
         do: nil,
         else: report && Map.put(report, "level", level(report))
 
@@ -1039,11 +1040,6 @@ defmodule Loom.Employees do
 
   defp past_today?(time, now), do: (m = clock(time)) != nil and minutes_today(now) >= m
 
-  defp report_due?(e, :daily, now) do
-    past_today?(e["daily_report"], now) and e["last_daily"] != today(now) and
-      e["last_wake_at"] != nil
-  end
-
   defp report_due?(e, :weekly, now) do
     w = e["weekly_report"] || %{}
     day = now |> local() |> DateTime.to_date() |> Date.day_of_week()
@@ -1205,10 +1201,6 @@ defmodule Loom.Employees do
 
   defp setting("budget_usd", n) when is_number(n) and n >= 0, do: {:ok, n}
   defp setting("budget_turns", n) when is_integer(n) and n >= 0, do: {:ok, n}
-
-  defp setting("daily_report", t) do
-    if clock(t), do: {:ok, t}, else: {:error, "daily_report is HH:MM"}
-  end
 
   defp setting("weekly_report", %{"day" => d, "time" => t}) when d in 1..7 do
     if clock(t),
@@ -1538,7 +1530,7 @@ defmodule Loom.Employees do
   defp load(path) do
     with {:ok, body} <- File.read(path),
          {:ok, %{"employees" => list} = all} when is_list(list) <- Jason.decode(body) do
-      {Map.new(list, fn e -> {e["id"], Map.merge(@defaults, e)} end), all["boss"] || []}
+      {Map.new(list, fn e -> {e["id"], upgrade(Map.merge(@defaults, e))} end), all["boss"] || []}
     else
       {:error, :enoent} ->
         {%{}, []}
@@ -1548,6 +1540,15 @@ defmodule Loom.Employees do
         {%{}, []}
     end
   end
+
+  # The daily report, dropped 2026-10-31: its setting goes, and the employee
+  # is told once, since its own notes may still plan one.
+  defp upgrade(%{"daily_report" => _} = e) do
+    e = Map.drop(e, @dropped)
+    if @daily_gone in (e["inbox"] || []), do: e, else: note(e, @daily_gone)
+  end
+
+  defp upgrade(e), do: e
 
   defp save(state) do
     File.mkdir_p!(Path.dirname(state.path))

@@ -238,7 +238,7 @@ const TABS: { id: EmployeeTab; label: string; icon: ReactNode }[] = [
   { id: "chat", label: "Chat", icon: <MessageCircle /> },
   { id: "kpis", label: "KPIs", icon: <ListChecks /> },
   { id: "updates", label: "Updates", icon: <Siren /> },
-  { id: "reports", label: "Daily & weekly", icon: <FileText /> },
+  { id: "reports", label: "Reports", icon: <FileText /> },
   { id: "settings", label: "Settings", icon: <SettingsIcon /> },
 ]
 
@@ -605,7 +605,7 @@ function SendBack({ kpi, onSend, onClose }: { kpi: Kpi; onSend: (note: string) =
   )
 }
 
-// ── Daily and weekly reports ───────────────────────────────────────────────
+// ── Reports ────────────────────────────────────────────────────────────────────
 
 function ReportsPane({ employee: e }: { employee: Employee }) {
   const [reports, setReports] = useState<EmployeeReport[] | null>(null)
@@ -652,8 +652,7 @@ function ReportsPane({ employee: e }: { employee: Employee }) {
       {reports === null && !error && <div className="emp-dim">loading…</div>}
       {reports?.length === 0 && (
         <div className="emp-empty">
-          None yet. A daily report comes at {e.daily_report}, a weekly one on {DAYS[e.weekly_report.day - 1]} at{" "}
-          {e.weekly_report.time}.
+          None yet. A weekly report comes on {DAYS[e.weekly_report.day - 1]} at {e.weekly_report.time}.
         </div>
       )}
       {reports?.map((r) => (
@@ -783,10 +782,6 @@ function SettingsPane({
       </div>
       <div className="emp-form-row">
         <label>
-          <span>Daily report</span>
-          <input type="time" value={draft.daily_report} onChange={(ev) => setDraft((d) => ({ ...d, daily_report: ev.target.value }))} />
-        </label>
-        <label>
           <span>Weekly report</span>
           <select
             value={draft.weekly_report?.day}
@@ -907,7 +902,6 @@ const editable = (e: Employee): EmployeeSettings => ({
   max_turn_min: e.max_turn_min,
   budget_usd: e.budget_usd,
   budget_turns: e.budget_turns,
-  daily_report: e.daily_report,
   weekly_report: e.weekly_report,
   ask_first: e.ask_first,
   model: e.model,
@@ -1054,8 +1048,8 @@ export function HireDialog({
           <BudgetField backend={backend} draft={draft} setDraft={setDraft} />
         </div>
         <small className="emp-dim">
-          It starts at once: looks around, then sleeps until there is work. Wakes every 2 hours, writes a daily report at
-          18:00 and a weekly one on Fridays; all of it can be changed later.
+          It starts at once: looks around, then sleeps until there is work. Wakes every 2 hours and writes a weekly report on
+          Fridays; all of it can be changed later.
         </small>
         {error && <div className="device-error">{error}</div>}
         <div className="confirm-actions">
