@@ -783,7 +783,7 @@ export function deleteAgentOutputOrAttachment(
 
 // ── Virtual employees (see Loom.Employees, LoomWeb.EmployeeController) ────
 
-export type EmployeeStatus = "working" | "sleeping" | "paused" | "approval" | "blocked"
+export type EmployeeStatus = "working" | "sleeping" | "paused" | "approval" | "blocked" | "offline"
 export type KpiStatus = "todo" | "doing" | "review" | "done" | "parked"
 export type Priority = "high" | "normal" | "low"
 
@@ -830,6 +830,10 @@ export type Employee = {
   budget_turns: number
   budget_unit: "usd" | "turns"
   paused: boolean
+  // A device's id: where what it does happens (null: this server). Its name
+  // is kept when the device is removed.
+  workstation: string | null
+  workstation_name: string | null
   status: EmployeeStatus
   chat_session: string
   work_session: string
@@ -876,6 +880,7 @@ export type EmployeeSettings = Partial<
     | "weekly_report"
     | "ask_first"
     | "model"
+    | "workstation"
   >
 >
 

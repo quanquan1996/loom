@@ -243,7 +243,8 @@ defmodule Loom.Agent.Backend.ClaudeCode do
       @base_args ++
         model_args(handle) ++
         effort_args(handle) ++
-        fallback_args() ++ session_args(handle) ++ instruction_args(handle)
+        fallback_args() ++
+        session_args(handle) ++ instruction_args(handle) ++ guard_args(handle)
 
     with {:ok, exe} <- executable(),
          {:ok, proc} <- Proc.spawn(handle.loom_id, exe, args, handle.cwd) do
@@ -312,6 +313,13 @@ defmodule Loom.Agent.Backend.ClaudeCode do
     do: ["--append-system-prompt", text]
 
   defp instruction_args(_handle), do: []
+
+  # A virtual employee on a workstation: every tool call is checked first.
+  defp guard_args(%{loom_id: id}) do
+    if Loom.Agent.Guard.guarded?(id),
+      do: ["--settings", Loom.Agent.Guard.claude_settings()],
+      else: []
+  end
 
   defp message_line(text) do
     Jsonl.line(%{"type" => "user", "message" => %{"role" => "user", "content" => text}})

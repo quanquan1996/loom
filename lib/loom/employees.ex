@@ -23,6 +23,13 @@ defmodule Loom.Employees do
   - **Permissions are soft.** The projects it is given are named in its
     instructions with their workspaces, and it is told to stay in them; it
     runs as the same user as every other agent, so nothing enforces it.
+  - **A workstation**, if it is given one: a device (`Loom.Nodes`) where
+    what it does happens. Its sessions stay here, but every tool call is
+    checked first (`Loom.Agent.Guard`, `rel/loom-guard`): commands, files,
+    browsing and the web only through `loom-node` on that device; here, only
+    its own notes. What is refused is a line in its Updates. While the device
+    is offline it does not wake, so it spends nothing; offline past a
+    heartbeat, the user is told once; back online, it carries on.
   - **Reports** go three ways: `info` is only written down, `important` is a
     notification, `urgent` a notification and the employee marked as blocked
     until a later turn says otherwise. Daily and weekly reports are files it
@@ -46,6 +53,7 @@ defmodule Loom.Employees do
   require Logger
 
   alias Loom.Agent
+  alias Loom.Agent.Guard
   alias Loom.Employees.{Card, Prompt}
 
   @name __MODULE__
@@ -81,14 +89,17 @@ defmodule Loom.Employees do
     # Chosen at hiring, for good, as for any session.
     "backend" => "claude_code",
     "model" => "opus",
-    "paused" => false
+    "paused" => false,
+    # A device's id: where it works (nil: here).
+    "workstation" => nil
   }
 
   # Each backend's own name for its best model, which an employee starts on.
   @models %{"claude_code" => "opus", "kiro" => "claude-opus-5.5", "codex" => ""}
 
   @editable ~w(name role persona language project_ids hours heartbeat_min min_gap_min
-               max_turn_min budget_usd budget_turns daily_report weekly_report ask_first model)
+               max_turn_min budget_usd budget_turns daily_report weekly_report ask_first model
+               workstation)
 
   @boss_kept 100
   @boss_chars 300
@@ -314,14 +325,18 @@ defmodule Loom.Employees do
     with {:ok, e} <- fetch(state, id),
          {:ok, settings} <- settings(e, attrs) do
       changed = Map.take(settings, @editable) != Map.take(e, @editable)
+      moved = settings["workstation"] != e["workstation"]
       e = Map.merge(e, settings)
+      e = if moved, do: e |> Map.merge(%{"offline_since" => nil}) |> refresh_station(), else: e
 
       e =
         if changed,
           do: note(e, "Your settings were changed by the boss; see the wake-up below."),
           else: e
 
-      {:reply, {:ok, view(e)}, put(state, e)}
+      state = put(state, e)
+      if moved, do: moved_station(e)
+      {:reply, {:ok, view(e)}, state}
     else
       error -> {:reply, error, state}
     end
@@ -333,6 +348,7 @@ defmodule Loom.Employees do
           is_binary(s),
           do: Agent.delete_session(s)
 
+      for s <- [e["chat_session"], e["work_session"]], is_binary(s), do: Guard.put(s, nil)
       File.rm_rf(dir(id))
       state = %{state | employees: Map.delete(state.employees, id)}
       save(state)
@@ -496,9 +512,14 @@ defmodule Loom.Employees do
   defp step(%{"paused" => true} = e, _now, _boss), do: e
 
   defp step(e, now, boss) do
+    e = refresh_station(e)
     busy = working?(e)
 
     cond do
+      e["workstation"] && e["station_online"] != true ->
+        if busy, do: stop_work(e)
+        offline(e, now)
+
       over_budget?(e, now) ->
         if busy, do: stop_work(e)
         ask_approval(e, now)
@@ -525,6 +546,7 @@ defmodule Loom.Employees do
       true ->
         e
     end
+    |> back_online()
   end
 
   # The turn ends and costs of this employee's sessions that arrived while
@@ -661,10 +683,39 @@ defmodule Loom.Employees do
     card = Card.parse(text)
     e = e |> count_turn(now) |> apply_kpis(card) |> apply_added(card) |> heard(card, kind)
 
+    blocked(e)
+
     case kind do
       "employee_work" -> work_ended(e, card, summary, now)
       _ -> chat_ended(e, card, now)
     end
+  end
+
+  # What the guard refused in the turn, a line each in its Updates.
+  defp blocked(e) do
+    path = Path.join(dir(e["id"]), "blocked.jsonl")
+
+    with {:ok, body} <- File.read(path),
+         :ok <- File.rm(path),
+         s when is_binary(s) <- e["work_session"] do
+      lines =
+        for line <- String.split(body, "\n", trim: true),
+            {:ok, %{"what" => what}} <- [Jason.decode(line)],
+            do: what
+
+      {shown, rest} = Enum.split(lines, 5)
+      more = if rest == [], do: "", else: " (and #{length(rest)} more)"
+
+      if shown != [],
+        do:
+          Agent.note(
+            s,
+            "Blocked on this server, off its workstation: " <>
+              Enum.map_join(shown, " · ", &String.slice(&1, 0, 120)) <> more
+          )
+    end
+  catch
+    :exit, _ -> :ok
   end
 
   defp work_ended(e, card, summary, now) do
@@ -922,6 +973,8 @@ defmodule Loom.Employees do
 
   defp start_session(e, kind) do
     id = Agent.new_id()
+    # Before it starts: its first spawn already has the hook, or not.
+    write_guard(e, id)
     title = if kind == "employee_chat", do: "#{e["name"]} · chat", else: "#{e["name"]} · work"
 
     {:ok, backend} = Agent.Backend.parse(e["backend"] || "claude_code")
@@ -1124,6 +1177,16 @@ defmodule Loom.Employees do
     end
   end
 
+  defp setting("workstation", w) when w in [nil, ""], do: {:ok, nil}
+
+  defp setting("workstation", id) when is_binary(id) do
+    if Enum.any?(Loom.Nodes.list(), &(&1.id == id)),
+      do: {:ok, id},
+      else: {:error, "no such device"}
+  catch
+    :exit, _ -> {:error, "devices are not available"}
+  end
+
   defp setting("project_ids", ids) when is_list(ids) do
     if Enum.all?(ids, &match?({:ok, _}, Loom.Projects.get(&1))),
       do: {:ok, Enum.uniq(ids)},
@@ -1210,6 +1273,107 @@ defmodule Loom.Employees do
     end
 
     state
+  end
+
+  # ── The workstation ─────────────────────────────────────────────────────
+
+  # Its device's name and whether it is online, from `Loom.Nodes`; a device
+  # removed keeps the name it had, and is offline for good.
+  defp refresh_station(%{"workstation" => nil} = e),
+    do: Map.merge(e, %{"workstation_name" => nil, "station_online" => nil})
+
+  defp refresh_station(e) do
+    node =
+      try do
+        Enum.find(Loom.Nodes.list(), &(&1.id == e["workstation"]))
+      catch
+        :exit, _ -> nil
+      end
+
+    Map.merge(e, %{
+      "workstation_name" => (node && node.name) || e["workstation_name"],
+      "station_online" => node != nil and node.online == true
+    })
+  end
+
+  # Not woken, so nothing spent; the boss told once it has been a heartbeat.
+  defp offline(e, now) do
+    since = e["offline_since"] || now
+    e = Map.put(e, "offline_since", since)
+
+    if now - since >= e["heartbeat_min"] * 60_000 and e["offline_told"] != since do
+      post(e, %{
+        "priority" => 4,
+        "key" => "workstation",
+        "text" =>
+          "Its workstation #{e["workstation_name"] || "?"} has been offline for #{div(now - since, 60_000)} min, so #{e["name"]} has stopped. It carries on once the device is back."
+      })
+
+      Map.put(e, "offline_told", since)
+    else
+      e
+    end
+  end
+
+  defp back_online(%{"offline_since" => since} = e) when is_integer(since) do
+    if e["station_online"] or e["workstation"] == nil do
+      if e["offline_told"] == since, do: withdraw(e, "workstation")
+      Map.merge(e, %{"offline_since" => nil, "offline_told" => nil})
+    else
+      e
+    end
+  end
+
+  defp back_online(e), do: e
+
+  defp withdraw(e, key) do
+    Loom.Notices.withdraw(e["id"], key)
+  catch
+    :exit, _ -> :ok
+  end
+
+  # Its sessions start again with the hook, or without; the chat hears of it.
+  defp moved_station(e) do
+    text =
+      if e["workstation"],
+        do:
+          "[Loom: your workstation is now #{e["workstation_name"]}. Everything you do happens there, through loom-node; on this server, only your own notes. See .employee/status.md.]",
+        else: "[Loom: you no longer have a workstation; you work on this server again.]"
+
+    for s <- [e["chat_session"], e["work_session"]], is_binary(s) do
+      try do
+        if Agent.exists?(s) do
+          Agent.tell(s, text)
+          Agent.reload_backend(s)
+        end
+      catch
+        :exit, _ -> :ok
+      end
+    end
+  end
+
+  # The guard's rules for one of its sessions: none without a workstation.
+  defp write_guard(%{"workstation" => nil}, session), do: Guard.put(session, nil)
+
+  defp write_guard(e, session) do
+    ws = workspace(e["id"])
+    # Claude Code keeps its memory for a directory under ~/.claude/projects.
+    memory = Path.expand("~/.claude/projects/" <> String.replace(ws, ~r/[\/.]/, "-"))
+
+    Guard.put(session, %{
+      workstation: e["workstation_name"],
+      workspace: ws,
+      writes: [memory],
+      reads: [
+        memory,
+        Path.expand("~/.claude/skills"),
+        Path.expand("~/.kiro/skills"),
+        dir(e["id"])
+      ],
+      log: Path.join(dir(e["id"]), "blocked.jsonl")
+    })
+  rescue
+    error -> Logger.warning("Loom.Employees: cannot write #{session}'s guard: #{inspect(error)}")
   end
 
   # ── The boss profile ────────────────────────────────────────────────────
@@ -1309,6 +1473,7 @@ defmodule Loom.Employees do
     status =
       cond do
         e["paused"] -> "paused"
+        e["workstation"] && e["station_online"] != true -> "offline"
         over_budget?(e, now) -> "approval"
         working?(e) -> "working"
         match?(%{"level" => "urgent"}, e["attention"]) -> "blocked"
@@ -1330,12 +1495,14 @@ defmodule Loom.Employees do
       "workspace" => workspace(e["id"]),
       "pending_notes" => length(e["inbox"] || [])
     })
+    |> Map.drop(["station_online", "offline_since", "offline_told"])
   end
 
   # Its system prompts, which a session reads as it starts (see
   # `Loom.Employees.Prompt.system/2`), and the mirror of where it stands.
   defp write_files(e, boss) do
     File.mkdir_p!(Path.join(workspace(e["id"]), ".employee"))
+    for s <- [e["chat_session"], e["work_session"]], is_binary(s), do: write_guard(e, s)
 
     File.write!(
       Path.join(dir(e["id"]), "system_employee_work.md"),

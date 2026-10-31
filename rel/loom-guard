@@ -1,0 +1,197 @@
+#!/usr/bin/env python3
+"""loom-guard: keep a virtual employee's hands on its workstation.
+
+Claude Code's PreToolUse hook and Kiro's preToolUse hook, for the sessions of
+a virtual employee (`Loom.Employees`). The tool call comes on stdin as JSON
+(`tool_name`, `tool_input`); the session is LOOM_SESSION_ID, and its rules are
+in <dir>/<session>.json (the hook's argument; ~/.loom/guards without one),
+written by Loom:
+
+  {"workstation": "HomeWindows" | null, "workspace": "...", "writes": [...],
+   "reads": [...], "log": ".../blocked.jsonl"}
+
+No workstation: everything goes, as for any session. With one, what the
+employee does happens there, through `loom-node` (exec, read, write, on that
+device only, where nothing is refused); on this server it may keep its own
+notes in its workspace, and read them, its skills and its memory, and look
+things up: MCP tools, web search and fetch. Anything else is refused: exit 2,
+the reason on stderr for the agent, and a line in the log for its Updates.
+"""
+import json, os, re, shlex, sys, time
+
+# What acts on nothing outside the conversation.
+HARMLESS = {
+    "Task", "Agent", "TodoWrite", "TodoRead", "Skill", "ToolSearch", "ExitPlanMode",
+    "BashOutput", "KillShell", "KillBash", "todo_list", "thinking", "introspect", "report_issue",
+}
+# Looking things up: the web, and every MCP tool (Claude Code `mcp__server__tool`,
+# Kiro `@server/tool`).
+LOOKUP = {"WebSearch", "WebFetch", "web_search", "web_fetch"}
+SHELL = {"Bash", "execute_bash", "shell", "execute_cmd"}
+WRITE = {"Write", "Edit", "MultiEdit", "NotebookEdit", "fs_write"}
+READ = {"Read", "Glob", "Grep", "LS", "NotebookRead", "fs_read", "glob", "grep"}
+# Ours, which talk to Loom on this server and act on nothing else.
+LOOM_CLIS = {"loom-notice", "loom-session"}
+# Only after a pipe: they see what came before, nothing else.
+FILTERS = {"head", "tail", "grep", "jq", "wc", "sort", "uniq", "cut", "tr", "cat", "base64", "column"}
+# They act on nothing: what they print goes on, e.g. into `loom-node write`.
+PURE = {"echo", "printf", "true", "false", ":", "sleep"}
+# A heredoc's body is the input of its command, not commands.
+HEREDOC = re.compile(r"(?<!<)<<(?!<)-?[ \t]*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\1[^\n]*\n(.*?\n)??[ \t]*\2[ \t]*(?=\n|$)", re.S)
+
+
+def main():
+    session = os.environ.get("LOOM_SESSION_ID")
+    rules_dir = sys.argv[1] if len(sys.argv) > 1 else os.path.expanduser("~/.loom/guards")
+    try:
+        rules = json.load(open(os.path.join(rules_dir, f"{session}.json")))
+    except (OSError, ValueError, TypeError):
+        return 0
+    station = rules.get("workstation")
+    if not station:
+        return 0
+    try:
+        call = json.load(sys.stdin)
+    except ValueError:
+        return 0
+
+    tool = call.get("tool_name") or ""
+    args = call.get("tool_input") or {}
+    cwd = call.get("cwd") or rules.get("workspace") or os.getcwd()
+    why = check(tool, args, cwd, station, rules)
+    if why is None:
+        return 0
+
+    what = summary(tool, args)
+    try:
+        with open(rules["log"], "a") as f:
+            f.write(json.dumps({"at": int(time.time() * 1000), "session": session, "tool": tool,
+                                "what": what, "why": why}, ensure_ascii=False) + "\n")
+    except (OSError, KeyError):
+        pass
+    print(f"Blocked by Loom: {why} Your workstation is {station}: do this there, "
+          f"with `loom-node exec {station} -- '<command>'` (or loom-node read/write {station}; "
+          f"the loom-nodes skill). On this server keep only your own notes, in "
+          f"{rules.get('workspace')}.", file=sys.stderr)
+    return 2
+
+
+def check(tool, args, cwd, station, rules):
+    if tool in HARMLESS or tool in LOOKUP or tool.startswith(("mcp__", "@")):
+        return None
+    if tool in SHELL:
+        return shell(str(args.get("command") or ""), cwd, station, rules)
+    if tool in WRITE:
+        for p in paths(args) or [cwd]:
+            if not inside(p, cwd, [rules.get("workspace")] + rules.get("writes", [])):
+                return f"writing {p} is on this server, outside your notes."
+        return None
+    if tool in READ:
+        for p in paths(args) or [cwd]:
+            if not inside(p, cwd, [rules.get("workspace")] + rules.get("reads", [])):
+                return f"reading {p} is on this server, outside your notes."
+        return None
+    return f"{tool} runs on this server, not on your workstation."
+
+
+def shell(command, cwd, station, rules):
+    for m in HEREDOC.finditer(command):
+        if not m.group(1) and re.search(r"\$\(|`", m.group(3) or ""):
+            return "command substitution runs on this server."
+    command = HEREDOC.sub(lambda m: m.group(0).split("\n", 1)[0], command)
+    if not command.strip():
+        return None
+    try:
+        lex = shlex.shlex(command, posix=True, punctuation_chars=";&|<>")
+        lex.whitespace_split = True
+        words = list(lex)
+    except ValueError:
+        return "a command Loom cannot read runs on this server."
+    # Inside single quotes it is the device's (`loom-node exec … -- '…'`).
+    if re.search(r"\$\(|`", re.sub(r"'[^']*'", "", command)):
+        return "command substitution runs on this server."
+
+    segment, after_pipe, redirect, heredoc = [], False, None, False
+    for word in words + [";"]:
+        if redirect:
+            target = os.path.expanduser(word)
+            if word not in ("&1", "&2", "/dev/null") and not inside(target, cwd, [rules.get("workspace")]):
+                return f"writing {word} is on this server, outside your notes."
+            redirect = None
+            continue
+        if word in (">", ">>", "&>", "2>", "1>") or (word.endswith(">") and word.strip(">&12") == ""):
+            redirect = True
+            continue
+        if word in ("<", "<<<"):
+            redirect = None
+            continue
+        if word in ("<<", "<<-"):
+            heredoc = True
+            continue
+        if heredoc:  # its delimiter
+            heredoc = False
+            continue
+        if word in (";", "&&", "||", "|", "&", "\n", "|&"):
+            why = segment_ok(segment, after_pipe, station)
+            if why:
+                return why
+            segment, after_pipe = [], word in ("|", "|&")
+            continue
+        segment.append(word)
+    return None
+
+
+def segment_ok(words, after_pipe, station):
+    while words and re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", words[0]):
+        words = words[1:]
+    if not words:
+        return None
+    exe = os.path.basename(words[0])
+    if exe == "loom-node":
+        sub = words[1] if len(words) > 1 else ""
+        if sub in ("exec", "read", "write") and (len(words) < 3 or words[2] != station):
+            return f"`loom-node {sub}` goes to {words[2] if len(words) > 2 else 'no device'}, not your workstation."
+        return None
+    if exe in LOOM_CLIS or exe in PURE:
+        return None
+    if after_pipe and exe in FILTERS:
+        return None
+    return f"`{exe}` runs on this server."
+
+
+def paths(args):
+    found = []
+
+    def walk(v, key=None):
+        if isinstance(v, dict):
+            for k, x in v.items():
+                walk(x, k)
+        elif isinstance(v, list):
+            for x in v:
+                walk(x, key)
+        elif isinstance(v, str) and key in ("file_path", "path", "notebook_path", "paths", "directory"):
+            found.append(v)
+
+    walk(args)
+    return found
+
+
+def inside(path, cwd, roots):
+    p = os.path.realpath(os.path.join(cwd, os.path.expanduser(path)))
+    for root in roots:
+        if root:
+            r = os.path.realpath(os.path.expanduser(root))
+            if p == r or p.startswith(r.rstrip("/") + "/"):
+                return True
+    return False
+
+
+def summary(tool, args):
+    if tool in SHELL:
+        return str(args.get("command") or "")[:200]
+    p = paths(args)
+    return (p[0] if p else json.dumps(args, ensure_ascii=False))[:200]
+
+
+if __name__ == "__main__":
+    sys.exit(main())

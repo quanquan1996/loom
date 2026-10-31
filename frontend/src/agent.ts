@@ -534,6 +534,11 @@ export function buildTimeline(t: Transcript): TimelineItem[] {
         break
       }
 
+      // A line from Loom itself, for the user: what a guard refused, say.
+      case "loom_note":
+        items.push({ key, kind: "notice", text: String(p.text ?? "") })
+        break
+
       case "compacted": {
         // The backend compacted its own context. Worth one line so a jump in
         // the token count has an explanation. Claude Code reports the sizes;

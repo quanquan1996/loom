@@ -867,3 +867,28 @@
     flex-basis: 5.5rem;
   }
 }
+
+/* Where it works, after its name, when that is not here. */
+.emp-row-station {
+  color: var(--fg-dim);
+}
+
+/* The fold for what most never need. */
+.emp-advanced {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.emp-advanced svg {
+  width: 1rem;
+  height: 1rem;
+  color: var(--fg-dim);
+}

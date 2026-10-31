@@ -292,6 +292,7 @@ defmodule Loom.Employees.Prompt do
     - Daily report at #{e["daily_report"]}; weekly report on #{day(e["weekly_report"]["day"])} at #{e["weekly_report"]["time"]}
     - Budget today: #{Loom.Employees.amount(e, ctx.spent)} used of #{Loom.Employees.amount(e, ctx.cap)} — #{Loom.Employees.amount(e, max(ctx.cap - ctx.spent, 0))} left
     #{if e["persona"] not in [nil, ""], do: "\nHow the boss wants you to work:\n" <> e["persona"] <> "\n", else: ""}
+#{workstation(e, ctx)}
     ## The boss profile (shared by all employees)
 
     #{boss(ctx[:boss] || [], ctx.offset)}
@@ -323,6 +324,32 @@ defmodule Loom.Employees.Prompt do
           )
       end)
   end
+
+  defp workstation(%{"workstation" => w} = e, ctx) when is_binary(w) do
+    name = e["workstation_name"] || "your workstation"
+
+    """
+    ## Your workstation: #{name}
+
+    You work on #{name}, one of the boss's devices, not on this server. On
+    #{name} you have the run of the machine: commands, files, installing what
+    you need, its browser, the network, nothing is refused there. You reach it
+    through `loom-node` (the loom-nodes skill): `loom-node exec #{name} -- '…'`,
+    `loom-node read #{name} …`, `loom-node write #{name} …`. Your work products
+    stay on #{name}. On this server keep only your own notes, in #{ctx.workspace}
+    (worklog.md, HANDOFF.md, reports/), and your memory: your conversations
+    and memory live here, your work there. Looking things up is fine from
+    here: web search, web fetch and every MCP tool. Loom's shared browser is
+    on this server, so not yours: to browse, use #{name}'s own browser (on
+    Windows, Edge: `& "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe"
+    --headless --dump-dom <url>`, or Playwright installed there with
+    `channel="msedge"`). Loom refuses anything else here,
+    and the refusal shows in your updates. When #{name} is offline Loom does
+    not wake you.
+    """
+  end
+
+  defp workstation(_e, _ctx), do: ""
 
   defp boss([], _offset), do: "Nothing yet."
 

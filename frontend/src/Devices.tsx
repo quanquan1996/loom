@@ -9,6 +9,7 @@ import {
   installCommands,
   renameDevice,
   type Device,
+  type Employee,
 } from "./api"
 
 /**
@@ -22,10 +23,13 @@ import {
  */
 export function DevicesDialog({
   devices,
+  employees,
   onUpsert,
   onClose,
 }: {
   devices: Device[]
+  // Those working on a device are named before it is removed: they stop.
+  employees: Employee[]
   onUpsert: (device: Device) => void
   onClose: () => void
 }) {
@@ -65,7 +69,11 @@ export function DevicesDialog({
   }
 
   const remove = async (device: Device) => {
-    if (!confirm(`Remove ${device.name}? loom-node uninstalls itself from it: right away if it is online, otherwise the next time it connects.`)) return
+    const working = employees.filter((e) => e.workstation === device.id).map((e) => e.name)
+    const stops = working.length
+      ? `\n\nIt is the workstation of ${working.join(", ")}, who will stop working until given another.`
+      : ""
+    if (!confirm(`Remove ${device.name}? loom-node uninstalls itself from it: right away if it is online, otherwise the next time it connects.${stops}`)) return
     try {
       await deleteDevice(device.id)
       if (install?.id === device.id) setInstall(null)

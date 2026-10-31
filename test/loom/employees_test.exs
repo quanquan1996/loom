@@ -368,6 +368,56 @@ defmodule Loom.EmployeesTest do
              |> Map.get("boss")
   end
 
+  test "a workstation: its sessions are guarded, offline it does not wake, refusals show in Updates",
+       %{server: server} do
+    {:ok, node, _code} = Loom.Nodes.create("emp-ws-#{System.unique_integer([:positive])}")
+    on_exit(fn -> Loom.Nodes.delete(node.id) end)
+
+    {:ok, e} = Employees.create(%{"name" => "钱多多"}, server)
+    # None by default, as before: no guard, no hook.
+    refute Loom.Agent.Guard.guarded?(e["chat_session"])
+
+    assert {:error, "no such device"} =
+             Employees.update(e["id"], %{"workstation" => "n_nope"}, server)
+
+    {:ok, e} = Employees.update(e["id"], %{"workstation" => node.id}, server)
+    assert e["workstation_name"] == node.name
+    assert e["status"] == "offline"
+
+    for s <- [e["chat_session"], e["work_session"]] do
+      rules = Loom.Agent.Guard.path(s) |> File.read!() |> Jason.decode!()
+      assert rules["workstation"] == node.name
+      assert rules["workspace"] == Employees.workspace(e["id"])
+    end
+
+    # Offline: woken, it does not start a turn.
+    {:ok, _} = Employees.wake(e["id"], nil, server)
+    refute_receive {:stub_turn, _}, 200
+
+    # Online: it wakes, told where it works; what the guard refused shows in Updates.
+    channel = spawn(fn -> Process.sleep(:infinity) end)
+    {:ok, _} = Loom.Nodes.connected(node.id, channel, %{})
+    {:ok, _} = Employees.wake(e["id"], nil, server)
+    text = BackendStub.await_turn()
+    assert text =~ "## Your workstation: #{node.name}"
+    assert text =~ "loom-node exec #{node.name}"
+
+    File.write!(
+      Path.join(Employees.dir(e["id"]), "blocked.jsonl"),
+      Jason.encode!(%{at: 1, tool: "Bash", what: "rm -rf build", why: "x"}) <> "\n"
+    )
+
+    end_turn(e["work_session"], card(%{}), server)
+    {:ok, %{events: events}} = Agent.attach(e["work_session"])
+    assert Enum.any?(events, &(&1.kind == :loom_note and &1.payload.text =~ "rm -rf build"))
+
+    # Taken away: as before.
+    {:ok, e} = Employees.update(e["id"], %{"workstation" => nil}, server)
+    refute Loom.Agent.Guard.guarded?(e["work_session"])
+    assert e["workstation_name"] == nil
+    Process.exit(channel, :kill)
+  end
+
   test "spent, it stops and waits for the boss; what they approve counts for today",
        %{server: server} do
     {:ok, e} = Employees.create(%{"name" => "小码", "budget_usd" => 50}, server)
