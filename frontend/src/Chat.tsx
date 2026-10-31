@@ -244,6 +244,7 @@ export function Chat({
         <div className="drop-note">drop to attach to this conversation</div>
       )}
 
+      <div className="chat-glass" />
       <div className="chat-top" ref={topRef}>
       {!bare && (
       <header className="chat-header">

@@ -1030,6 +1030,10 @@
     inset: 0;
     z-index: 10;
     border-left: none;
+    /* Clear of the status bar a home-screen app draws under, where the
+       pane's back button could not be tapped. */
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top);
   }
 
   .narrow-only {
