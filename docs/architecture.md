@@ -241,10 +241,12 @@ says when it needs the user.
   `"employee_work"`, where it works. The work session is the report: every
   turn is a wake-up or the user answering. Neither is in the lists; the
   Employees section of the sidebar opens a page with Chat, KPIs, Updates (the
-  work session), Daily & weekly and Settings.
+  work session), Reports and Settings.
 - **A heartbeat, not a loop.** A one-minute tick wakes an employee when its
-  `wake_at` comes (within its hours), or for the daily and weekly report
-  (`reports/daily-YYYY-MM-DD.md`, `reports/weekly-YYYY-Www.md`). A wake-up is
+  `wake_at` comes (within its hours), or for the weekly report
+  (`reports/weekly-YYYY-Www.md`). No daily report since 2026-10-31 (the boss
+  reviews employees when they choose); old `reports/daily-*.md` stay listed,
+  and the stored `daily_report`/`last_daily` are dropped on load. A wake-up is
   one turn, `origin: "employee"`, with `Loom.Employees.Prompt.wake/3` behind a
   one-line display. It ends with a **work card** (`Loom.Employees.Card`), a
   fenced `employee-card` JSON block: when to wake (kept between the minimum

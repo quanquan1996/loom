@@ -224,7 +224,6 @@ defmodule Loom.Employees.Prompt do
     t = clock(now, offset)
 
     case reason do
-      :daily_report -> "Wake-up · #{t} · daily report"
       :weekly_report -> "Wake-up · #{t} · weekly report"
       _ -> "Wake-up · #{t}"
     end
@@ -234,7 +233,6 @@ defmodule Loom.Employees.Prompt do
   def wake(e, reason, ctx) do
     why =
       case reason do
-        :daily_report -> "time for your daily report"
         :weekly_report -> "time for your weekly report"
         _ -> e["wake_reason"] || "your heartbeat"
       end
@@ -289,7 +287,7 @@ defmodule Loom.Employees.Prompt do
 
     - Name: #{e["name"]}; role: #{blank(e["role"], "—")}
     - Working hours: #{hours(e["hours"])}; heartbeat every #{e["heartbeat_min"]} min; at least #{e["min_gap_min"]} min between wake-ups; a turn may run #{e["max_turn_min"]} min at most
-    - Daily report at #{e["daily_report"]}; weekly report on #{day(e["weekly_report"]["day"])} at #{e["weekly_report"]["time"]}
+    - Weekly report on #{day(e["weekly_report"]["day"])} at #{e["weekly_report"]["time"]}
     - Budget today: #{Loom.Employees.amount(e, ctx.spent)} used of #{Loom.Employees.amount(e, ctx.cap)} — #{Loom.Employees.amount(e, max(ctx.cap - ctx.spent, 0))} left
     #{if e["persona"] not in [nil, ""], do: "\nHow the boss wants you to work:\n" <> e["persona"] <> "\n", else: ""}
     ## The boss profile (shared by all employees)
@@ -352,27 +350,16 @@ defmodule Loom.Employees.Prompt do
     "## New since your last wake-up\n\n" <> Enum.map_join(notes, "\n", &("- " <> &1)) <> "\n"
   end
 
-  defp task(:daily_report, ctx) do
-    """
-    ## Now: the daily report
-
-    Write `reports/daily-#{ctx.today}.md`: what you did today (from
-    `worklog.md`), where each KPI stands, what it cost (#{ctx.spent_text} so far),
-    problems or risks, and the plan for tomorrow. Short and concrete. Then end
-    with the work card, without a `report`: the boss reads reports on your
-    page, and the bell is not for them. Anything that needs the boss goes in
-    a report at your next wake-up.
-    """
-  end
-
   defp task(:weekly_report, ctx) do
     """
     ## Now: the weekly report
 
     Write `reports/weekly-#{ctx.week}.md`: the week's results against the
-    KPIs, what is done and waiting for review, what slipped and why, what it
-    cost, and the plan for next week. Then end with the work card, without a
-    `report`, as for the daily one.
+    KPIs (from `worklog.md`), what is done and waiting for review, what
+    slipped and why, what it cost, and the plan for next week. Short and
+    concrete. Then end with the work card, without a `report`: the boss reads
+    it on your page, and the bell is not for it. Anything that needs the boss
+    goes in a report at your next wake-up.
     """
   end
 

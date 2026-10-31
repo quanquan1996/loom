@@ -819,7 +819,6 @@ export type Employee = {
   min_gap_min: number
   max_turn_min: number
   budget_usd: number
-  daily_report: string
   // ISO weekday, 1 is Monday.
   weekly_report: { day: number; time: string }
   ask_first: string[]
@@ -872,7 +871,6 @@ export type EmployeeSettings = Partial<
     | "budget_usd"
     | "budget_turns"
     | "backend"
-    | "daily_report"
     | "weekly_report"
     | "ask_first"
     | "model"

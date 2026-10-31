@@ -182,18 +182,18 @@ defmodule Loom.EmployeesTest do
     assert Loom.Notices.open_of(e["id"]) == []
   end
 
-  test "a daily report's turn rings no bell", %{server: server} do
+  test "a weekly report's turn rings no bell", %{server: server} do
     {:ok, e} = Employees.create(%{"name" => "小日"}, server)
     {:ok, _} = Employees.wake(e["id"], nil, server)
     BackendStub.await_turn()
 
     :sys.replace_state(server, fn st ->
-      put_in(st.employees[e["id"]]["turn_reason"], "daily_report")
+      put_in(st.employees[e["id"]]["turn_reason"], "weekly_report")
     end)
 
     end_turn(
       e["work_session"],
-      card(%{"report" => %{"priority" => 3, "text" => "日报写好了"}}),
+      card(%{"report" => %{"priority" => 3, "text" => "周报写好了"}}),
       server
     )
 
@@ -429,6 +429,64 @@ defmodule Loom.EmployeesTest do
     assert {:error, "no such project"} =
              Employees.create(%{"name" => "a", "project_ids" => ["p_nope"]}, server)
 
-    assert {:error, _} = Employees.create(%{"name" => "a", "daily_report" => "25:00"}, server)
+    assert {:error, _} =
+             Employees.create(
+               %{"name" => "a", "weekly_report" => %{"day" => 5, "time" => "25:00"}},
+               server
+             )
+  end
+
+  test "an employee from before the daily report went: the setting is dropped, it is told once",
+       %{server: server, dir: dir} do
+    {:ok, e} = Employees.create(%{"name" => "老员工"}, server)
+    path = Path.join(dir, "employees.json")
+    stop_supervised!(server)
+
+    all = path |> File.read!() |> Jason.decode!()
+
+    old =
+      Enum.map(
+        all["employees"],
+        &Map.merge(&1, %{"daily_report" => "18:00", "last_daily" => nil})
+      )
+
+    File.write!(path, Jason.encode!(%{all | "employees" => old}))
+
+    name = :"employees_#{System.unique_integer([:positive])}"
+
+    start_supervised!({Employees, name: name, path: path, tick: :timer.hours(24), run: true},
+      id: name
+    )
+
+    {:ok, e2} = Employees.get(e["id"], name)
+    refute Map.has_key?(e2, "daily_report") or Map.has_key?(e2, "last_daily")
+    {:ok, _} = Employees.wake(e["id"], nil, name)
+    assert BackendStub.await_turn() =~ "The boss dropped the daily report"
+  end
+
+  test "no daily report: an evening wakes no one; Friday's weekly report still comes",
+       %{server: server} do
+    {:ok, e} = Employees.create(%{"name" => "小周"}, server)
+    {:ok, _} = Employees.wake(e["id"], nil, server)
+    BackendStub.await_turn()
+    end_turn(e["work_session"], card(%{"next" => "sleep", "sleep_minutes" => 10_000}), server)
+
+    {:ok, e} = Employees.get(e["id"], server)
+    refute Map.has_key?(e, "daily_report")
+
+    # 18:30 in the boss's time (UTC+8): Thursday 2026-10-29, then Friday.
+    at = fn date ->
+      DateTime.new!(date, ~T[10:30:00], "Etc/UTC") |> DateTime.to_unix(:millisecond)
+    end
+
+    run = fn now -> :sys.replace_state(server, &Employees.run(&1, e["id"], now)) end
+
+    run.(at.(~D[2026-10-29]))
+    refute_receive {:stub_turn, _}, 200
+
+    run.(at.(~D[2026-10-30]))
+    text = BackendStub.await_turn()
+    assert text =~ "time for your weekly report"
+    refute text =~ ~r/daily report/i
   end
 end
