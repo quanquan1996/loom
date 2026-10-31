@@ -22,8 +22,33 @@
          iOS reads this when the app is added to the home screen. -->
     <meta name="apple-mobile-web-app-status-bar-style" content="black" />
     <title>loom</title>
+    <!-- iOS 26+ lays a blur over the top of a home-screen app, our header with
+         it, unless WebKit finds a fixed, full-width surface with a solid
+         background at the middle of the top edge (LocalFrameView::
+         fixedContainerEdges): then the status bar takes its colour. So the
+         status bar's own strip is painted in the page's colour, above the
+         drawer's transparent fixed layer that would otherwise be found there.
+         Switched on from script: iOS no longer reliably reports
+         `display-mode: standalone`. After HKUDS/nanobot#5942. -->
+    <style>
+      .ios-edge { display: none; }
+      .ios-app .ios-edge {
+        display: block;
+        position: fixed;
+        inset: 0 0 auto;
+        /* More than 10px, or WebKit passes it over as a border. */
+        height: max(11px, env(safe-area-inset-top));
+        z-index: 100;
+        pointer-events: none;
+        background-color: inherit;
+      }
+    </style>
+    <script>
+      if (navigator.standalone === true) document.documentElement.classList.add("ios-app")
+    </script>
   </head>
   <body>
+    <div class="ios-edge" aria-hidden="true"></div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
