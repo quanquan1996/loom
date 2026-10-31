@@ -32,6 +32,11 @@
          `display-mode: standalone`. After HKUDS/nanobot#5942. -->
     <style>
       .ios-edge { display: none; }
+      /* DIAGNOSTIC, temporary: blue on any iOS, red once navigator.standalone. */
+      @supports (-webkit-touch-callout: none) {
+        .ios-edge { display: block; position: fixed; inset: 0 0 auto; height: max(11px, env(safe-area-inset-top)); z-index: 100; pointer-events: none; background-color: #0050ff; }
+      }
+      .ios-app .ios-edge { background-color: #ff0000 !important; }
       .ios-app .ios-edge {
         display: block;
         position: fixed;
