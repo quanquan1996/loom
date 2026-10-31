@@ -1499,3 +1499,29 @@ pre.code,
     box-shadow: none;
   }
 }
+
+/* An app opened from the iOS home screen (`.ios-app`, set in index.html), on
+   a phone. iOS 26+ blurs the top of the screen there, about 93pt down — past
+   the status bar, over the first row of whatever is on top — and nothing on
+   the page turns it off (an edge strip, a solid fixed header, the status-bar
+   style: all tried on the device). So the first row starts below the band:
+   the chat's header, the sidebar's, the panes' and the bell's. */
+@media (max-width: 640px) {
+  .ios-app {
+    --ios-top: max(100px, calc(env(safe-area-inset-top) + 12px));
+  }
+
+  .ios-app .chat-header,
+  .ios-app .drawer .sidebar,
+  .ios-app .side-column,
+  .ios-app .search-panel {
+    padding-top: var(--ios-top);
+  }
+
+  /* The header now sits low in its glass: frosted all the way to its foot,
+     fading only in the 16px below, or the page shows through its buttons. */
+  .ios-app .chat-glass {
+    -webkit-mask-image: linear-gradient(#000 calc(100% - 16px), transparent);
+    mask-image: linear-gradient(#000 calc(100% - 16px), transparent);
+  }
+}

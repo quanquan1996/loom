@@ -21,6 +21,10 @@
          instead of stopping at an opaque strip. The header pads past it. -->
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>loom</title>
+    <!-- An app opened from the iOS home screen; see `.ios-app` in theme.css. -->
+    <script>
+      if (navigator.standalone === true) document.documentElement.classList.add("ios-app")
+    </script>
   </head>
   <body>
     <div id="root"></div>
