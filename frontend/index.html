@@ -16,37 +16,14 @@
     <meta name="theme-color" media="(max-width: 640px)" content="#000000" />
     <meta name="theme-color" content="#212121" />
     <meta name="apple-mobile-web-app-title" content="loom" />
-    <!-- Opened from the home screen: the page runs on under the status bar,
-         so the conversation scrolls behind the header's glass all the way up
-         instead of stopping at an opaque strip. The header pads past it. -->
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <!-- Opened from the home screen: an opaque status bar, the page below it.
+         Not black-translucent, under which iOS 27 lays a blur over the top of
+         the app that nothing on the page can turn off — our header with it.
+         iOS reads this when the app is added to the home screen. -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
     <title>loom</title>
-    <!-- iOS 27 lays a blur over the top of a home-screen app, our header with
-         it, unless a full-width fixed surface with a solid background sits at
-         the top edge: then the status bar takes that colour instead. So the
-         status bar's own strip is painted in the page's colour (an invisible
-         one, its background clipped to empty text as in HKUDS/nanobot#5942,
-         did not stop the blur). Only in an installed iOS app. -->
-    <style>
-      .ios-edge { display: none; }
-      @supports (-webkit-touch-callout: none) {
-        @media (display-mode: standalone) {
-          .ios-edge {
-            display: block;
-            position: fixed;
-            inset: 0 0 auto;
-            /* At least 11px: WebKit ignores a strip of 10px or less. */
-            height: max(11px, env(safe-area-inset-top));
-            z-index: 100;
-            pointer-events: none;
-            background-color: inherit;
-          }
-        }
-      }
-    </style>
   </head>
   <body>
-    <div class="ios-edge" aria-hidden="true"></div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
