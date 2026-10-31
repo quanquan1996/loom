@@ -283,8 +283,10 @@ says when it needs the user.
   sessions stay here, but each has rules in `~/.loom/guards/<session>.json`
   (`Loom.Agent.Guard`), and its backend then installs `rel/loom-guard` as the
   hook before every tool call (Claude Code `--settings` PreToolUse, Kiro
-  agent `hooks.preToolUse`). Allowed: `loom-node` to that device, our CLIs,
-  the employee's own notes and memory, its skills; refused (exit 2) is
+  agent `hooks.preToolUse`). Allowed: `loom-node` to that device (where it
+  has the run of the machine; the shared browser is here, so it browses with
+  the device's own), our CLIs, the employee's own notes and memory, its
+  skills, and looking things up (MCP tools, web search/fetch); refused (exit 2) is
   logged to `blocked.jsonl` and shown in Updates (`Session.note/2`, a
   `loom_note` event). Offline: not woken, status `offline`, one priority-4
   notice past a heartbeat, withdrawn when back. No workstation, no rules.

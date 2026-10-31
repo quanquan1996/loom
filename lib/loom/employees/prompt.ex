@@ -331,13 +331,19 @@ defmodule Loom.Employees.Prompt do
     """
     ## Your workstation: #{name}
 
-    You work on #{name}, one of the boss's devices, not on this server. Everything
-    you do — commands, reading and writing files, browsing, the web — happens
-    there, through `loom-node` (the loom-nodes skill): `loom-node exec #{name} -- '…'`,
+    You work on #{name}, one of the boss's devices, not on this server. On
+    #{name} you have the run of the machine: commands, files, installing what
+    you need, its browser, the network, nothing is refused there. You reach it
+    through `loom-node` (the loom-nodes skill): `loom-node exec #{name} -- '…'`,
     `loom-node read #{name} …`, `loom-node write #{name} …`. Your work products
     stay on #{name}. On this server keep only your own notes, in #{ctx.workspace}
     (worklog.md, HANDOFF.md, reports/), and your memory: your conversations
-    and memory live here, your work there. Loom refuses anything else here,
+    and memory live here, your work there. Looking things up is fine from
+    here: web search, web fetch and every MCP tool. Loom's shared browser is
+    on this server, so not yours: to browse, use #{name}'s own browser (on
+    Windows, Edge: `& "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe"
+    --headless --dump-dom <url>`, or Playwright installed there with
+    `channel="msedge"`). Loom refuses anything else here,
     and the refusal shows in your updates. When #{name} is offline Loom does
     not wake you.
     """

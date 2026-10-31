@@ -12,9 +12,10 @@ written by Loom:
 
 No workstation: everything goes, as for any session. With one, what the
 employee does happens there, through `loom-node` (exec, read, write, on that
-device only); on this server it may keep its own notes in its workspace, and
-read them, its skills and its memory. Anything else is refused: exit 2, the
-reason on stderr for the agent, and a line in the log for its Updates.
+device only, where nothing is refused); on this server it may keep its own
+notes in its workspace, and read them, its skills and its memory, and look
+things up: MCP tools, web search and fetch. Anything else is refused: exit 2,
+the reason on stderr for the agent, and a line in the log for its Updates.
 """
 import json, os, re, shlex, sys, time
 
@@ -23,6 +24,9 @@ HARMLESS = {
     "Task", "Agent", "TodoWrite", "TodoRead", "Skill", "ToolSearch", "ExitPlanMode",
     "BashOutput", "KillShell", "KillBash", "todo_list", "thinking", "introspect", "report_issue",
 }
+# Looking things up: the web, and every MCP tool (Claude Code `mcp__server__tool`,
+# Kiro `@server/tool`).
+LOOKUP = {"WebSearch", "WebFetch", "web_search", "web_fetch"}
 SHELL = {"Bash", "execute_bash", "shell", "execute_cmd"}
 WRITE = {"Write", "Edit", "MultiEdit", "NotebookEdit", "fs_write"}
 READ = {"Read", "Glob", "Grep", "LS", "NotebookRead", "fs_read", "glob", "grep"}
@@ -30,6 +34,10 @@ READ = {"Read", "Glob", "Grep", "LS", "NotebookRead", "fs_read", "glob", "grep"}
 LOOM_CLIS = {"loom-notice", "loom-session"}
 # Only after a pipe: they see what came before, nothing else.
 FILTERS = {"head", "tail", "grep", "jq", "wc", "sort", "uniq", "cut", "tr", "cat", "base64", "column"}
+# They act on nothing: what they print goes on, e.g. into `loom-node write`.
+PURE = {"echo", "printf", "true", "false", ":", "sleep"}
+# A heredoc's body is the input of its command, not commands.
+HEREDOC = re.compile(r"(?<!<)<<(?!<)-?[ \t]*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\1[^\n]*\n(.*?\n)??[ \t]*\2[ \t]*(?=\n|$)", re.S)
 
 
 def main():
@@ -69,7 +77,7 @@ def main():
 
 
 def check(tool, args, cwd, station, rules):
-    if tool in HARMLESS:
+    if tool in HARMLESS or tool in LOOKUP or tool.startswith(("mcp__", "@")):
         return None
     if tool in SHELL:
         return shell(str(args.get("command") or ""), cwd, station, rules)
@@ -87,6 +95,10 @@ def check(tool, args, cwd, station, rules):
 
 
 def shell(command, cwd, station, rules):
+    for m in HEREDOC.finditer(command):
+        if not m.group(1) and re.search(r"\$\(|`", m.group(3) or ""):
+            return "command substitution runs on this server."
+    command = HEREDOC.sub(lambda m: m.group(0).split("\n", 1)[0], command)
     if not command.strip():
         return None
     try:
@@ -99,7 +111,7 @@ def shell(command, cwd, station, rules):
     if re.search(r"\$\(|`", re.sub(r"'[^']*'", "", command)):
         return "command substitution runs on this server."
 
-    segment, after_pipe, redirect = [], False, None
+    segment, after_pipe, redirect, heredoc = [], False, None, False
     for word in words + [";"]:
         if redirect:
             target = os.path.expanduser(word)
@@ -110,8 +122,14 @@ def shell(command, cwd, station, rules):
         if word in (">", ">>", "&>", "2>", "1>") or (word.endswith(">") and word.strip(">&12") == ""):
             redirect = True
             continue
-        if word == "<":
+        if word in ("<", "<<<"):
             redirect = None
+            continue
+        if word in ("<<", "<<-"):
+            heredoc = True
+            continue
+        if heredoc:  # its delimiter
+            heredoc = False
             continue
         if word in (";", "&&", "||", "|", "&", "\n", "|&"):
             why = segment_ok(segment, after_pipe, station)
@@ -134,7 +152,7 @@ def segment_ok(words, after_pipe, station):
         if sub in ("exec", "read", "write") and (len(words) < 3 or words[2] != station):
             return f"`loom-node {sub}` goes to {words[2] if len(words) > 2 else 'no device'}, not your workstation."
         return None
-    if exe in LOOM_CLIS:
+    if exe in LOOM_CLIS or exe in PURE:
         return None
     if after_pipe and exe in FILTERS:
         return None
