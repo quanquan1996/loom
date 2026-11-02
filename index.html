@@ -124,6 +124,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
   <a class="brand" href="#"><img src="favicon.svg" alt="">Loom</a>
   <div class="links">
     <a href="#say"><span class="zh">能做什么</span><span class="en">What it does</span></a>
+    <a href="#light"><span class="zh">轻</span><span class="en">Light</span></a>
     <a href="#why"><span class="zh">理念</span><span class="en">Ideas</span></a>
     <a href="#phone"><span class="zh">手机上</span><span class="en">On a phone</span></a>
     <a href="#always"><span class="zh">一直在</span><span class="en">Always on</span></a>
@@ -137,12 +138,12 @@ footer .wrap{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
   <div class="txt">
     <span class="pill"><b>v0.4</b><span class="zh">Working · 接着做 · 无痕会话 · Android</span><span class="en">Working · Continue · Incognito · Android</span></span>
     <h1><span class="zh">一个对话框，<br><span class="soft">管你的一切。</span></span><span class="en">One chat box.<br><span class="soft">Everything you own.</span></span></h1>
-    <p class="lead"><span class="zh">写代码、开电脑、动手机、关家里的灯、读邮件、记饮食 —— 在手机上说一句就行。Loom 把 Claude Code 装在你自己的服务器上，再把你所有的设备接进来。</span><span class="en">Write code, drive your computers and phone, turn off the lights at home, read your mail, log a meal — one sentence on your phone. Loom puts Claude Code on your own server and plugs in every device you have.</span></p>
+    <p class="lead"><span class="zh">写代码、开电脑、动手机、关家里的灯、读邮件、记饮食 —— 在手机上说一句就行。Loom 是一个网页：Claude Code 跑在你自己的服务器上，手机加到主屏就是 App，你所有的设备都接进来。</span><span class="en">Write code, drive your computers and phone, turn off the lights at home, read your mail, log a meal — one sentence on your phone. Loom is a web page: Claude Code runs on your own server, your phone adds it to the home screen as an app, and every device you have plugs in.</span></p>
     <div class="cta">
       <a class="btn primary" href="https://github.com/quanquan1996/loom"><span class="zh">在 GitHub 上查看</span><span class="en">View on GitHub</span></a>
       <a class="btn" href="#say"><span class="zh">看看它能做什么</span><span class="en">See what it does</span></a>
     </div>
-    <div class="chips"><span>Claude Code</span><span>Codex</span><span>Kiro</span><span>Mac · Windows · Linux · Android</span></div>
+    <div class="chips"><span>Web · PWA</span><span>Claude Code</span><span>Codex</span><span>Kiro</span><span>Mac · Windows · Linux · Android</span></div>
   </div>
   <div>
     <div class="phone">
@@ -171,6 +172,19 @@ footer .wrap{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
     <div class="tile rv"><div class="ic">🥗</div><h3><span class="zh">生活</span><span class="en">Life</span></h3><q><span class="zh">记一下，今天午饭一碗牛肉面</span><span class="en">Log it: beef noodles for lunch</span></q><div class="where">skill · memory</div></div>
   </div>
   <p class="note rv"><span class="zh">家电、摄像头、邮箱这些不是 Loom 内置的：接进一台设备、写一个 skill，它就成了 Loom 的一部分 —— 这些 skill 大多也是在 Loom 里一句话写出来的。</span><span class="en">Lights, cameras and mail aren't built in: plug in a device, add a skill, and it's part of Loom — and most of those skills were themselves written by asking, inside Loom.</span></p>
+</div></section>
+
+<section id="light"><div class="wrap">
+  <div class="center">
+    <div class="eyebrow rv">Just a web page</div>
+    <h2 class="rv"><span class="zh">一个网址，<span class="soft">就是全部。</span></span><span class="en">One URL.<span class="soft"> That's the whole app.</span></span></h2>
+    <p class="sub rv"><span class="zh">没有要装的 App，没有要等的更新。电脑上用浏览器打开，手机上加到主屏，就是一个 App。</span><span class="en">Nothing to install, no updates to wait for. Open it in a browser on a computer; on a phone, add it to the home screen and it's an app.</span></p>
+  </div>
+  <div class="three">
+    <div class="card rv"><h3><span class="zh">手机上是 PWA</span><span class="en">A PWA on your phone</span></h3><p><span class="zh">加到主屏后全屏打开，和原生 App 一样。重要的事推送到锁屏，不用应用商店，也不用你自己申请推送账号。服务器一更新，下次打开就是新版本。</span><span class="en">From the home screen it opens full screen, like a native app. What matters is pushed to the lock screen, with no app store and no push account of your own. Ship the server and the next open is the new version.</span></p><div class="tags"><span>iOS</span><span>Android</span><span>Web Push</span></div></div>
+    <div class="card rv"><h3><span class="zh">客户端超轻</span><span class="en">A featherweight client</span></h3><p><span class="zh">打开一次只下载约 270 KB（压缩后）。终端、远程桌面这些重的部分用到才加载，弱网下也能很快打开、点一下就有反应。</span><span class="en">About 270 KB (gzipped) on first open. The heavy parts, like the terminal and remote desktop, load only when used, so it opens fast and answers taps even on a weak network.</span></p><div class="tags"><span>~270 KB</span><span>React</span><span>lazy‑loaded</span></div></div>
+    <div class="card rv"><h3><span class="zh">服务端高性能</span><span class="en">A high‑performance server</span></h3><p><span class="zh">服务端用 Elixir / Phoenix，跑在专为电信系统打造的 BEAM 虚拟机上：每个会话是一个独立的轻量进程，几十个会话、员工、设备同时跑互不拖累，消息通过 WebSocket 实时推到每个打开的页面。</span><span class="en">Elixir / Phoenix on the BEAM, the VM built for telecom switches: each session is its own lightweight process, so dozens of chats, employees and devices run side by side without slowing each other, and every update streams live over WebSocket to every open page.</span></p><div class="tags"><span>Elixir</span><span>Phoenix</span><span>BEAM</span><span>WebSocket</span></div></div>
+  </div>
 </div></section>
 
 <section id="why"><div class="wrap">
