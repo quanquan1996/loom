@@ -274,6 +274,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
     <a class="brand" href="#"><img src="favicon.svg" alt="">Loom</a>
     <div class="links">
       <a href="#features"><span class="zh">功能</span><span class="en">Features</span></a>
+      <a href="#parallel"><span class="zh">并行会话</span><span class="en">Parallel chats</span></a>
       <a href="#reply"><span class="zh">点选回复</span><span class="en">Tap to reply</span></a>
       <a href="#restart"><span class="zh">重启不断线</span><span class="en">Restart‑proof</span></a>
       <a href="#sleep"><span class="zh">睡眠</span><span class="en">Sleep</span></a>
@@ -288,7 +289,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
 <header class="hero">
   <canvas id="threads"></canvas>
   <div class="wrap">
-    <span class="pill rv"><b>NEW</b><span class="zh">点一下就回复 · 智能体的铃铛 · 草稿跨设备</span><span class="en">Tap‑to‑reply · The bell · Drafts on every device</span></span>
+    <span class="pill rv"><b>v0.4</b><span class="zh">Working · 在新会话里接着做 · 无痕会话 · Android</span><span class="en">Working · Continue in a new chat · Incognito · Android</span></span>
     <h1 class="rv">
       <span class="zh">把 AI 编程智能体<br><span class="grad">织进你的每一台设备</span></span>
       <span class="en">Weave your coding agents<br><span class="grad">into every device you own</span></span>
@@ -360,7 +361,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
       <div><b class="grad">3</b><span class="zh">智能体后端：Claude Code / Codex / Kiro</span><span class="en">agent backends: Claude Code, Codex, Kiro</span></div>
       <div><b><span class="count" data-to="2">0</span>s</b><span class="zh">常驻进程，回复起步约 2 秒（冷启动约 10 秒）</span><span class="en">first token with a warm process (10s cold)</span></div>
       <div><b>0</b><span class="zh">服务器重启时丢掉的回合</span><span class="en">turns lost when Loom restarts</span></div>
-      <div><b><span class="count" data-to="5">0</span>+</b><span class="zh">设备类型：Mac / Windows / Linux / WSL / 手机</span><span class="en">device kinds: Mac, Windows, Linux, WSL, phone</span></div>
+      <div><b><span class="count" data-to="5">0</span>+</b><span class="zh">设备类型：Mac / Windows / Linux / WSL / Android</span><span class="en">device kinds: Mac, Windows, Linux, WSL, Android</span></div>
       <div><b><span class="count" data-to="25">0</span>k</b><span class="zh">行代码，3 个月，大部分由 Loom 里的智能体写成</span><span class="en">lines in 3 months, mostly written by agents inside Loom</span></div>
     </div>
   </div>
@@ -425,6 +426,34 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
         <div class="ico">⌘</div>
         <h3><span class="zh">Vim 键位</span><span class="en">Vim keys</span></h3>
         <p><span class="zh"><code class="mono">i</code> 输入，<code class="mono">j/k</code> 滚动，空格作为 Leader 键切换面板，<code class="mono">?</code> 查看全部快捷键。还能调字号、深浅色主题和思考强度。</span><span class="en"><code class="mono">i</code> to type, <code class="mono">j/k</code> to scroll, Space as leader for panes, <code class="mono">?</code> for the list. Plus text size, themes and a thinking slider.</span></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="parallel">
+  <div class="wrap spot">
+    <div class="txt">
+      <div class="eyebrow rv">Working · Continue · Incognito</div>
+      <h2 class="rv"><span class="zh">同时开好几个会话，<br><span class="grad">脑子也跟得上。</span></span><span class="en">Many chats at once,<br><span class="grad">and you still keep up.</span></span></h2>
+      <p class="sub rv"><span class="zh">一边让它修 bug，一边让它查资料，再开一个问个快问题。Loom 把正在进行的放在最上面，做完的一键收起；一个会话走不下去，就在新会话里接着做。</span><span class="en">One chat fixes a bug, another digs into research, a third answers a quick question. Loom keeps what's in flight on top and puts the finished away in one tap; when a chat can't go on, carry it on in a new one.</span></p>
+      <div class="points rv">
+        <div><span><b>Working</b> — <span class="zh">最近一小时用过的会话排在 Recents 上面，直到你标 Done；手机上从输入框下方拉出卡片，左右滑切换、上滑完成，10 分钟没回会自动写一段进展</span><span class="en">chats used in the last hour sit above Recents until you mark them Done; on a phone, cards from under the composer — swipe to switch, throw up for Done, with a recap after ten quiet minutes</span></span></div>
+        <div><span><b><span class="zh">在新会话里接着做</span><span class="en">Continue in a new chat</span></b> — <span class="zh">fork 原会话，或让新会话先把旧的读一遍（连同它产出的文件）；被安全分类器拦下的会话也能一键接着做</span><span class="en">fork it, or have the new chat read the old one first — files it made included; a chat stopped by a safety classifier continues in one tap</span></span></div>
+        <div><span><b><span class="zh">无痕会话</span><span class="en">Incognito</span></b> — <span class="zh">沙箱里跑，不进 Recents、不写记忆和项目，30 天后自动删除；适合零散的快问快答</span><span class="en">sandboxed, out of Recents, never touches memory or projects, gone after 30 days — for quick one‑offs</span></span></div>
+        <div><span><b><span class="zh">按会话选模型</span><span class="en">A model per chat</span></b> — <span class="zh">在顶栏切换 Claude Code / Codex / Kiro，每一轮都标出是谁答的</span><span class="en">switch Claude Code / Codex / Kiro from the header; every turn says who answered</span></span></div>
+      </div>
+    </div>
+    <div class="viz rv">
+      <div class="bell">
+        <div class="hd"><span class="dot"></span>Working</div>
+        <div class="nt on"><span class="pr p0">●</span><span class="w"><span class="zh">修复手机顶栏模糊</span><span class="en">Fix the blurred phone header</span><small><span class="zh">正在跑测试…</span><span class="en">running the tests…</span></small></span><span class="tag">Claude</span></div>
+        <div class="nt on"><span class="pr p3">●</span><span class="w"><span class="zh">竞品周报</span><span class="en">Competitor weekly</span><small><span class="zh">等你回答：要不要加 Gemini？</span><span class="en">waiting on you: add Gemini?</span></small></span><span class="tag">Codex</span></div>
+        <div class="nt on"><span class="pr p7">✓</span><span class="w"><span class="zh">家里路由器接入节点</span><span class="en">Home router as a node</span><small><span class="zh">已完成 · 上滑收起</span><span class="en">done · throw up to put away</span></small></span><span class="tag">Done</span></div>
+      </div>
+      <div class="ask">
+        <div class="bub"><span class="zh">这个会话被拦下了，要在新会话里接着做吗？</span><span class="en">This chat was stopped. Continue in a new one?</span></div>
+        <div class="rcomp"><span class="tx"><span class="zh">↪ Continue · 新会话已读完旧会话和它的 3 个文件</span><span class="en">↪ Continue · the new chat read the old one and its 3 files</span></span><span class="send">↑</span></div>
       </div>
     </div>
   </div>
@@ -517,11 +546,13 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
     <div class="txt">
       <div class="eyebrow rv">Virtual employees</div>
       <h2 class="rv"><span class="zh">招一个 AI 员工，<br><span class="grad">给它 KPI 和预算。</span></span><span class="en">Hire an AI employee.<br><span class="grad">Give it KPIs and a budget.</span></span></h2>
-      <p class="sub rv"><span class="zh">只要 Loom 开着，它就一直在干活：靠心跳定时醒来，推进你给的 KPI，每天写日报、每周写周报，需要你的时候才推送提醒。</span><span class="en">It works whenever Loom is up: a heartbeat wakes it, it pushes your KPIs forward, writes daily and weekly reports, and pings you only when it needs you.</span></p>
+      <p class="sub rv"><span class="zh">只要 Loom 开着，它就一直在干活：靠心跳定时醒来，推进你给的 KPI，每周交一份周报，需要你的时候才摇铃铛。</span><span class="en">It works whenever Loom is up: a heartbeat wakes it, it pushes your KPIs forward, writes a weekly report, and rings the bell only when it needs you.</span></p>
       <div class="points rv">
         <div><span><b><span class="zh">靠心跳，不靠死循环</span><span class="en">A heartbeat, not a loop</span></b> — <span class="zh">每次醒来只跑一个回合，结尾附一张"工作卡"，写明下次什么时候醒</span><span class="en">one turn per wake‑up, ending in a work card that says when to wake next</span></span></div>
         <div><span><b><span class="zh">硬性预算</span><span class="en">Hard budget</span></b> — <span class="zh">按每回合的真实花费累计，当天额度用完就停，并通知你一次</span><span class="en">counts real per‑turn cost; spent means stop, and one notification</span></span></div>
         <div><span><b><span class="zh">任选模型</span><span class="en">Any backend</span></b> — <span class="zh">Claude Code（Opus）、Kiro 或 Codex</span><span class="en">Claude Code on Opus, Kiro, or Codex</span></span></div>
+        <div><span><b><span class="zh">共用一份老板档案</span><span class="en">One boss profile for all</span></b> — <span class="zh">你跟任何一个员工说过的规矩（语言、禁区），所有员工立刻都知道</span><span class="en">a rule you tell one employee — language, what's off limits — every employee knows at once</span></span></div>
+        <div><span><b><span class="zh">工位</span><span class="en">A workstation</span></b> — <span class="zh">把员工安排在你的某台电脑上干活，由 hook 强制，不会越界</span><span class="en">seat an employee on one of your computers, enforced by a hook</span></span></div>
       </div>
     </div>
     <div class="viz rv" id="eviz">
@@ -538,7 +569,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
 <div class="workcard">```employee-card
 { <span class="k">"next"</span>: <span class="s">"sleep"</span>, <span class="k">"wake_at"</span>: <span class="s">"2026-10-29 14:30"</span>,
   <span class="k">"kpis"</span>: [{ <span class="k">"id"</span>: <span class="s">"k_oss"</span>, <span class="k">"progress"</span>: <span class="n">85</span>, <span class="k">"status"</span>: <span class="s">"doing"</span> }],
-  <span class="k">"report"</span>: { <span class="k">"level"</span>: <span class="s">"important"</span>,
+  <span class="k">"report"</span>: { <span class="k">"priority"</span>: <span class="n">4</span>,
     <span class="k">"text"</span>: <span class="s">"Found 2 new repos worth a look"</span> } }
 ```</div>
     </div>
@@ -550,7 +581,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
     <div class="txt">
       <div class="eyebrow rv">loom‑node</div>
       <h2 class="rv"><span class="zh">服务器不是你的电脑，<br><span class="grad">但你的电脑可以接进来。</span></span><span class="en">The server isn't your computer.<br><span class="grad">Your computers can join it.</span></span></h2>
-      <p class="sub rv"><span class="zh">让智能体从你的笔记本里取一份文档，在服务器上处理完，再放回原处。设备连接状态在侧边栏里实时显示。</span><span class="en">Have an agent fetch a document from your laptop, work on it on the server, and put the result back. Devices show live in the sidebar.</span></p>
+      <p class="sub rv"><span class="zh">让智能体从你的笔记本里取一份文档，在服务器上处理完，再放回原处。设备连接状态在侧边栏里实时显示。Android 手机装一个 APK 也能接进来，智能体能看屏幕、点按、输入。</span><span class="en">Have an agent fetch a document from your laptop, work on it on the server, and put the result back. Devices show live in the sidebar. An Android phone joins with one APK, and the agent can see the screen, tap and type.</span></p>
       <div class="points rv">
         <div><span><b><span class="zh">只向外连接</span><span class="en">Outbound only</span></b> — <span class="zh">设备本地不监听任何端口</span><span class="en">nothing listens on the device</span></span></div>
         <div><span><b><span class="zh">每台设备一个令牌</span><span class="en">One token per device</span></b> — <span class="zh">服务器只存哈希，删除设备即吊销</span><span class="en">stored only as a hash; removing the device revokes it</span></span></div>
@@ -571,7 +602,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
         <div class="node" style="left:18%;top:21%"><div class="box"></div>MacBook</div>
         <div class="node" style="left:82%;top:21%"><div class="box">🪟</div>Windows</div>
         <div class="node" style="left:18%;top:82%"><div class="box">🐧</div>Linux / WSL</div>
-        <div class="node" style="left:82%;top:82%"><div class="box">📱</div>iPhone</div>
+        <div class="node" style="left:82%;top:82%"><div class="box">🤖</div>Android</div>
         <div class="node srv" style="left:50%;top:50%"><div class="box"><img src="favicon.svg" alt=""></div><b style="color:var(--fg)">Loom</b></div>
       </div>
     </div>
@@ -584,20 +615,20 @@ footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
       <div>
         <div class="eyebrow">Built inside itself</div>
         <h2 style="font-size:clamp(28px,3.6vw,42px)"><span class="zh">Loom 是在 Loom 里<br><span class="grad">由智能体写出来的。</span></span><span class="en">Loom is built<br><span class="grad">by agents, inside Loom.</span></span></h2>
-        <p class="sub"><span class="zh">提需求、写代码、跑测试、部署、重启，再接回自己的回合，整个过程都在 Loom 的会话里完成。睡眠、虚拟员工、重启不断线、点选回复、铃铛，都是在手机上一句话提出来，当天就上线的。<b style="color:var(--fg)">这个页面也是。</b></span><span class="en">Ask, code, test, deploy, restart, and adopt its own turn back — all from a Loom session. Sleep, virtual employees, restart‑proof turns, tap‑to‑reply and the bell each went from one sentence on a phone to production the same day. <b style="color:var(--fg)">So did this page.</b></span></p>
+        <p class="sub"><span class="zh">提需求、写代码、跑测试、部署、重启，再接回自己的回合，整个过程都在 Loom 的会话里完成。睡眠、虚拟员工、重启不断线、点选回复、铃铛、Working、无痕会话，都是在手机上一句话提出来，当天就上线的。<b style="color:var(--fg)">这个页面也是。</b></span><span class="en">Ask, code, test, deploy, restart, and adopt its own turn back — all from a Loom session. Sleep, virtual employees, restart‑proof turns, tap‑to‑reply, the bell, Working and incognito each went from one sentence on a phone to production the same day. <b style="color:var(--fg)">So did this page.</b></span></p>
       </div>
       <div class="commits">
-        <div><span>2ae9253</span>Sidebar: the bell takes Search's place; Search is gone</div>
+        <div><span>a39cfa7</span>Taps answer at once: new chat opens before the server has it</div>
+        <div><span>5eca386</span>Android node: screen control and `loom-node control`</div>
+        <div><span>c1b205a</span>Working: the phone's switcher under the composer, thrown up for Done</div>
+        <div><span>5fb6eac</span>Working: sessions used in the last hour sit above Recents until Done</div>
+        <div><span>44ffb2d</span>Incognito sessions: sandboxed, out of Recents, gone after 30 days</div>
+        <div><span>90f9586</span>Continue in a new chat: carry a session on by fork or by reading it</div>
+        <div><span>e43c661</span>Per-session model: pick it from the header, see who answered each turn</div>
+        <div><span>40b3712</span>Projects open a page of their own: Files and Sessions tabs</div>
         <div><span>cdd104d</span>The bell: notices by priority, posted by agents</div>
-        <div><span>01ffa05</span>Chat: several questions at once, a page each, picks as numbered lines</div>
-        <div><span>385027a</span>Chat: keep each session's unsent draft on this device and the server</div>
-        <div><span>c2408b1</span>Chat: choice card for suggested replies, glass composer and header</div>
-        <div><span>0e12c21</span>Text size in Settings, a shaded sidebar foot, and an unread mark</div>
-        <div><span>9534f2b</span>Messages that do not get through stay, with a red "!" to resend them</div>
         <div><span>8fe773b</span>Agent turns that carry on through a restart, and are taken back after it</div>
-        <div><span>28c2e7e</span>Sleep, virtual employees, and Kiro CLI as a third backend</div>
-        <div><span>e999446</span>loom-node: native Windows devices</div>
-        <div style="color:var(--dim)"><span style="color:var(--dim)">…</span>149 commits since 2026‑07‑29</div>
+        <div style="color:var(--dim)"><span style="color:var(--dim)">…</span>236 commits since 2026‑07‑29</div>
       </div>
     </div>
   </div>
