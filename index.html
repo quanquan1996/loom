@@ -121,17 +121,15 @@ footer .wrap{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .rail{position:fixed;z-index:55;left:22px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:2px;padding:8px;border-radius:22px;background:#0b0b0dcc;border:1px solid var(--line);backdrop-filter:blur(20px) saturate(1.6);-webkit-backdrop-filter:blur(20px) saturate(1.6)}
 .rail a{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:14px;color:var(--dim);font-size:13px;white-space:nowrap;transition:color .2s,background .2s}
 .rail a i{width:6px;height:6px;border-radius:50%;background:currentColor;flex:none;transition:transform .2s}
-.rail .lb{max-width:0;overflow:hidden;opacity:0;transition:max-width .3s,opacity .2s}
-.rail:hover .lb,.rail a.on .lb{max-width:120px;opacity:1}
+.rail .lb{white-space:nowrap}
 .rail a:hover{color:var(--fg);background:var(--card2)}
 .rail a.on{color:var(--fg);background:var(--card2)}
 .rail a.on i{transform:scale(1.5);background:var(--fg)}
-@media(max-width:1220px){
+@media(max-width:1360px){
  .rail{left:50%;top:auto;bottom:calc(14px + env(safe-area-inset-bottom));transform:translateX(-50%);flex-direction:row;max-width:calc(100vw - 28px);overflow-x:auto;scrollbar-width:none;border-radius:999px;padding:5px}
  .rail::-webkit-scrollbar{display:none}
  .rail a{padding:8px 13px;border-radius:999px}
  .rail a i{display:none}
- .rail .lb,.rail:hover .lb{max-width:none;opacity:1}
  .rail a[data-s=top]{display:none}
  footer{padding-bottom:90px}
 }
@@ -146,7 +144,7 @@ html.zh .hx{letter-spacing:-.015em;line-height:1.1}
 .hx .s3 b{color:var(--fg);font-size:1.22em;font-weight:800;letter-spacing:-.03em}
 .sec{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px}
 .sec>span{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--mute)}
-.sec>span::before{content:"";width:14px;height:14px;border-radius:50%;background:var(--ok) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 8.5l2.5 2.5L12 5.5' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/12px no-repeat}
+.sec>span::before{content:"";width:14px;height:14px;background:var(--fg);-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M4.5 10.5l3.5 3.5 7.5-8' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M4.5 10.5l3.5 3.5 7.5-8' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat}
 .sec>span+span{margin-left:8px}
 @media(max-width:900px){.sec{justify-content:center}}
 .cmp{margin-top:44px;border-radius:24px;border:1px solid var(--line);background:linear-gradient(#ffffff06,#ffffff02);overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:thin}
@@ -163,14 +161,15 @@ html.zh .hx{letter-spacing:-.015em;line-height:1.1}
 .cmp thead .me img{width:22px;height:22px;display:block;margin:0 auto 6px}
 .cmp td small{display:block;font-size:11.5px;color:var(--dim);margin-top:4px;line-height:1.35}
 .cmp .me small{color:var(--mute)}
-.y,.p,.n{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;font-size:12px;font-weight:700;line-height:1}
-.y{background:var(--ok);color:#000}
-.me .y{background:#fff;color:#000;box-shadow:0 0 0 4px #ffffff1c}
-.p{border:1.5px solid #ff9f0a;color:#ff9f0a}
-.n{color:#5a5a63;font-weight:400;font-size:16px}
+.y,.p,.n{display:inline-block;width:20px;height:20px;vertical-align:middle}
+.y,.p{background:currentColor;-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M4.5 10.5l3.5 3.5 7.5-8' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M4.5 10.5l3.5 3.5 7.5-8' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat}
+.y{color:var(--mute)}
+.me .y{color:var(--fg)}
+.p{color:#4a4a52}
+.n{width:10px;height:1.5px;background:#3a3a41;border-radius:1px}
 .legend{display:flex;gap:18px;justify-content:center;margin-top:18px;font-size:13px;color:var(--dim);flex-wrap:wrap}
 .legend span{display:inline-flex;gap:7px;align-items:center}
-.legend .y,.legend .p,.legend .n{width:18px;height:18px;font-size:10px}
+.legend .y,.legend .p{width:16px;height:16px}
 .swipe{display:none;text-align:center;color:var(--dim);font-size:12.5px;margin-top:10px}
 @media(max-width:1000px){.swipe{display:block}}
 .cmp thead th{white-space:nowrap}
@@ -315,18 +314,18 @@ html.zh .hx{letter-spacing:-.015em;line-height:1.1}
   <div class="cmp rv"><table>
     <thead><tr><th></th><th class="me"><img src="favicon.svg" alt="">Loom<small><span class="zh">你的服务器</span><span class="en">your server</span></small></th><th>Claude<small><span class="zh">Anthropic</span><span class="en">Anthropic</span></small></th><th>Codex<small>OpenAI</small></th><th>Gemini<small>Google</small></th><th>Grok Bot<small>xAI</small></th><th>WorkBuddy<small><span class="zh">腾讯</span><span class="en">Tencent</span></small></th><th><span class="zh">豆包</span><span class="en">Doubao</span><small><span class="zh">字节</span><span class="en">ByteDance</span></small></th><th>Meta Muse<small>Meta</small></th></tr></thead>
     <tbody>
-<tr><th><span class="zh">浏览器打开就能用</span><span class="en">Works in a browser</span></th><td class="me"><span class="y">✓</span><small><span class="zh">手机装成 PWA</span><span class="en">PWA on the phone</span></small></td><td><span class="y">✓</span><small><span class="zh">另有 App</span><span class="en">plus apps</span></small></td><td><span class="y">✓</span><small><span class="zh">另有 App</span><span class="en">plus apps</span></small></td><td><span class="y">✓</span><small><span class="zh">另有 App</span><span class="en">plus apps</span></small></td><td><span class="y">✓</span><small><span class="zh">另有 App</span><span class="en">plus apps</span></small></td><td><span class="n">—</span><small><span class="zh">桌面客户端</span><span class="en">desktop client</span></small></td><td><span class="y">✓</span><small><span class="zh">另有 App</span><span class="en">plus apps</span></small></td><td><span class="p">◐</span><small><span class="zh">主要在 WhatsApp</span><span class="en">mostly WhatsApp</span></small></td></tr>
-<tr><th><span class="zh">跑在你自己的服务器</span><span class="en">Runs on your own server</span></th><td class="me"><span class="y">✓</span></td><td><span class="p">◐</span><small><span class="zh">自托管 runner 公测</span><span class="en">self‑hosted runner beta</span></small></td><td><span class="p">◐</span><small><span class="zh">可连本机</span><span class="en">can use your PC</span></small></td><td><span class="n">—</span></td><td><span class="n">—</span></td><td><span class="p">◐</span><small><span class="zh">本机 + 云沙箱</span><span class="en">PC + cloud sandbox</span></small></td><td><span class="p">◐</span><small><span class="zh">可连本机</span><span class="en">can use your PC</span></small></td><td><span class="n">—</span></td></tr>
-<tr><th><span class="zh">模型随时换</span><span class="en">Switch models</span></th><td class="me"><span class="y">✓</span><small><span class="zh">Claude Code · Codex · Kiro</span><span class="en">Claude Code · Codex · Kiro</span></small></td><td><span class="n">—</span></td><td><span class="n">—</span></td><td><span class="n">—</span></td><td><span class="n">—</span></td><td><span class="y">✓</span><small><span class="zh">多模型</span><span class="en">several</span></small></td><td><span class="n">—</span></td><td><span class="n">—</span></td></tr>
-<tr><th><span class="zh">不绑厂家账号</span><span class="en">No vendor account</span></th><td class="me"><span class="y">✓</span><small><span class="zh">agent 用你自己的登录</span><span class="en">agents use your own login</span></small></td><td><span class="n">—</span></td><td><span class="n">—</span></td><td><span class="n">—</span></td><td><span class="n">—</span></td><td><span class="n">—</span></td><td><span class="n">—</span></td><td><span class="n">—</span></td></tr>
-<tr><th><span class="zh">接你的电脑和手机</span><span class="en">Your computers & phone</span></th><td class="me"><span class="y">✓</span><small><span class="zh">Mac · Win · Linux · Android</span><span class="en">Mac · Win · Linux · Android</span></small></td><td><span class="p">◐</span><small><span class="zh">自托管机器</span><span class="en">self‑hosted hosts</span></small></td><td><span class="y">✓</span><small><span class="zh">Mac / Windows</span><span class="en">Mac / Windows</span></small></td><td><span class="p">◐</span><small><span class="zh">Mac</span><span class="en">Mac</span></small></td><td><span class="n">—</span></td><td><span class="p">◐</span><small><span class="zh">本机</span><span class="en">this PC</span></small></td><td><span class="y">✓</span><small><span class="zh">最多 7 台电脑</span><span class="en">up to 7 PCs</span></small></td><td><span class="n">—</span></td></tr>
-<tr><th><span class="zh">接家里的灯、摄像头</span><span class="en">Home lights & cameras</span></th><td class="me"><span class="y">✓</span><small><span class="zh">写个 skill</span><span class="en">add a skill</span></small></td><td><span class="n">—</span></td><td><span class="n">—</span></td><td><span class="n">—</span></td><td><span class="n">—</span></td><td><span class="n">—</span></td><td><span class="n">—</span></td><td><span class="n">—</span></td></tr>
-<tr><th><span class="zh">数据全在你手里</span><span class="en">Your data stays yours</span></th><td class="me"><span class="y">✓</span></td><td><span class="n">—</span></td><td><span class="n">—</span></td><td><span class="n">—</span></td><td><span class="n">—</span></td><td><span class="p">◐</span><small><span class="zh">本机 + 云</span><span class="en">local + cloud</span></small></td><td><span class="n">—</span></td><td><span class="n">—</span></td></tr>
-<tr><th><span class="zh">开源</span><span class="en">Open source</span></th><td class="me"><span class="y">✓</span><small><span class="zh">MIT</span><span class="en"></span></small></td><td><span class="n">—</span></td><td><span class="n">—</span></td><td><span class="n">—</span></td><td><span class="n">—</span></td><td><span class="n">—</span></td><td><span class="n">—</span></td><td><span class="n">—</span></td></tr>
+<tr><th><span class="zh">浏览器打开就能用</span><span class="en">Works in a browser</span></th><td class="me"><span class="y"></span><small><span class="zh">手机装成 PWA</span><span class="en">PWA on the phone</span></small></td><td><span class="y"></span><small><span class="zh">另有 App</span><span class="en">plus apps</span></small></td><td><span class="y"></span><small><span class="zh">另有 App</span><span class="en">plus apps</span></small></td><td><span class="y"></span><small><span class="zh">另有 App</span><span class="en">plus apps</span></small></td><td><span class="y"></span><small><span class="zh">另有 App</span><span class="en">plus apps</span></small></td><td><span class="n"></span><small><span class="zh">桌面客户端</span><span class="en">desktop client</span></small></td><td><span class="y"></span><small><span class="zh">另有 App</span><span class="en">plus apps</span></small></td><td><span class="p"></span><small><span class="zh">主要在 WhatsApp</span><span class="en">mostly WhatsApp</span></small></td></tr>
+<tr><th><span class="zh">跑在你自己的服务器</span><span class="en">Runs on your own server</span></th><td class="me"><span class="y"></span></td><td><span class="p"></span><small><span class="zh">自托管 runner 公测</span><span class="en">self‑hosted runner beta</span></small></td><td><span class="p"></span><small><span class="zh">可连本机</span><span class="en">can use your PC</span></small></td><td><span class="n"></span></td><td><span class="n"></span></td><td><span class="p"></span><small><span class="zh">本机 + 云沙箱</span><span class="en">PC + cloud sandbox</span></small></td><td><span class="p"></span><small><span class="zh">可连本机</span><span class="en">can use your PC</span></small></td><td><span class="n"></span></td></tr>
+<tr><th><span class="zh">模型随时换</span><span class="en">Switch models</span></th><td class="me"><span class="y"></span><small><span class="zh">Claude Code · Codex · Kiro</span><span class="en">Claude Code · Codex · Kiro</span></small></td><td><span class="n"></span></td><td><span class="n"></span></td><td><span class="n"></span></td><td><span class="n"></span></td><td><span class="y"></span><small><span class="zh">多模型</span><span class="en">several</span></small></td><td><span class="n"></span></td><td><span class="n"></span></td></tr>
+<tr><th><span class="zh">不绑厂家账号</span><span class="en">No vendor account</span></th><td class="me"><span class="y"></span><small><span class="zh">agent 用你自己的登录</span><span class="en">agents use your own login</span></small></td><td><span class="n"></span></td><td><span class="n"></span></td><td><span class="n"></span></td><td><span class="n"></span></td><td><span class="n"></span></td><td><span class="n"></span></td><td><span class="n"></span></td></tr>
+<tr><th><span class="zh">接你的电脑和手机</span><span class="en">Your computers & phone</span></th><td class="me"><span class="y"></span><small><span class="zh">Mac · Win · Linux · Android</span><span class="en">Mac · Win · Linux · Android</span></small></td><td><span class="p"></span><small><span class="zh">自托管机器</span><span class="en">self‑hosted hosts</span></small></td><td><span class="y"></span><small><span class="zh">Mac / Windows</span><span class="en">Mac / Windows</span></small></td><td><span class="p"></span><small><span class="zh">Mac</span><span class="en">Mac</span></small></td><td><span class="n"></span></td><td><span class="p"></span><small><span class="zh">本机</span><span class="en">this PC</span></small></td><td><span class="y"></span><small><span class="zh">最多 7 台电脑</span><span class="en">up to 7 PCs</span></small></td><td><span class="n"></span></td></tr>
+<tr><th><span class="zh">接家里的灯、摄像头</span><span class="en">Home lights & cameras</span></th><td class="me"><span class="y"></span><small><span class="zh">写个 skill</span><span class="en">add a skill</span></small></td><td><span class="n"></span></td><td><span class="n"></span></td><td><span class="n"></span></td><td><span class="n"></span></td><td><span class="n"></span></td><td><span class="n"></span></td><td><span class="n"></span></td></tr>
+<tr><th><span class="zh">数据全在你手里</span><span class="en">Your data stays yours</span></th><td class="me"><span class="y"></span></td><td><span class="n"></span></td><td><span class="n"></span></td><td><span class="n"></span></td><td><span class="n"></span></td><td><span class="p"></span><small><span class="zh">本机 + 云</span><span class="en">local + cloud</span></small></td><td><span class="n"></span></td><td><span class="n"></span></td></tr>
+<tr><th><span class="zh">开源</span><span class="en">Open source</span></th><td class="me"><span class="y"></span><small><span class="zh">MIT</span><span class="en"></span></small></td><td><span class="n"></span></td><td><span class="n"></span></td><td><span class="n"></span></td><td><span class="n"></span></td><td><span class="n"></span></td><td><span class="n"></span></td><td><span class="n"></span></td></tr>
     </tbody>
   </table></div>
   <div class="swipe"><span class="zh">← 左右滑动看全部 →</span><span class="en">← swipe for more →</span></div>
-  <div class="legend"><span><span class="y">✓</span><span class="zh">有</span><span class="en">Yes</span></span><span><span class="p">◐</span><span class="zh">部分 / 测试中</span><span class="en">Partly / beta</span></span><span><span class="n">—</span><span class="zh">没有</span><span class="en">No</span></span></div>
+  <div class="legend"><span><span class="y"></span><span class="zh">有</span><span class="en">Yes</span></span><span><span class="p"></span><span class="zh">部分 / 测试中</span><span class="en">Partly / beta</span></span><span><span class="n"></span><span class="zh">没有</span><span class="en">No</span></span></div>
   <p class="note rv"><span class="zh">竞品信息来自各家 2026 年公开的发布说明和报道，截至 2026‑11；只比功能和形态。</span><span class="en">Competitor details from public release notes and press in 2026, as of 2026‑11; features and form only.</span></p>
 </div></section>
 
@@ -371,7 +370,7 @@ function demo(reset){T.forEach(clearTimeout);T=[];if(reset)box.innerHTML='';cons
 demo(true);
 
 const rl=[...document.querySelectorAll('.rail a')];
-const so=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){rl.forEach(a=>a.classList.toggle('on',a.dataset.s===e.target.id));const on=rl.find(a=>a.dataset.s===e.target.id);if(on&&innerWidth<=1220)on.scrollIntoView({inline:'center',block:'nearest',behavior:'smooth'})}}),{rootMargin:'-45% 0px -50% 0px'});
+const so=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){rl.forEach(a=>a.classList.toggle('on',a.dataset.s===e.target.id));const on=rl.find(a=>a.dataset.s===e.target.id);if(on&&innerWidth<=1360)on.scrollIntoView({inline:'center',block:'nearest',behavior:'smooth'})}}),{rootMargin:'-45% 0px -50% 0px'});
 rl.forEach(a=>{const t=document.getElementById(a.dataset.s);if(t)so.observe(t)});
 </script>
 </body>
