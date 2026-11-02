@@ -116,6 +116,15 @@ footer .wrap{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .rv{opacity:0;transform:translateY(14px);transition:opacity .7s,transform .7s}
 .rv.in{opacity:1;transform:none}
 @media(prefers-reduced-motion:reduce){.rv,.m{opacity:1!important;transform:none!important;transition:none}}
+.cmp{overflow-x:auto;margin-top:40px;border:1px solid var(--line);border-radius:18px;-webkit-overflow-scrolling:touch}
+.cmp table{border-collapse:collapse;width:100%;min-width:900px;font-size:14px}
+.cmp th,.cmp td{padding:13px 14px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line);color:var(--mute)}
+.cmp tr:last-child td{border-bottom:0}
+.cmp thead th{color:var(--fg);font-weight:600;background:var(--card)}
+.cmp tbody th{color:var(--fg);font-weight:500;white-space:nowrap;position:sticky;left:0;background:#0b0b0d}
+.cmp .me{color:var(--fg);background:var(--card2);font-weight:600}
+.free{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:28px}
+.free span{padding:8px 14px;border:1px solid var(--line2);border-radius:999px;font-size:14px;color:var(--fg)}
 </style>
 </head>
 <body>
@@ -128,6 +137,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
     <a href="#why"><span class="zh">理念</span><span class="en">Ideas</span></a>
     <a href="#phone"><span class="zh">手机上</span><span class="en">On a phone</span></a>
     <a href="#always"><span class="zh">一直在</span><span class="en">Always on</span></a>
+    <a href="#vs"><span class="zh">对比</span><span class="en">Compare</span></a>
     <a href="#run"><span class="zh">跑起来</span><span class="en">Run it</span></a>
   </div>
   <button class="lang" id="lang">EN</button>
@@ -252,6 +262,29 @@ footer .wrap{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
     <div><span>28c2e7e</span>Sleep, virtual employees, and Kiro CLI</div>
     <div style="color:var(--dim)">… 236 commits since 2026‑07‑29</div>
   </div>
+</div></section>
+
+<section id="vs"><div class="wrap">
+  <div class="center">
+    <div class="eyebrow rv">No lock‑in</div>
+    <h2 class="rv"><span class="zh">不绑任何厂家。<br><span class="soft">机器、数据、模型都是你的。</span></span><span class="en">Tied to no vendor.<br><span class="soft">Your machines, your data, your models.</span></span></h2>
+    <p class="sub rv"><span class="zh">Loom 不调任何模型 API，也不需要任何云服务账号：哪个 agent 命令行好用就用哪个，随时换；任何一台 Linux 都能当服务器；推送走浏览器标准的 Web Push。</span><span class="en">Loom calls no model API and needs no cloud account: use whichever agent CLI is best and switch any time; any Linux box is a server; push is the browser’s standard Web Push.</span></p>
+    <div class="free rv"><span><span class="zh">不绑模型</span><span class="en">No model lock‑in</span></span><span><span class="zh">不绑云</span><span class="en">No cloud lock‑in</span></span><span><span class="zh">不需要厂家账号</span><span class="en">No vendor account</span></span><span><span class="zh">不用应用商店</span><span class="en">No app store</span></span><span>MIT</span></div>
+  </div>
+  <div class="cmp rv"><table>
+    <thead><tr><th></th><th class="me">Loom</th><th>Claude</th><th>Codex</th><th>Gemini</th><th>Grok Bot</th><th>WorkBuddy</th><th><span class="zh">豆包</span><span class="en">Doubao</span></th><th>Meta Muse</th></tr></thead>
+    <tbody>
+<tr><th><span class="zh">怎么用</span><span class="en">How you use it</span></th><td class="me"><span class="zh">一个网址；手机加到主屏就是 App</span><span class="en">A URL; add to home screen</span></td><td><span class="zh">App + 网页</span><span class="en">Apps + web</span></td><td><span class="zh">ChatGPT / Codex App</span><span class="en">ChatGPT / Codex apps</span></td><td><span class="zh">App + 网页</span><span class="en">Apps + web</span></td><td><span class="zh">App + 网页</span><span class="en">Apps + web</span></td><td><span class="zh">桌面客户端 + App</span><span class="en">Desktop client + app</span></td><td><span class="zh">桌面 + 手机 App</span><span class="en">Desktop + phone apps</span></td><td><span class="zh">WhatsApp / Meta AI App</span><span class="en">WhatsApp / Meta AI</span></td></tr>
+<tr><th><span class="zh">跑在哪</span><span class="en">Runs where</span></th><td class="me"><span class="zh">你自己的服务器</span><span class="en">Your own server</span></td><td><span class="zh">厂家云（自托管 runner 公测）</span><span class="en">Vendor cloud (self‑hosted runner beta)</span></td><td><span class="zh">厂家云 + 你的电脑</span><span class="en">Vendor cloud + your computer</span></td><td><span class="zh">厂家云</span><span class="en">Vendor cloud</span></td><td><span class="zh">厂家云电脑</span><span class="en">Vendor cloud computer</span></td><td><span class="zh">你的电脑 + 厂家云沙箱</span><span class="en">Your computer + vendor sandbox</span></td><td><span class="zh">厂家云 + 你的电脑</span><span class="en">Vendor cloud + your computer</span></td><td><span class="zh">厂家云</span><span class="en">Vendor cloud</span></td></tr>
+<tr><th><span class="zh">模型</span><span class="en">Models</span></th><td class="me"><span class="zh">Claude Code / Codex / Kiro，每个会话随便换</span><span class="en">Claude Code / Codex / Kiro, per chat</span></td><td>Claude</td><td>OpenAI</td><td>Gemini</td><td>Grok</td><td><span class="zh">多模型</span><span class="en">Several</span></td><td><span class="zh">豆包</span><span class="en">Doubao</span></td><td>Meta</td></tr>
+<tr><th><span class="zh">账号</span><span class="en">Account</span></th><td class="me"><span class="zh">不需要任何厂家账号</span><span class="en">No vendor account</span></td><td>Anthropic</td><td>OpenAI</td><td>Google</td><td>xAI</td><td><span class="zh">腾讯</span><span class="en">Tencent</span></td><td><span class="zh">字节</span><span class="en">ByteDance</span></td><td>Meta</td></tr>
+<tr><th><span class="zh">接你的设备</span><span class="en">Your devices</span></th><td class="me"><span class="zh">Mac · Windows · Linux · Android，一行命令</span><span class="en">Mac · Windows · Linux · Android, one command</span></td><td><span class="zh">自托管机器</span><span class="en">Self‑hosted machines</span></td><td><span class="zh">Mac / Windows 主机</span><span class="en">Mac / Windows hosts</span></td><td><span class="zh">Mac（Spark）</span><span class="en">Mac (Spark)</span></td><td>—</td><td><span class="zh">本机；手机看电脑</span><span class="en">This PC; phone views it</span></td><td><span class="zh">电脑，最多 7 台</span><span class="en">Computers, up to 7</span></td><td>—</td></tr>
+<tr><th><span class="zh">家里的灯、摄像头…</span><span class="en">Lights, cameras…</span></th><td class="me"><span class="zh">写个 skill 就接上</span><span class="en">Add a skill</span></td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><th><span class="zh">数据在哪</span><span class="en">Your data</span></th><td class="me"><span class="zh">全在你的服务器</span><span class="en">All on your server</span></td><td><span class="zh">厂家</span><span class="en">Vendor</span></td><td><span class="zh">厂家</span><span class="en">Vendor</span></td><td><span class="zh">厂家</span><span class="en">Vendor</span></td><td><span class="zh">厂家</span><span class="en">Vendor</span></td><td><span class="zh">本机 + 厂家</span><span class="en">Local + vendor</span></td><td><span class="zh">厂家</span><span class="en">Vendor</span></td><td><span class="zh">厂家</span><span class="en">Vendor</span></td></tr>
+<tr><th><span class="zh">开源</span><span class="en">Open source</span></th><td class="me">MIT</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+    </tbody>
+  </table></div>
+  <p class="note rv"><span class="zh">竞品信息来自各家 2026 年公开的发布说明和报道，截至 2026‑11；只比功能和形态。</span><span class="en">Competitor details from public release notes and press in 2026, as of 2026‑11; features and form only.</span></p>
 </div></section>
 
 <section class="final center"><div class="wrap">
