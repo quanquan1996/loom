@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Loom — 一个对话框，管你的一切</title>
+<title>Loom — 一个安全的 Web 对话框，管你的一切</title>
 <meta name="description" content="Loom: one self-hosted chat for everything. Claude Code, Codex and Kiro on your server, reaching every computer, phone and home device you own — from your phone, in one sentence.">
 <meta property="og:title" content="Loom — One chat for everything">
 <meta property="og:description" content="Self-hosted, phone-first. Your coding agents, your computers, your phone, your home — all from one chat box.">
@@ -22,19 +22,14 @@ body{font-family:var(--sans);color:var(--fg);background:var(--bg);line-height:1.
 a{color:inherit;text-decoration:none}
 html.zh .en,html.en .zh{display:none!important}
 .wrap{max-width:1080px;margin:0 auto;padding:0 22px}
-nav{position:fixed;inset:0 0 auto;z-index:50;background:#000000b8;backdrop-filter:blur(20px) saturate(1.6);-webkit-backdrop-filter:blur(20px) saturate(1.6);border-bottom:1px solid var(--line)}
-nav .wrap{display:flex;align-items:center;height:56px;gap:24px}
 .brand{display:flex;align-items:center;gap:9px;font-weight:700;font-size:18px;letter-spacing:-.01em}
 .brand img{width:24px;height:24px}
-nav .links{display:flex;gap:20px;font-size:14px;color:var(--mute);margin-left:auto}
-nav .links a:hover{color:var(--fg)}
 .btn{display:inline-flex;align-items:center;gap:8px;padding:10px 20px;border-radius:999px;font-weight:600;font-size:15px;border:1px solid var(--line2);transition:.2s}
 .btn:hover{background:var(--card2)}
 .btn.primary{background:var(--fg);color:#000;border-color:var(--fg)}
 .btn.primary:hover{background:#fff}
 .btn.sm{padding:6px 14px;font-size:13px}
 .lang{cursor:pointer;font-size:13px;padding:6px 12px;border-radius:999px;border:1px solid var(--line2);color:var(--mute);background:none;font-family:inherit}
-@media(max-width:760px){nav .links{display:none}nav .lang{margin-left:auto}}
 .hero{padding:128px 0 40px}
 .hero .wrap{display:grid;grid-template-columns:1.15fr .85fr;gap:48px;align-items:center}
 @media(max-width:900px){.hero .wrap{grid-template-columns:1fr;gap:40px}.hero .txt{text-align:center}.hero .cta,.hero .chips{justify-content:center}}
@@ -116,39 +111,85 @@ footer .wrap{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .rv{opacity:0;transform:translateY(14px);transition:opacity .7s,transform .7s}
 .rv.in{opacity:1;transform:none}
 @media(prefers-reduced-motion:reduce){.rv,.m{opacity:1!important;transform:none!important;transition:none}}
-.cmp{overflow-x:auto;margin-top:40px;border:1px solid var(--line);border-radius:18px;-webkit-overflow-scrolling:touch}
-.cmp table{border-collapse:collapse;width:100%;min-width:900px;font-size:14px}
-.cmp th,.cmp td{padding:13px 14px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line);color:var(--mute)}
-.cmp tr:last-child td{border-bottom:0}
-.cmp thead th{color:var(--fg);font-weight:600;background:var(--card)}
-.cmp tbody th{color:var(--fg);font-weight:500;white-space:nowrap;position:sticky;left:0;background:#0b0b0d}
-.cmp .me{min-width:150px;color:var(--fg);background:var(--card2);font-weight:600}
 .free{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:28px}
 .free>span{padding:8px 14px;border:1px solid var(--line2);border-radius:999px;font-size:14px;color:var(--fg)}
+.corner{position:fixed;top:0;left:0;right:0;z-index:60;display:flex;align-items:center;justify-content:space-between;padding:14px 22px;pointer-events:none}
+.corner>*{pointer-events:auto}
+.corner .brand{padding:6px 14px 6px 8px;border-radius:999px;background:#0b0b0dcc;border:1px solid var(--line);backdrop-filter:blur(20px) saturate(1.6);-webkit-backdrop-filter:blur(20px) saturate(1.6)}
+.corner .cr{display:flex;gap:8px;align-items:center;padding:5px;border-radius:999px;background:#0b0b0dcc;border:1px solid var(--line);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
+.corner .lang{border:0}
+.rail{position:fixed;z-index:55;left:22px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:2px;padding:8px;border-radius:22px;background:#0b0b0dcc;border:1px solid var(--line);backdrop-filter:blur(20px) saturate(1.6);-webkit-backdrop-filter:blur(20px) saturate(1.6)}
+.rail a{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:14px;color:var(--dim);font-size:13px;white-space:nowrap;transition:color .2s,background .2s}
+.rail a i{width:6px;height:6px;border-radius:50%;background:currentColor;flex:none;transition:transform .2s}
+.rail .lb{max-width:0;overflow:hidden;opacity:0;transition:max-width .3s,opacity .2s}
+.rail:hover .lb,.rail a.on .lb{max-width:120px;opacity:1}
+.rail a:hover{color:var(--fg);background:var(--card2)}
+.rail a.on{color:var(--fg);background:var(--card2)}
+.rail a.on i{transform:scale(1.5);background:var(--fg)}
+@media(max-width:1220px){
+ .rail{left:50%;top:auto;bottom:calc(14px + env(safe-area-inset-bottom));transform:translateX(-50%);flex-direction:row;max-width:calc(100vw - 28px);overflow-x:auto;scrollbar-width:none;border-radius:999px;padding:5px}
+ .rail::-webkit-scrollbar{display:none}
+ .rail a{padding:8px 13px;border-radius:999px}
+ .rail a i{display:none}
+ .rail .lb,.rail:hover .lb{max-width:none;opacity:1}
+ .rail a[data-s=top]{display:none}
+ footer{padding-bottom:90px}
+}
+@media(max-width:520px){.corner{padding:10px 12px}}
+.hx{font-size:clamp(44px,6.2vw,78px);line-height:1.04;letter-spacing:-.035em;margin:22px 0 22px}
+html.zh .hx{letter-spacing:-.015em;line-height:1.1}
+.hx .s1{display:block;font-size:.42em;font-weight:600;color:var(--mute);letter-spacing:-.01em;margin-bottom:.25em}
+.hx .s1 mark{background:none;color:var(--fg);position:relative;z-index:0;padding:0 .08em}
+.hx .s1 mark::after{content:"";position:absolute;left:0;right:0;bottom:-.04em;height:.09em;background:var(--fg);border-radius:2px;z-index:-1}
+.hx .s2{display:block;white-space:nowrap}
+.hx .s3{display:block;color:var(--dim);white-space:nowrap}
+.hx .s3 b{color:var(--fg);font-size:1.22em;font-weight:800;letter-spacing:-.03em}
+.sec{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px}
+.sec>span{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--mute)}
+.sec>span::before{content:"";width:14px;height:14px;border-radius:50%;background:var(--ok) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 8.5l2.5 2.5L12 5.5' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/12px no-repeat}
+.sec>span+span{margin-left:8px}
+@media(max-width:900px){.sec{justify-content:center}}
+.cmp{margin-top:44px;border-radius:24px;border:1px solid var(--line);background:linear-gradient(#ffffff06,#ffffff02);overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:thin}
+.cmp table{border-collapse:separate;border-spacing:0;width:100%;min-width:960px;font-size:13.5px}
+.cmp th,.cmp td{padding:15px 12px;text-align:center;vertical-align:middle;border-bottom:1px solid var(--line);color:var(--mute)}
+.cmp tbody tr:last-child>*{border-bottom:0}
+.cmp tbody tr:hover>*{background:#ffffff05}
+.cmp thead th{padding:20px 12px 16px;color:var(--fg);font-weight:600;font-size:14px}
+.cmp thead th small{display:block;font-weight:400;color:var(--dim);font-size:11.5px;margin-top:2px}
+.cmp tbody th{text-align:left;color:var(--fg);font-weight:500;white-space:nowrap;position:sticky;left:0;z-index:2;background:#0a0a0c;padding-left:22px}
+.cmp thead th:first-child{position:sticky;left:0;z-index:2;background:#0a0a0c}
+.cmp .me{background:#ffffff10!important;color:var(--fg);box-shadow:inset 1px 0 0 var(--line2),inset -1px 0 0 var(--line2);min-width:150px}
+.cmp thead .me{border-radius:0;font-size:16px}
+.cmp thead .me img{width:22px;height:22px;display:block;margin:0 auto 6px}
+.cmp td small{display:block;font-size:11.5px;color:var(--dim);margin-top:4px;line-height:1.35}
+.cmp .me small{color:var(--mute)}
+.y,.p,.n{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;font-size:12px;font-weight:700;line-height:1}
+.y{background:var(--ok);color:#000}
+.me .y{background:#fff;color:#000;box-shadow:0 0 0 4px #ffffff1c}
+.p{border:1.5px solid #ff9f0a;color:#ff9f0a}
+.n{color:#5a5a63;font-weight:400;font-size:16px}
+.legend{display:flex;gap:18px;justify-content:center;margin-top:18px;font-size:13px;color:var(--dim);flex-wrap:wrap}
+.legend span{display:inline-flex;gap:7px;align-items:center}
+.legend .y,.legend .p,.legend .n{width:18px;height:18px;font-size:10px}
+.swipe{display:none;text-align:center;color:var(--dim);font-size:12.5px;margin-top:10px}
+@media(max-width:1000px){.swipe{display:block}}
+.cmp thead th{white-space:nowrap}
 </style>
 </head>
 <body>
 
-<nav><div class="wrap">
-  <a class="brand" href="#"><img src="favicon.svg" alt="">Loom</a>
-  <div class="links">
-    <a href="#say"><span class="zh">能做什么</span><span class="en">What it does</span></a>
-    <a href="#light"><span class="zh">轻</span><span class="en">Light</span></a>
-    <a href="#why"><span class="zh">理念</span><span class="en">Ideas</span></a>
-    <a href="#phone"><span class="zh">手机上</span><span class="en">On a phone</span></a>
-    <a href="#always"><span class="zh">一直在</span><span class="en">Always on</span></a>
-    <a href="#vs"><span class="zh">对比</span><span class="en">Compare</span></a>
-    <a href="#run"><span class="zh">跑起来</span><span class="en">Run it</span></a>
-  </div>
-  <button class="lang" id="lang">EN</button>
-  <a class="btn sm primary" href="https://github.com/quanquan1996/loom">GitHub</a>
-</div></nav>
+<div class="corner">
+  <a class="brand" href="#top"><img src="favicon.svg" alt="">Loom</a>
+  <div class="cr"><button class="lang" id="lang">EN</button><a class="btn sm primary" href="https://github.com/quanquan1996/loom">GitHub</a></div>
+</div>
+<nav class="rail" aria-label="Sections"><a href="#top" data-s="top"><i></i><span class="lb"><span class="zh">首页</span><span class="en">Home</span></span></a><a href="#say" data-s="say"><i></i><span class="lb"><span class="zh">能做什么</span><span class="en">What it does</span></span></a><a href="#light" data-s="light"><i></i><span class="lb"><span class="zh">轻快</span><span class="en">Light</span></span></a><a href="#why" data-s="why"><i></i><span class="lb"><span class="zh">理念</span><span class="en">Ideas</span></span></a><a href="#phone" data-s="phone"><i></i><span class="lb"><span class="zh">手机上</span><span class="en">On a phone</span></span></a><a href="#always" data-s="always"><i></i><span class="lb"><span class="zh">一直在</span><span class="en">Always on</span></span></a><a href="#run" data-s="run"><i></i><span class="lb"><span class="zh">跑起来</span><span class="en">Run it</span></span></a><a href="#vs" data-s="vs"><i></i><span class="lb"><span class="zh">对比</span><span class="en">Compare</span></span></a></nav>
 
-<header class="hero"><div class="wrap">
+<header class="hero" id="top"><div class="wrap">
   <div class="txt">
     <span class="pill"><b>v0.4</b><span class="zh">Working · 接着做 · 无痕会话 · Android</span><span class="en">Working · Continue · Incognito · Android</span></span>
-    <h1><span class="zh">一个对话框，<br><span class="soft">管你的一切。</span></span><span class="en">One chat box.<br><span class="soft">Everything you own.</span></span></h1>
+    <h1 class="hx"><span class="zh"><span class="s1">一个<mark>安全</mark>的 <mark>Web</mark></span><span class="s2">对话框，</span><span class="s3">管你的<b>一切</b>。</span></span><span class="en"><span class="s1">A <mark>secure</mark> <mark>web</mark></span><span class="s2">chat box</span><span class="s3">for <b>everything.</b></span></span></h1>
     <p class="lead"><span class="zh">写代码、开电脑、动手机、关家里的灯、读邮件、记饮食 —— 在手机上说一句就行。Loom 是一个网页：Claude Code 跑在你自己的服务器上，手机加到主屏就是 App，你所有的设备都接进来。</span><span class="en">Write code, drive your computers and phone, turn off the lights at home, read your mail, log a meal — one sentence on your phone. Loom is a web page: Claude Code runs on your own server, your phone adds it to the home screen as an app, and every device you have plugs in.</span></p>
+    <div class="sec"><span><span class="zh">密码登录</span><span class="en">Password login</span></span><span><span class="zh">设备只往外连，不开端口</span><span class="en">Devices dial out, no open ports</span></span><span><span class="zh">数据只在你的服务器</span><span class="en">Data stays on your server</span></span></div>
     <div class="cta">
       <a class="btn primary" href="https://github.com/quanquan1996/loom"><span class="zh">在 GitHub 上查看</span><span class="en">View on GitHub</span></a>
       <a class="btn" href="#say"><span class="zh">看看它能做什么</span><span class="en">See what it does</span></a>
@@ -272,23 +313,25 @@ footer .wrap{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
     <div class="free rv"><span><span class="zh">不绑模型</span><span class="en">No model lock‑in</span></span><span><span class="zh">不绑云</span><span class="en">No cloud lock‑in</span></span><span><span class="zh">不绑账号</span><span class="en">No account lock‑in</span></span><span><span class="zh">不用应用商店</span><span class="en">No app store</span></span><span>MIT</span></div>
   </div>
   <div class="cmp rv"><table>
-    <thead><tr><th></th><th class="me">Loom</th><th>Claude</th><th>Codex</th><th>Gemini</th><th>Grok Bot</th><th>WorkBuddy</th><th><span class="zh">豆包</span><span class="en">Doubao</span></th><th>Meta Muse</th></tr></thead>
+    <thead><tr><th></th><th class="me"><img src="favicon.svg" alt="">Loom<small><span class="zh">你的服务器</span><span class="en">your server</span></small></th><th>Claude<small><span class="zh">Anthropic</span><span class="en">Anthropic</span></small></th><th>Codex<small>OpenAI</small></th><th>Gemini<small>Google</small></th><th>Grok Bot<small>xAI</small></th><th>WorkBuddy<small><span class="zh">腾讯</span><span class="en">Tencent</span></small></th><th><span class="zh">豆包</span><span class="en">Doubao</span><small><span class="zh">字节</span><span class="en">ByteDance</span></small></th><th>Meta Muse<small>Meta</small></th></tr></thead>
     <tbody>
-<tr><th><span class="zh">怎么用</span><span class="en">How you use it</span></th><td class="me"><span class="zh">一个网址；手机加到主屏就是 App</span><span class="en">A URL; add to home screen</span></td><td><span class="zh">App + 网页</span><span class="en">Apps + web</span></td><td><span class="zh">ChatGPT / Codex App</span><span class="en">ChatGPT / Codex apps</span></td><td><span class="zh">App + 网页</span><span class="en">Apps + web</span></td><td><span class="zh">App + 网页</span><span class="en">Apps + web</span></td><td><span class="zh">桌面客户端 + App</span><span class="en">Desktop client + app</span></td><td><span class="zh">桌面 + 手机 App</span><span class="en">Desktop + phone apps</span></td><td><span class="zh">WhatsApp / Meta AI App</span><span class="en">WhatsApp / Meta AI</span></td></tr>
-<tr><th><span class="zh">跑在哪</span><span class="en">Runs where</span></th><td class="me"><span class="zh">你自己的服务器</span><span class="en">Your own server</span></td><td><span class="zh">厂家云（自托管 runner 公测）</span><span class="en">Vendor cloud (self‑hosted runner beta)</span></td><td><span class="zh">厂家云 + 你的电脑</span><span class="en">Vendor cloud + your computer</span></td><td><span class="zh">厂家云</span><span class="en">Vendor cloud</span></td><td><span class="zh">厂家云电脑</span><span class="en">Vendor cloud computer</span></td><td><span class="zh">你的电脑 + 厂家云沙箱</span><span class="en">Your computer + vendor sandbox</span></td><td><span class="zh">厂家云 + 你的电脑</span><span class="en">Vendor cloud + your computer</span></td><td><span class="zh">厂家云</span><span class="en">Vendor cloud</span></td></tr>
-<tr><th><span class="zh">模型</span><span class="en">Models</span></th><td class="me"><span class="zh">Claude Code / Codex / Kiro，每个会话随便换</span><span class="en">Claude Code / Codex / Kiro, per chat</span></td><td>Claude</td><td>OpenAI</td><td>Gemini</td><td>Grok</td><td><span class="zh">多模型</span><span class="en">Several</span></td><td><span class="zh">豆包</span><span class="en">Doubao</span></td><td>Meta</td></tr>
-<tr><th><span class="zh">账号</span><span class="en">Account</span></th><td class="me"><span class="zh">Loom 本身不要；agent 用你自己的登录</span><span class="en">None for Loom; agents use your own login</span></td><td>Anthropic</td><td>OpenAI</td><td>Google</td><td>xAI</td><td><span class="zh">腾讯</span><span class="en">Tencent</span></td><td><span class="zh">字节</span><span class="en">ByteDance</span></td><td>Meta</td></tr>
-<tr><th><span class="zh">接你的设备</span><span class="en">Your devices</span></th><td class="me"><span class="zh">Mac · Windows · Linux · Android，一行命令</span><span class="en">Mac · Windows · Linux · Android, one command</span></td><td><span class="zh">自托管机器</span><span class="en">Self‑hosted machines</span></td><td><span class="zh">Mac / Windows 主机</span><span class="en">Mac / Windows hosts</span></td><td><span class="zh">Mac（Spark）</span><span class="en">Mac (Spark)</span></td><td>—</td><td><span class="zh">本机；手机看电脑</span><span class="en">This PC; phone views it</span></td><td><span class="zh">电脑，最多 7 台</span><span class="en">Computers, up to 7</span></td><td>—</td></tr>
-<tr><th><span class="zh">家里的灯、摄像头…</span><span class="en">Lights, cameras…</span></th><td class="me"><span class="zh">写个 skill 就接上</span><span class="en">Add a skill</span></td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
-<tr><th><span class="zh">数据在哪</span><span class="en">Your data</span></th><td class="me"><span class="zh">全在你的服务器</span><span class="en">All on your server</span></td><td><span class="zh">厂家</span><span class="en">Vendor</span></td><td><span class="zh">厂家</span><span class="en">Vendor</span></td><td><span class="zh">厂家</span><span class="en">Vendor</span></td><td><span class="zh">厂家</span><span class="en">Vendor</span></td><td><span class="zh">本机 + 厂家</span><span class="en">Local + vendor</span></td><td><span class="zh">厂家</span><span class="en">Vendor</span></td><td><span class="zh">厂家</span><span class="en">Vendor</span></td></tr>
-<tr><th><span class="zh">开源</span><span class="en">Open source</span></th><td class="me">MIT</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><th><span class="zh">浏览器打开就能用</span><span class="en">Works in a browser</span></th><td class="me"><span class="y">✓</span><small><span class="zh">手机装成 PWA</span><span class="en">PWA on the phone</span></small></td><td><span class="y">✓</span><small><span class="zh">另有 App</span><span class="en">plus apps</span></small></td><td><span class="y">✓</span><small><span class="zh">另有 App</span><span class="en">plus apps</span></small></td><td><span class="y">✓</span><small><span class="zh">另有 App</span><span class="en">plus apps</span></small></td><td><span class="y">✓</span><small><span class="zh">另有 App</span><span class="en">plus apps</span></small></td><td><span class="n">—</span><small><span class="zh">桌面客户端</span><span class="en">desktop client</span></small></td><td><span class="y">✓</span><small><span class="zh">另有 App</span><span class="en">plus apps</span></small></td><td><span class="p">◐</span><small><span class="zh">主要在 WhatsApp</span><span class="en">mostly WhatsApp</span></small></td></tr>
+<tr><th><span class="zh">跑在你自己的服务器</span><span class="en">Runs on your own server</span></th><td class="me"><span class="y">✓</span></td><td><span class="p">◐</span><small><span class="zh">自托管 runner 公测</span><span class="en">self‑hosted runner beta</span></small></td><td><span class="p">◐</span><small><span class="zh">可连本机</span><span class="en">can use your PC</span></small></td><td><span class="n">—</span></td><td><span class="n">—</span></td><td><span class="p">◐</span><small><span class="zh">本机 + 云沙箱</span><span class="en">PC + cloud sandbox</span></small></td><td><span class="p">◐</span><small><span class="zh">可连本机</span><span class="en">can use your PC</span></small></td><td><span class="n">—</span></td></tr>
+<tr><th><span class="zh">模型随时换</span><span class="en">Switch models</span></th><td class="me"><span class="y">✓</span><small><span class="zh">Claude Code · Codex · Kiro</span><span class="en">Claude Code · Codex · Kiro</span></small></td><td><span class="n">—</span></td><td><span class="n">—</span></td><td><span class="n">—</span></td><td><span class="n">—</span></td><td><span class="y">✓</span><small><span class="zh">多模型</span><span class="en">several</span></small></td><td><span class="n">—</span></td><td><span class="n">—</span></td></tr>
+<tr><th><span class="zh">不绑厂家账号</span><span class="en">No vendor account</span></th><td class="me"><span class="y">✓</span><small><span class="zh">agent 用你自己的登录</span><span class="en">agents use your own login</span></small></td><td><span class="n">—</span></td><td><span class="n">—</span></td><td><span class="n">—</span></td><td><span class="n">—</span></td><td><span class="n">—</span></td><td><span class="n">—</span></td><td><span class="n">—</span></td></tr>
+<tr><th><span class="zh">接你的电脑和手机</span><span class="en">Your computers & phone</span></th><td class="me"><span class="y">✓</span><small><span class="zh">Mac · Win · Linux · Android</span><span class="en">Mac · Win · Linux · Android</span></small></td><td><span class="p">◐</span><small><span class="zh">自托管机器</span><span class="en">self‑hosted hosts</span></small></td><td><span class="y">✓</span><small><span class="zh">Mac / Windows</span><span class="en">Mac / Windows</span></small></td><td><span class="p">◐</span><small><span class="zh">Mac</span><span class="en">Mac</span></small></td><td><span class="n">—</span></td><td><span class="p">◐</span><small><span class="zh">本机</span><span class="en">this PC</span></small></td><td><span class="y">✓</span><small><span class="zh">最多 7 台电脑</span><span class="en">up to 7 PCs</span></small></td><td><span class="n">—</span></td></tr>
+<tr><th><span class="zh">接家里的灯、摄像头</span><span class="en">Home lights & cameras</span></th><td class="me"><span class="y">✓</span><small><span class="zh">写个 skill</span><span class="en">add a skill</span></small></td><td><span class="n">—</span></td><td><span class="n">—</span></td><td><span class="n">—</span></td><td><span class="n">—</span></td><td><span class="n">—</span></td><td><span class="n">—</span></td><td><span class="n">—</span></td></tr>
+<tr><th><span class="zh">数据全在你手里</span><span class="en">Your data stays yours</span></th><td class="me"><span class="y">✓</span></td><td><span class="n">—</span></td><td><span class="n">—</span></td><td><span class="n">—</span></td><td><span class="n">—</span></td><td><span class="p">◐</span><small><span class="zh">本机 + 云</span><span class="en">local + cloud</span></small></td><td><span class="n">—</span></td><td><span class="n">—</span></td></tr>
+<tr><th><span class="zh">开源</span><span class="en">Open source</span></th><td class="me"><span class="y">✓</span><small><span class="zh">MIT</span><span class="en"></span></small></td><td><span class="n">—</span></td><td><span class="n">—</span></td><td><span class="n">—</span></td><td><span class="n">—</span></td><td><span class="n">—</span></td><td><span class="n">—</span></td><td><span class="n">—</span></td></tr>
     </tbody>
   </table></div>
+  <div class="swipe"><span class="zh">← 左右滑动看全部 →</span><span class="en">← swipe for more →</span></div>
+  <div class="legend"><span><span class="y">✓</span><span class="zh">有</span><span class="en">Yes</span></span><span><span class="p">◐</span><span class="zh">部分 / 测试中</span><span class="en">Partly / beta</span></span><span><span class="n">—</span><span class="zh">没有</span><span class="en">No</span></span></div>
   <p class="note rv"><span class="zh">竞品信息来自各家 2026 年公开的发布说明和报道，截至 2026‑11；只比功能和形态。</span><span class="en">Competitor details from public release notes and press in 2026, as of 2026‑11; features and form only.</span></p>
 </div></section>
 
 <section class="final center"><div class="wrap">
-  <h2 class="rv"><span class="zh">一个对话框，<span class="soft">管你的一切。</span></span><span class="en">One chat box.<span class="soft"> Everything you own.</span></span></h2>
+  <h2 class="rv"><span class="zh">一个安全的 Web 对话框，<br><span class="soft">管你的一切。</span></span><span class="en">A secure web chat box,<br><span class="soft">for everything.</span></span></h2>
   <div class="cta rv" style="justify-content:center">
     <a class="btn primary" href="https://github.com/quanquan1996/loom">★ GitHub</a>
     <a class="btn" href="https://github.com/quanquan1996/loom/blob/main/docs/architecture.md"><span class="zh">架构文档</span><span class="en">Architecture</span></a>
@@ -326,6 +369,10 @@ function demo(reset){T.forEach(clearTimeout);T=[];if(reset)box.innerHTML='';cons
  L.forEach(([u,w,a])=>{T.push(setTimeout(()=>add('u',u),t));t+=900;T.push(setTimeout(()=>add('a','<small><i></i>'+w+'</small><br>'+a),t));t+=1700});
  T.push(setTimeout(()=>demo(true),t+2200))}
 demo(true);
+
+const rl=[...document.querySelectorAll('.rail a')];
+const so=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){rl.forEach(a=>a.classList.toggle('on',a.dataset.s===e.target.id));const on=rl.find(a=>a.dataset.s===e.target.id);if(on&&innerWidth<=1220)on.scrollIntoView({inline:'center',block:'nearest',behavior:'smooth'})}}),{rootMargin:'-45% 0px -50% 0px'});
+rl.forEach(a=>{const t=document.getElementById(a.dataset.s);if(t)so.observe(t)});
 </script>
 </body>
 </html>
