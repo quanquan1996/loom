@@ -18,6 +18,8 @@ defmodule LoomWeb.Router do
     pipe_through :api
 
     post "/login", AuthController, :login
+    # Its own key, not the login token: `LoomWeb.AskController`.
+    post "/ask", AskController, :create
   end
 
   scope "/api", LoomWeb do
