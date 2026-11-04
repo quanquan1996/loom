@@ -242,7 +242,7 @@ html.zh h1.h2s{letter-spacing:-.005em}
 
 <header class="hero" id="top"><div class="wrap">
   <div class="txt">
-    <span class="pill"><b>v0.5</b><span class="zh">会议模式 · 对话招聘员工 · 员工硬权限 · loom‑home</span><span class="en">Meeting mode · Hire in a chat · Hard permissions · loom‑home</span></span>
+    <span class="pill"><b>v0.6</b><span class="zh">引用会话 · 分享长图 · 标题跟着话题走 · 安全加固</span><span class="en">Reference a chat · Share as an image · Titles that keep up · Hardening</span></span>
     <h1 class="h2s"><span class="zh"><span class="l1"><span class="nw">一个安全的</span> <span class="nw">Web 对话框，</span></span><br><span class="soft">管你的一切。</span></span><span class="en"><span class="l1"><span class="nw">A secure web</span> <span class="nw">chat box,</span></span><br><span class="soft">for everything.</span></span></h1>
     <p class="lead"><span class="zh">写代码、开电脑、动手机、关家里的灯、读邮件、记饮食 —— 在手机上说一句就行。Loom 是一个网页：Claude Code 跑在你自己的服务器上，手机加到主屏就是 App，你所有的设备都接进来。</span><span class="en">Write code, drive your computers and phone, turn off the lights at home, read your mail, log a meal — one sentence on your phone. Loom is a web page: Claude Code runs on your own server, your phone adds it to the home screen as an app, and every device you have plugs in.</span></p>
     <div class="sec"><span><span class="zh">密码登录</span><span class="en">Password login</span></span><span><span class="zh">设备只往外连，不开端口</span><span class="en">Devices dial out, no open ports</span></span><span><span class="zh">数据只在你的服务器</span><span class="en">Data stays on your server</span></span></div>
@@ -292,7 +292,7 @@ html.zh h1.h2s{letter-spacing:-.005em}
   <p class="note rv"><span class="zh">数字在作者自己的服务器上实测（2026‑11‑02）：一台 8 核机器，同时连着电脑、手机和路由器；agent 自己的进程（claude 等）不算在内。</span><span class="en">Measured on the author’s own server (2026‑11‑02): an 8‑core box with computers, a phone and a router attached; the agents’ own processes (claude etc.) not counted.</span></p>
   <div class="three">
     <div class="card rv"><h3><span class="zh">手机上是 PWA</span><span class="en">A PWA on your phone</span></h3><p><span class="zh">加到主屏后全屏打开，和原生 App 一样。重要的事推送到锁屏，不用应用商店，也不用你自己申请推送账号。服务器一更新，下次打开就是新版本。</span><span class="en">From the home screen it opens full screen, like a native app. What matters is pushed to the lock screen, with no app store and no push account of your own. Ship the server and the next open is the new version.</span></p><div class="tags"><span>iOS</span><span>Android</span><span>Web Push</span></div></div>
-    <div class="card rv"><h3><span class="zh">客户端超轻</span><span class="en">A featherweight client</span></h3><p><span class="zh">打开一次只下载约 270 KB（压缩后）。终端、远程桌面这些重的部分用到才加载，弱网下也能很快打开、点一下就有反应。</span><span class="en">About 270 KB (gzipped) on first open. The heavy parts, like the terminal and remote desktop, load only when used, so it opens fast and answers taps even on a weak network.</span></p><div class="tags"><span>~270 KB</span><span>React</span><span>lazy‑loaded</span></div></div>
+    <div class="card rv"><h3><span class="zh">客户端超轻</span><span class="en">A featherweight client</span></h3><p><span class="zh">打开一次只下载约 270 KB（压缩后）。终端、会议语音模型这些重的部分用到才加载，弱网下也能很快打开、点一下就有反应。</span><span class="en">About 270 KB (gzipped) on first open. The heavy parts, like the terminal and the meeting speech models, load only when used, so it opens fast and answers taps even on a weak network.</span></p><div class="tags"><span>~270 KB</span><span>React</span><span>lazy‑loaded</span></div></div>
     <div class="card rv"><h3><span class="zh">服务端高性能</span><span class="en">A high‑performance server</span></h3><p><span class="zh">服务端用 Elixir / Phoenix，跑在专为电信系统打造的 BEAM 虚拟机上：每个会话是一个独立的轻量进程，几十个会话、员工、设备同时跑互不拖累，消息通过 WebSocket 实时推到每个打开的页面。</span><span class="en">Elixir / Phoenix on the BEAM, the VM built for telecom switches: each session is its own lightweight process, so dozens of chats, employees and devices run side by side without slowing each other, and every update streams live over WebSocket to every open page.</span></p><div class="tags"><span>Elixir</span><span>Phoenix</span><span>BEAM</span><span>WebSocket</span></div></div>
   </div>
 </div></section>
@@ -350,17 +350,17 @@ html.zh h1.h2s{letter-spacing:-.005em}
 <b>❯</b> mix phx.server            # :4000</pre>
   </div>
   <div class="commits rv">
+    <div><span>1f44b07</span>Security fixes from an AWS Continuum scan</div>
+    <div><span>521ae3a</span>Composer +: reference a recent chat</div>
+    <div><span>03cdb52</span>Share a chat as one long image</div>
     <div><span>bdf74c3</span>Meeting mode: the agent learns the hotwords</div>
     <div><span>52da68a</span>loom-home: voice server with MQTT home devices</div>
     <div><span>b22a5a1</span>Employees: hard permissions, hiring in a chat</div>
     <div><span>5eca386</span>Android node: screen control and `loom-node control`</div>
     <div><span>44ffb2d</span>Incognito sessions: sandboxed, out of Recents</div>
     <div><span>90f9586</span>Continue in a new chat: by fork or by reading it</div>
-    <div><span>e43c661</span>Per-session model: pick it from the header</div>
     <div><span>cdd104d</span>The bell: notices by priority, posted by agents</div>
-    <div><span>8fe773b</span>Agent turns that carry on through a restart</div>
-    <div><span>28c2e7e</span>Sleep, virtual employees, and Kiro CLI</div>
-    <div style="color:var(--dim)">… 260 commits since 2026‑07‑29</div>
+    <div style="color:var(--dim)">… 288 commits since 2026‑07‑29</div>
   </div>
 </div></section>
 
