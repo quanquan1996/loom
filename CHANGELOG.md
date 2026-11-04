@@ -16,8 +16,8 @@ that ran live. Format after [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Added
-- **Reference a recent chat**: the composer's + opens a menu — Files, or one
-  of the 8 latest chats. A picked chat rides along as a chip; the agent is told
+- **Reference a recent chat**: the composer's + opens a menu — Files, or
+  "Reference a chat…", a dialog of recent chats with a title filter. A picked chat rides along as a chip; the agent is told
   its title, id and directory and reads it with `loom-session read` only if the
   request needs it. Tap the chip in a sent message to open that chat.
 - **Share a chat as an image**: "Share…" in the chat's menu lists the
