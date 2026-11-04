@@ -19,7 +19,7 @@ that ran live. Format after [Keep a Changelog](https://keepachangelog.com/).
 - **Titles that keep up**: ten minutes after a turn, the same small-model call
   that writes a Working row's recap also retitles the session — from its first
   message to what it is about, and to "old topic · new topic" once the talk
-  moves on. Never over a title the user gave.
+  moves on. Never over a title the user gave, nor in a meeting's chat.
 - **Reference a recent chat**: the composer's + opens a menu — Files, or
   "Reference a chat…", a dialog of recent chats with a title filter. A picked chat rides along as a chip; the agent is told
   its title, id and directory and reads it with `loom-session read` only if the

@@ -1078,14 +1078,15 @@ defmodule Loom.Agent.Session do
   # The title comes with it: the Working row is the session's title, and a
   # first-message one says little, nor does one from before the talk moved on.
   # Only over a first-message or tidied title (nil may be the user's, from
-  # before this was kept); given as "tidy", the same as a `retitle/2`.
+  # before this was kept), and not in a meeting's chat; given as "tidy", the
+  # same as a `retitle/2`.
   def handle_info({:recapped, seq, %{} = got}, %{seq: seq} = state) do
     state = if is_binary(got[:recap]), do: %{state | recap: got[:recap]}, else: state
 
     state =
       case got[:title] do
         title when is_binary(title) and title != "" ->
-          if state.title_by in ["auto", "tidy"] and title != state.title,
+          if state.title_by in ["auto", "tidy"] and title != state.title and not meeting?(state),
             do: put_title(state, title, "tidy"),
             else: state
 
@@ -1261,6 +1262,10 @@ defmodule Loom.Agent.Session do
   end
 
   defp schedule_recap(state), do: state
+
+  # A meeting's chat keeps the name the meeting gave it (`Loom.Meeting`, which
+  # keeps its transcripts in the session's `meeting/`).
+  defp meeting?(state), do: File.dir?(Path.join(Store.session_dir(state.id), "meeting"))
 
   defp put_title(state, title, by),
     do: emit(%{state | title: title, title_by: by}, :renamed, %{title: title})

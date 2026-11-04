@@ -155,6 +155,22 @@ defmodule Loom.Agent.SessionTest do
       assert Agent.info(id).title == "mine"
     end
 
+    test "a meeting's chat keeps its title through a recap" do
+      Application.put_env(:loom, :recap, __MODULE__.Recap)
+      on_exit(fn -> Application.put_env(:loom, :recap, nil) end)
+      id = new_session()
+      Agent.submit(id, "hello")
+      BackendStub.await_turn()
+      backend_sends(id, [{:event, :assistant_text, %{text: "hi there"}}])
+      finish_turn(id)
+      File.mkdir_p!(Path.join(Loom.Agent.Store.session_dir(id), "meeting"))
+
+      [{pid, _}] = Registry.lookup(Loom.Agent.Registry, id)
+      send(pid, {:recap, Agent.info(id).seq})
+      assert_eventually(fn -> Agent.info(id).recap != nil end)
+      assert Agent.info(id).title == "hello"
+    end
+
     test "the session is named after its first message" do
       id = new_session()
       Agent.submit(id, "fix the login bug\nand also the logout one")
