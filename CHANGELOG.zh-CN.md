@@ -6,6 +6,7 @@
 
 | 版本 | 日期 | 主题 |
 | --- | --- | --- |
+| [0.6.0](#060--2026-11-04) | 2026-11-04 | 引用会话、分享长图、标题跟着话题走、每条铃铛通知一个 session、安全修复 |
 | [0.5.0](#050--2026-11-03) | 2026-11-03 | 会议模式、用对话招聘、员工硬权限、只有铃铛会响、loom-home |
 | [0.4.0](#040--2026-11-02) | 2026-11-02 | 按会话选模型、Continue、无痕会话、Working、Android |
 | [0.3.0](#030--2026-10-31) | 2026-10-31 | 铃铛、会话整理、员工工位、更安全的设备 |
@@ -13,6 +14,8 @@
 | [0.1.0](#010--2026-10-28) | 2026-10-28 | 上游基线 |
 
 ## [Unreleased]
+
+## [0.6.0] – 2026-11-04
 
 ### 新增
 - **标题跟着话题走**：一轮结束 10 分钟后，写 Working 摘要的那次小模型调用顺带改标题——
@@ -28,8 +31,9 @@
 - **Continue 可选后端**："在新会话里接着做"旁加了箭头（会话里和侧栏会话菜单里都有），
   新会话可以换一个后端跑，不必沿用旧会话的。
 
-### 改动
+### 变更
 - **每条铃铛通知自带一个 session**：通知一发出就新建一个 session，开头就是发通知的 agent 写的完整说明（上限放宽到 6000 字，markdown；`loom-notice post --detail-file`）。点卡片或推送都进这个 session，在里面问清楚、做决定，它的 agent 把决定传回原 session。你在里面说过话，它才出现在 Recents。卡片只剩 Later、Done 和说明的前两行；预设答案、Approve/Reject、卡片内回复都去掉了，铃铛的 Chat 标签页也去掉了。
+- 设备：在线设备按类型分组（Linux、Windows、Mac、Android、Bot），离线的排在最后。
 - 员工页标签："更新"排第一。
 - 会议栏：去掉人头图标和单独的行数，它们容易被看成参会人数和轮数。
 - loom-home：设备打开通道时就预热 Bedrock 连接，保持 75 秒，首句回复更快。
@@ -140,6 +144,7 @@
 
 fork 的起点：[EthanLLL/loom](https://github.com/EthanLLL/loom) 的 `cf1facd`。包含 Claude Code 和 Codex 会话、终端、canvas、幻灯片、定时提示、支持 macOS/Linux/WSL 的 `loom-node`、共享浏览器、PWA 和推送通知。
 
+[0.6.0]: https://github.com/quanquan1996/loom/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/quanquan1996/loom/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/quanquan1996/loom/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/quanquan1996/loom/compare/v0.2.0...v0.3.0

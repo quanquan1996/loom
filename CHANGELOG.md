@@ -7,6 +7,7 @@ that ran live. Format after [Keep a Changelog](https://keepachangelog.com/).
 
 | Version | Date | Theme |
 | --- | --- | --- |
+| [0.6.0](#060--2026-11-04) | 2026-11-04 | Reference a chat, share as an image, titles that keep up, a session per bell notice, security fixes |
 | [0.5.0](#050--2026-11-03) | 2026-11-03 | Meeting mode, hiring in a chat, hard employee permissions, only the bell rings, loom-home |
 | [0.4.0](#040--2026-11-02) | 2026-11-02 | Model picker, Continue, incognito, Working, Android |
 | [0.3.0](#030--2026-10-31) | 2026-10-31 | The bell, tidy, employee workstations, safer devices |
@@ -14,6 +15,8 @@ that ran live. Format after [Keep a Changelog](https://keepachangelog.com/).
 | [0.1.0](#010--2026-10-28) | 2026-10-28 | Upstream base |
 
 ## [Unreleased]
+
+## [0.6.0] – 2026-11-04
 
 ### Added
 - **Titles that keep up**: ten minutes after a turn, the same small-model call
@@ -42,6 +45,8 @@ that ran live. Format after [Keep a Changelog](https://keepachangelog.com/).
   source session. It shows in Recents once you write in it. The card keeps
   only Later and Done, plus two lines of the brief: the one-tap answers,
   Approve/Reject and the inline reply are gone, and so is the bell's Chat tab.
+- Devices: online ones are grouped by kind (Linux, Windows, Mac, Android,
+  Bot), offline ones last.
 - Employee page tabs: Updates comes first.
 - Meeting bar: the people icon and the bare line count are gone; they read as
   attendees and rounds.
@@ -243,6 +248,7 @@ The fork point: [EthanLLL/loom](https://github.com/EthanLLL/loom) at
 scheduled prompts, `loom-node` for macOS/Linux/WSL, the shared browser, PWA
 and push notifications.
 
+[0.6.0]: https://github.com/quanquan1996/loom/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/quanquan1996/loom/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/quanquan1996/loom/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/quanquan1996/loom/compare/v0.2.0...v0.3.0
