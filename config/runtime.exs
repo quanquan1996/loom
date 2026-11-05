@@ -85,9 +85,6 @@ if config_env() == :prod do
             _ -> System.get_env("LOOM_PASSWORD")
           end)
 
-  # The key for POST /api/ask (a voice shortcut); unset leaves it shut.
-  config :loom, :ask_key, System.get_env("LOOM_ASK_KEY")
-
   config :loom, LoomWeb.Endpoint,
     url: [host: host, port: 443, scheme: "https"],
     http: [
