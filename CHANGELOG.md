@@ -16,6 +16,10 @@ that ran live. Format after [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Changed
+- **The bell acts on your answer**: a notice's session now carries out what you
+  decided itself, then tells the employee or task that asked what it did.
+
 ## [0.6.0] – 2026-11-04
 
 ### Added
