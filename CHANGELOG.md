@@ -22,6 +22,9 @@ that ran live. Format after [Keep a Changelog](https://keepachangelog.com/).
 - **Suggested answers in a notice's session**: the answers the employee or task
   foresaw show as one-tap replies under the brief — in the session, after
   you have read it, not on the card.
+- **One card for the night's sleep**: every project's Dream proposals gather in
+  one notice; its session asks one question per project, and a project with
+  nothing to ask posts nothing.
 
 ## [0.6.0] – 2026-11-04
 

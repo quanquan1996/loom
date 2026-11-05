@@ -331,4 +331,46 @@ defmodule Loom.NoticesTest do
       refute_received {:submitted, _, _}
     end
   end
+
+  test "every project's sleep report gathers in one notice, a question each", %{s: s} do
+    home = %{kind: "dream", id: "dream:home", name: "Dream"}
+    life = %{kind: "dream", id: "dream:p_1", name: "Dream · 生活"}
+
+    {:ok, a} =
+      post(
+        s,
+        %{summary: "1 条提议", priority: 4, key: "sleep", session: "a_h", options: ["1. 记下"]},
+        home
+      )
+
+    assert_received {:notified, _, _, _}
+
+    {:ok, b} =
+      post(
+        s,
+        %{
+          summary: "2 个提议",
+          priority: 4,
+          key: "sleep",
+          session: "a_l",
+          detail: "1. x\n2. y",
+          options: ["1. x", "2. y"]
+        },
+        life
+      )
+
+    assert b["id"] == a["id"]
+    assert b["source"]["id"] == "dream" and b["session"] == nil
+    assert b["summary"] == "Dream: 1 条提议 ｜ 生活: 2 个提议"
+    assert b["detail"] =~ "### 生活\n\n2 个提议\n\n1. x"
+    assert Notices.brief(b) =~ "#+ Dream\n1. 记下\n#+ 生活\n1. x\n2. y\n-->"
+    # Merging in does not notify again.
+    refute_received {:notified, _, _, _}
+
+    # The same project again replaces its own part.
+    {:ok, c} = post(s, %{summary: "改了", priority: 4, key: "sleep", session: "a_l"}, life)
+    assert length(c["parts"]) == 2
+    assert c["summary"] == "Dream: 1 条提议 ｜ 生活: 改了"
+    assert length(Enum.filter(Notices.list(s), &(&1["status"] == "open"))) == 1
+  end
 end

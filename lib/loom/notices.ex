@@ -37,6 +37,9 @@ defmodule Loom.Notices do
     notification.
   - **A key per source** makes a notice something to update rather than
     repeat: posting the same key again replaces the open one.
+    Sleep reports (`kind: "dream"`, key `sleep`) are the one exception that
+    spans sources: every project's lands in one open notice (`parts`), so a
+    night is one card, its session one question per project.
   - **Done** is the user's: answering in the source session (any message
     they type there), deciding in the notice's own session (its agent
     relays it), Done in the bell, or, for one that only asks to be read,
@@ -272,6 +275,7 @@ defmodule Loom.Notices do
   def handle_call({:post, source, attrs}, _from, state) do
     case validate(source, attrs) do
       {:ok, source, attrs} ->
+        {source, attrs} = gather(state, source, attrs)
         {n, state} = upsert(state, source, attrs)
         {:reply, {:ok, view(n)}, changed(state)}
 
@@ -585,6 +589,63 @@ defmodule Loom.Notices do
     n = if rose?, do: alert(state, n, now), else: Map.put(n, "held", old["held"] || false)
     {n, put_in(state.notices[n["id"]], n)}
   end
+
+  # Sleep reports, one per project a night, gather in one notice: one card
+  # to go through, each project a question of its own in its session. A
+  # project posting again replaces its part; the rest stay until settled.
+  @sleep_source "dream"
+  @sleep_key "sleep"
+
+  defp gather(state, %{"kind" => "dream"} = source, %{"key" => @sleep_key} = attrs) do
+    old = find_open(state, @sleep_source, @sleep_key)
+
+    part =
+      attrs
+      |> Map.take(["summary", "detail", "options", "priority", "session"])
+      |> Map.merge(%{"source" => source["id"], "name" => project_name(source["name"])})
+
+    parts =
+      ((old && old["parts"]) || [])
+      |> Enum.reject(&(&1["source"] == source["id"]))
+      |> Kernel.++([part])
+
+    summary =
+      parts
+      |> Enum.map_join(" ｜ ", &"#{&1["name"]}: #{&1["summary"]}")
+      |> then(
+        &if(String.length(&1) > @summary_max,
+          do: String.slice(&1, 0, @summary_max - 1) <> "…",
+          else: &1
+        )
+      )
+
+    detail =
+      Enum.map_join(parts, "\n\n", fn p ->
+        Enum.join(
+          Enum.reject(["### #{p["name"]}", p["summary"], p["detail"]], &is_nil/1),
+          "\n\n"
+        )
+      end)
+
+    attrs =
+      Map.merge(attrs, %{
+        "summary" => summary,
+        "detail" => detail(detail),
+        "priority" => parts |> Enum.map(& &1["priority"]) |> Enum.min(),
+        "needs" => "reply",
+        "options" => [],
+        "session" => nil,
+        "anchor" => nil,
+        "parts" => parts
+      })
+
+    {%{"kind" => "dream", "id" => @sleep_source, "name" => "Dream"}, attrs}
+  end
+
+  defp gather(_state, source, attrs), do: {source, attrs}
+
+  defp project_name("Dream · " <> name), do: name
+  defp project_name(name), do: name
 
   # Its own session: made with the first brief, given each new one. Without
   # one (it could not start), the card leads to the source as before.
@@ -905,6 +966,18 @@ defmodule Loom.Notices do
     Enum.join(Enum.reject([head, n["summary"], n["detail"], replies(n)], &is_nil/1), "\n\n")
   end
 
+  defp replies(%{"parts" => [_ | _] = parts}) do
+    questions =
+      parts
+      |> Enum.filter(&match?([_ | _], &1["options"]))
+      |> Enum.take(5)
+      |> Enum.map(fn p ->
+        "#+ " <> p["name"] <> "\n" <> Enum.join(Enum.take(p["options"], 5), "\n")
+      end)
+
+    if questions != [], do: "<!-- loom:replies\n" <> Enum.join(questions, "\n") <> "\n-->"
+  end
+
   defp replies(%{"options" => [_ | _] = options}),
     do: "<!-- loom:replies\n" <> Enum.join(Enum.take(options, 5), "\n") <> "\n-->"
 
@@ -915,8 +988,17 @@ defmodule Loom.Notices do
   # the work out itself.
   defp about(n, new?) do
     from =
-      case n["session"] do
-        s when is_binary(s) ->
+      case {n["parts"], n["session"]} do
+        {parts, _} when is_list(parts) ->
+          "gathering each project's sleep report, from their sleep sessions: " <>
+            Enum.map_join(
+              parts,
+              "; ",
+              &"#{&1["name"]} — #{&1["session"]}#{where(&1["session"])}"
+            ) <>
+            ". Carry out what the user agrees to for each project in its own working directory"
+
+        {_, s} when is_binary(s) ->
           "from session #{s}" <>
             if(is_integer(n["anchor"]),
               do: " (the turn that starts at seq #{n["anchor"]})",
