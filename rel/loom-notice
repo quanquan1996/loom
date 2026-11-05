@@ -73,7 +73,8 @@ def main():
     post.add_argument("--needs", choices=["read", "reply", "approve"])
     post.add_argument("--detail", "-d", help="the brief its own session opens on (markdown)")
     post.add_argument("--detail-file", help="the brief, from a file ('-' for stdin)")
-    post.add_argument("--option", "-o", action="append", default=[], help=argparse.SUPPRESS)
+    post.add_argument("--option", "-o", action="append", default=[],
+                      help="a foreseen answer (repeat, max 5): suggested replies in the notice's session")
     post.add_argument("summary", nargs="+")
     w = sub.add_parser("withdraw", help="take back your open notice with KEY")
     w.add_argument("key")

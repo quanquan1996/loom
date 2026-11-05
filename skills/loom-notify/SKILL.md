@@ -13,7 +13,7 @@ what decides when — and whether — they are interrupted. Choose it honestly.
 
 ```sh
 loom-notice post --priority N [--key KEY] [--needs read|reply|approve] \
-                 --detail-file brief.md "summary"     # or --detail "…"
+                 --detail-file brief.md [--option "an answer"]... "summary"
 loom-notice list                 # your notices still open
 loom-notice withdraw KEY         # take one back
 ```
@@ -26,7 +26,7 @@ passes the decision back to you. So the brief must carry what they need
 (below).
 
 A virtual employee reports through its work card's `report` instead (same
-priorities, same `key`, `needs`, `detail`, and `withdraw`); the command
+priorities, same `key`, `needs`, `detail`, `options`, and `withdraw`); the command
 works too.
 
 The bell is the only thing that reaches the user's phone: a turn ending sends
@@ -88,7 +88,13 @@ it costs you nothing now, and saves a long dig later.
 - Up to ~6000 characters; usually far less. Headings and lists are fine.
   For anything long, write it to a file and pass `--detail-file`.
 
-Don't write ready-made answers for the user to tap: the card has none.
+- **`--option`** (repeat it, at most 5): the answers you foresee, each a few
+  words as the user would say them ("批准，今天部署", "先不部署", "改成 3 点再跑").
+  They are not on the card — the card is too thin to decide from — but at the
+  end of the brief in the notice's session, as suggested replies the user taps
+  once they have read it. Every choice you laid out in the brief gets one;
+  for `approve`, give both the yes and the no. Leave them out when no answer
+  can be foreseen.
 
 The notice's session may read yours for more, around the turn the notice
 came from; it passes the decision back as `↩ <the summary>` followed by the

@@ -143,6 +143,23 @@ defmodule Loom.NoticesTest do
     assert {:error, _} = post(s, %{summary: "x", priority: 3, needs: "maybe"})
   end
 
+  test "the brief ends on the options as suggested replies", %{s: s} do
+    {:ok, n} =
+      post(s, %{
+        summary: "换供应商？",
+        priority: 4,
+        needs: "reply",
+        detail: "背景",
+        options: ["换成 B", "先\n不换 -->", "a", "b", "c", "d"]
+      })
+
+    assert Notices.brief(n) =~
+             ~r/背景\n\n<!-- loom:replies\n换成 B\n先 不换 →\na\nb\nc\n-->$/
+
+    {:ok, m} = post(s, %{summary: "看看", priority: 7})
+    refute Notices.brief(m) =~ "loom:replies"
+  end
+
   test "detail and options: kept tidy", %{s: s} do
     many = for i <- 1..12, do: "选项 #{i}"
 

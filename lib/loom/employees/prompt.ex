@@ -144,8 +144,11 @@ defmodule Loom.Employees.Prompt do
     without your session in mind. Write it so they can decide from it alone:
     the situation, the specifics (names, numbers, files, links), what you
     need, the choices with what each leads to, and your recommendation. Up to
-    ~6000 characters. No ready-made answers: the boss says what they decide
-    in that session, and it comes back to you as `↩ <text>` and then the
+    ~6000 characters. `options` (at most 5): the answers you foresee, a few
+    words each as the boss would say them, one per choice in the brief; they
+    are offered as suggested replies at the end of the brief in that session.
+    The boss says what they decide there, and it comes back to you as
+    `↩ <text>` and then the
     boss's words (or `✅ Approved: …` / `❌ Rejected: …`). Give a
     `key` to a report you may update later; reporting the same key again
     replaces it, with a new priority if things changed (it is listed in your
@@ -170,6 +173,7 @@ defmodule Loom.Employees.Prompt do
      "kpis": [{"id": "k_abc", "progress": 40, "status": "doing", "note": "what is left"}],
      "report": {"priority": 4, "text": "what the boss should know or decide",
                 "detail": "the brief: situation, specifics, choices, your pick",
+                "options": ["换供应商", "先不换"],
                 "key": "supplier-switch", "needs": "reply"},
      "withdraw": ["build-failed"],
      "boss": ["回复一律用中文"]}

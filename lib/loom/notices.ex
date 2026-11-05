@@ -872,11 +872,18 @@ defmodule Loom.Notices do
     :exit, _ -> chat(n, nil)
   end
 
-  # What the user sees first: who, what it needs, and the brief.
-  defp brief(n) do
+  # What the user sees first: who, what it needs, and the brief — ending on
+  # the source's foreseen answers as suggested replies (the chat's choice card).
+  @doc false
+  def brief(n) do
     head = "**#{n["source"]["name"]}** · P#{n["priority"]} · #{label(n)}"
-    Enum.join(Enum.reject([head, n["summary"], n["detail"]], &is_nil/1), "\n\n")
+    Enum.join(Enum.reject([head, n["summary"], n["detail"], replies(n)], &is_nil/1), "\n\n")
   end
+
+  defp replies(%{"options" => [_ | _] = options}),
+    do: "<!-- loom:replies\n" <> Enum.join(Enum.take(options, 5), "\n") <> "\n-->"
+
+  defp replies(_), do: nil
 
   # What the agent is told ahead of the user's first message.
   defp about(n, new?) do
@@ -955,7 +962,13 @@ defmodule Loom.Notices do
   defp options(list) when is_list(list) do
     list
     |> Enum.filter(&is_binary/1)
-    |> Enum.map(&(&1 |> String.trim() |> String.slice(0, @option_max)))
+    |> Enum.map(
+      &(&1
+        |> String.replace(~r/\s+/u, " ")
+        |> String.replace("-->", "→")
+        |> String.trim()
+        |> String.slice(0, @option_max))
+    )
     |> Enum.reject(&(&1 == ""))
     |> Enum.uniq()
     |> Enum.take(@options_max)

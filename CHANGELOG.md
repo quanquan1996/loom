@@ -19,6 +19,9 @@ that ran live. Format after [Keep a Changelog](https://keepachangelog.com/).
 ### Changed
 - **The bell acts on your answer**: a notice's session now carries out what you
   decided itself, then tells the employee or task that asked what it did.
+- **Suggested answers in a notice's session**: the answers the employee or task
+  foresaw show as one-tap replies under the brief — in the session, after
+  you have read it, not on the card.
 
 ## [0.6.0] – 2026-11-04
 
