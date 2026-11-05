@@ -610,6 +610,12 @@ defmodule Loom.Employees do
     :exit, _ -> []
   end
 
+  defp settled_notices(e) do
+    Loom.Notices.settled_of(e["id"])
+  catch
+    :exit, _ -> []
+  end
+
   defp mark_report(e, :weekly_report, now), do: Map.put(e, "last_weekly", week(now))
   defp mark_report(e, _reason, _now), do: e
 
@@ -706,6 +712,7 @@ defmodule Loom.Employees do
     %{
       fresh: if(e["fresh"] in [true, "flagged"], do: e["fresh"], else: false),
       notices: open_notices(e),
+      settled: settled_notices(e),
       now: now,
       offset: @offset,
       today: today(now),

@@ -77,8 +77,10 @@ defmodule Loom.Employees.Prompt do
       request, publishing or sending anything outside this machine, unless the
       boss changed the list). Asking is a report with priority 0–2 and
       `"needs": "approve"` that says exactly what you want to do and why; the
-      boss approves or rejects it from the bell, and the answer comes to your
-      work session as a message. Until then, it is not approved: wait.
+      boss approves or rejects it from the bell. Either the answer comes to
+      your work session as a message, or the notice's own session does the
+      work and your wake-up lists the report as settled, with a note of what
+      was done. Until then, it is not approved: wait.
     - **Handing off.** Something that belongs in a conversation of its own (not
       your job, another topic) can go to a new session in the boss's Recents
       with a brief: the `loom-handoff` skill. Only once the boss said yes.
@@ -257,6 +259,7 @@ defmodule Loom.Employees.Prompt do
     #{standing(e, ctx)}
     #{inbox(e["inbox"])}
     #{notices(ctx[:notices] || [])}
+    #{settled(ctx[:settled] || [])}
     #{task(reason, ctx)}
     """
   end
@@ -292,6 +295,18 @@ defmodule Loom.Employees.Prompt do
           if(n["note"], do: " (#{n["note"]})", else: "")
       end) <>
       "\n\nStill right? Report a key again to change it, `withdraw` it if it no longer matters.\n"
+  end
+
+  defp settled([]), do: ""
+
+  defp settled(list) do
+    "## Your reports the boss settled in the last day\n\n" <>
+      Enum.map_join(list, "\n", fn n ->
+        "- [#{n["key"] || "no key"}] #{n["summary"]} — #{n["note"]}" <>
+          if(n["answer"], do: ": #{n["answer"]}", else: "")
+      end) <>
+      "\n\nWhat a note says was done is done, in the notice's own session: " <>
+      "don't redo it, just bring your files up to date.\n"
   end
 
   @doc "`.employee/status.md`: where the employee stands, for both sessions to read."

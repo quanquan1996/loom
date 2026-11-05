@@ -101,6 +101,14 @@ defmodule Loom.Notices do
   @doc "A source's open notices, for it to look over."
   def open_of(source_id, server \\ @name), do: GenServer.call(server, {:open_of, source_id})
 
+  @doc """
+  A source's notices settled in the last day, newest first: how the user's
+  decision reaches it when the notice's own session did the work and sent
+  nothing back (the `answer` says what was done).
+  """
+  def settled_of(source_id, server \\ @name),
+    do: GenServer.call(server, {:settled_of, source_id})
+
   @doc "The user opened it: done if it only asked to be read."
   def read(id, server \\ @name), do: GenServer.call(server, {:read, id})
 
@@ -294,6 +302,22 @@ defmodule Loom.Notices do
     {:reply, open, state}
   end
 
+  def handle_call({:settled_of, source_id}, _from, state) do
+    since = state.clock.() - :timer.hours(24)
+
+    settled =
+      state.notices
+      |> Map.values()
+      |> Enum.filter(
+        &(&1["status"] != "open" and &1["source"]["id"] == source_id and
+            (&1["done_at"] || 0) >= since)
+      )
+      |> Enum.sort_by(&(-&1["done_at"]))
+      |> Enum.map(&view/1)
+
+    {:reply, settled, state}
+  end
+
   def handle_call({:read, id}, _from, state) do
     case state.notices[id] do
       %{"status" => "open", "needs" => "read"} = n ->
@@ -432,6 +456,7 @@ defmodule Loom.Notices do
         "reject" -> {"❌ Rejected: #{n["summary"]}", "reject", "Rejected"}
         "reply" when text != "" -> {"↩ #{n["summary"]}\n\n#{text}", text, "Answered"}
         "reply" -> {:error, "an empty reply", nil}
+        "done" when text != "" -> {nil, text, "Done"}
         "done" -> {nil, nil, "Done"}
         _ -> {:error, "action is approve, reject, reply or done", nil}
       end
@@ -885,7 +910,9 @@ defmodule Loom.Notices do
 
   defp replies(_), do: nil
 
-  # What the agent is told ahead of the user's first message.
+  # What the agent is told ahead of the user's first message: the notice, and
+  # where its source works and keeps its context, so this session can carry
+  # the work out itself.
   defp about(n, new?) do
     from =
       case n["session"] do
@@ -894,7 +921,7 @@ defmodule Loom.Notices do
             if(is_integer(n["anchor"]),
               do: " (the turn that starts at seq #{n["anchor"]})",
               else: ""
-            )
+            ) <> where(s)
 
         _ ->
           "with no session behind it"
@@ -908,6 +935,20 @@ defmodule Loom.Notices do
       else:
         "[Loom: #{n["source"]["name"]} updated notice #{n["id"]}; the message above " <>
           "is its new brief (priority #{n["priority"]}, needs: #{n["needs"]}).]"
+  end
+
+  defp where(session) do
+    cwd =
+      case Agent.Store.read_meta(session) do
+        {:ok, %{cc_cwd: cwd}} when is_binary(cwd) -> "; it works in `#{cwd}`"
+        _ -> ""
+      end
+
+    cwd <>
+      "; its context: `loom-session read #{session}`, transcript " <>
+      "`#{Agent.Store.events_path(session)}`"
+  rescue
+    _ -> ""
   end
 
   defp submit(session, text) do

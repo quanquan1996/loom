@@ -308,6 +308,19 @@ defmodule Loom.NoticesTest do
       assert_received {:submitted, "a_src", "↩ 换供应商？\n\n换成 B，周一开始"}
     end
 
+    test "done with a note settles it, tells the source nothing, and the source sees it", %{c: c} do
+      {:ok, n} = post(c, %{summary: "回滚？", priority: 3, needs: "approve", session: "a_src"})
+      {:ok, d} = Notices.relay(n["id"], n["chat"], "done", "Rejected — rolled back here", c)
+      assert d["status"] == "done" and d["answer"] == "Rejected — rolled back here"
+      refute_received {:submitted, _, _}
+      assert Notices.open_of(@emp.id, c) == []
+
+      assert [%{"id" => id, "answer" => "Rejected — rolled back here"}] =
+               Notices.settled_of(@emp.id, c)
+
+      assert id == n["id"]
+    end
+
     test "a read one opened is done, yet its chat can still pass word on", %{c: c} do
       {:ok, n} = post(c, %{summary: "日报好了", priority: 4, session: "a_src"})
       {:ok, %{"status" => "done"}} = Notices.read(n["id"], c)

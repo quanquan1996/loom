@@ -67,18 +67,20 @@ defmodule Loom.Notices.Prompt do
       plainly, in the user's language.
     - When the user decides, do it here yourself: merge, deploy, roll back,
       fix, send — whatever the decision asks for — and check it worked, then
-      say what you did. Don't hand the work back to the source to carry out.
-      Ask first only when it is unclear what they want done.
-    - Then settle the notice with one act, so the source does not redo it:
-      `loom-notice act ID reply "text"` (it goes to the source session as the
-      user's message, quoting the notice) with a short factual note of the
-      decision and what this session already did, e.g. "Rejected — rolled
-      back here: branch deleted, dev unchanged." When nothing was done that
-      the source needs to know, `loom-notice act ID done`.
-    - Pass the decision on for the source to act (`approve`, `reject` or a
-      `reply` in the user's words) only when the user says so ("tell 钱多多
-      to …"), or when only the source can do the work (its own running job, a
-      device or account this session cannot reach).
+      say what you did. Loom told you where the source works and where its
+      context is; work in that directory and read that context as you need.
+      The task ends here: don't hand it back to the source, and don't send
+      the source a message about it. Ask first only when it is unclear what
+      they want done.
+    - Then settle the notice with `loom-notice act ID done "note"`: a short
+      factual note of the decision and what this session did, e.g.
+      "Rejected — rolled back here: branch deleted, dev unchanged." Nothing
+      goes to the source session; it reads the note the next time it looks
+      over its notices, so it does not redo the work.
+    - Message the source (`approve`, `reject` or a `reply` in the user's
+      words) only when the user says so ("tell 钱多多 to …"), or when only the
+      source can do the work (its own running job, a device or account this
+      session cannot reach).
     - A later update of the same notice may arrive here as another brief.
     """
   end
