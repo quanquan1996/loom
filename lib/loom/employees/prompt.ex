@@ -269,13 +269,60 @@ defmodule Loom.Employees.Prompt do
     [Wake-up from Loom — #{date_time(ctx.now, ctx.offset)} (the boss's time), because: #{why}]
 
     #{fresh(ctx)}
-    #{standing(e, ctx)}
+    #{once(:standing, e, ctx)}
     #{inbox(e["inbox"])}
-    #{notices(ctx[:notices] || [])}
-    #{settled(ctx[:settled] || [])}
+    #{once(:notices, e, ctx)}
+    #{once(:settled, e, ctx)}
     #{task(reason, ctx)}
     """
   end
+
+  @doc """
+  A fingerprint of each repeatable section of a wake-up, for `wake/3` to tell
+  next time (as `ctx.sent`) what the same session was already given. The
+  budget line is left out of `standing`: it changes every turn and is always
+  sent.
+  """
+  def marks(e, ctx) do
+    %{
+      "standing" => :erlang.phash2(standing(e, Map.put(ctx, :spent, 0))),
+      "notices" => :erlang.phash2(notices(ctx[:notices] || [])),
+      "settled" => :erlang.phash2(settled(ctx[:settled] || []))
+    }
+  end
+
+  # A section the session already has, unchanged, goes as one line; an idle
+  # heartbeat otherwise re-sends ~3k tokens that stay in the context.
+  defp once(section, e, ctx) do
+    full = section(section, e, ctx)
+    key = Atom.to_string(section)
+
+    cond do
+      full == "" -> ""
+      is_map(ctx[:sent]) and ctx[:sent][key] == marks(e, ctx)[key] -> same(section, e, ctx)
+      true -> full
+    end
+  end
+
+  defp section(:standing, e, ctx), do: standing(e, ctx)
+  defp section(:notices, _e, ctx), do: notices(ctx[:notices] || [])
+  defp section(:settled, _e, ctx), do: settled(ctx[:settled] || [])
+
+  defp same(:standing, e, ctx) do
+    """
+    ## You
+
+    Profile, rules, projects, permissions and KPIs are as in your last
+    wake-up (also in `.employee/status.md`).
+    - Budget today: #{Loom.Employees.amount(e, ctx.spent)} used of #{Loom.Employees.amount(e, ctx.cap)} — #{Loom.Employees.amount(e, max(ctx.cap - ctx.spent, 0))} left
+    """
+  end
+
+  defp same(:notices, _e, _ctx),
+    do: "## Your reports still open in the boss's bell\n\nThe same as in your last wake-up.\n"
+
+  defp same(:settled, _e, _ctx),
+    do: "## Your reports the boss settled in the last day\n\nThe same as in your last wake-up.\n"
 
   defp fresh(%{fresh: true}) do
     """

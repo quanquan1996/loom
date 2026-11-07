@@ -71,7 +71,11 @@ defmodule Loom.Employees do
   @offset 480
   @log_kept 100
   @past_kept 60
-  @fresh_tokens 60_000
+  # Measured on a 10-minute heartbeat (2026-11): a fresh session rewrites
+  # ~60k tokens of cache, an idle wake-up adds ~3k and reads the rest. At 60k
+  # it turned over every ~5 wake-ups and the rewrites were half the spend;
+  # ~150k is where re-reading the longer context starts to cost more.
+  @fresh_tokens 150_000
   @fresh_turns 12
   @chat_quiet_ms :timer.minutes(30)
   @write_handoff "Loom starts your work session afresh from your next wake-up. Before this turn ends, write HANDOFF.md as the rules say, so the new session can carry on."
@@ -576,7 +580,8 @@ defmodule Loom.Employees do
 
   defp wake_up(e, reason, now, boss) do
     with {:ok, e} <- e |> turn_over(now) |> ensure_sessions(),
-         prompt = Prompt.wake(e, reason, context(e, boss, now)),
+         ctx = Map.put(context(e, boss, now), :sent, sent(e)),
+         prompt = Prompt.wake(e, reason, ctx),
          {:ok, _} <-
            Agent.submit(e["work_session"], Prompt.display(e, reason, now, @offset),
              origin: "employee",
@@ -590,7 +595,8 @@ defmodule Loom.Employees do
         "wake_at" => nil,
         "wake_reason" => nil,
         "inbox" => [],
-        "fresh" => false
+        "fresh" => false,
+        "wake_sent" => Map.put(Prompt.marks(e, ctx), "session", e["work_session"])
       })
       |> mark_report(reason, now)
     else
@@ -603,6 +609,15 @@ defmodule Loom.Employees do
       Logger.warning("Loom.Employees: #{e["id"]} could not wake: #{inspect(reason)}")
       Map.put(e, "wake_at", now + min_gap(e))
   end
+
+  # What the last wake-up of this same work session already carried, so an
+  # unchanged section goes as one line instead of again in full. A new
+  # session (or one Loom marks fresh) gets everything.
+  defp sent(%{"wake_sent" => %{"session" => s} = sent, "work_session" => s} = e)
+       when is_binary(s),
+       do: if(e["fresh"] in [true, "flagged"], do: nil, else: sent)
+
+  defp sent(_e), do: nil
 
   defp open_notices(e) do
     Loom.Notices.open_of(e["id"])
@@ -1719,7 +1734,7 @@ defmodule Loom.Employees do
       end
 
     e
-    |> Map.drop(["inbox", "spend", "turns", "extra", "approval_asked", "fresh", "turn_reason"])
+    |> Map.drop(["inbox", "spend", "turns", "extra", "approval_asked", "fresh", "turn_reason", "wake_sent"])
     |> Map.merge(%{
       "status" => status,
       "spent_today" => spent(e, now),
