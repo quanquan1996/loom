@@ -889,6 +889,12 @@ defmodule Loom.Employees do
   # done is the boss's to say.
   defp apply_kpis(e, %{"kpis" => updates}) when is_list(updates) do
     Enum.reduce(updates, e, fn
+      %{"id" => id, "remove" => true}, e ->
+        # Only a KPI it added itself; the boss's stay.
+        Map.update!(e, "kpis", fn kpis ->
+          Enum.reject(kpis, &(&1["id"] == id and &1["by"] == "employee"))
+        end)
+
       %{"id" => id} = u, e ->
         u = Map.take(u, ["progress", "status", "note"])
         u = if u["status"] == "done", do: Map.put(u, "status", "review"), else: u
@@ -908,7 +914,10 @@ defmodule Loom.Employees do
   # KPIs the boss gave it in chat, written down by the chat session.
   defp apply_added(e, %{"kpi_add" => added}) when is_list(added) do
     kpis =
-      for attrs <- added, is_map(attrs), {:ok, kpi} <- [new_kpi(attrs)], do: kpi
+      for attrs <- added,
+          is_map(attrs),
+          {:ok, kpi} <- [new_kpi(attrs)],
+          do: Map.put(kpi, "by", "employee")
 
     Map.update!(e, "kpis", &(&1 ++ kpis))
   end

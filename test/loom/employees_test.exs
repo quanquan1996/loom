@@ -359,6 +359,34 @@ defmodule Loom.EmployeesTest do
     assert e["wake_at"] <= System.system_time(:millisecond)
   end
 
+  test "the chat removes a KPI it added, never the boss's", %{server: server} do
+    {:ok, e} = Employees.create(%{"name" => "小研"}, server)
+
+    {:ok, %{"kpis" => [%{"id" => boss_kpi}]}} =
+      Employees.add_kpi(e["id"], %{"title" => "Boss's"}, server)
+
+    {:ok, _} = Agent.submit(e["chat_session"], "track Y")
+    BackendStub.await_turn()
+    end_turn(e["chat_session"], card(%{"kpi_add" => [%{"title" => "Y"}]}), server)
+
+    {:ok, e} = Employees.get(e["id"], server)
+    [_, %{"id" => own, "by" => "employee"}] = e["kpis"]
+
+    {:ok, _} = Agent.submit(e["chat_session"], "don't make KPIs")
+    BackendStub.await_turn()
+
+    end_turn(
+      e["chat_session"],
+      card(%{
+        "kpis" => [%{"id" => own, "remove" => true}, %{"id" => boss_kpi, "remove" => true}]
+      }),
+      server
+    )
+
+    {:ok, e} = Employees.get(e["id"], server)
+    assert [%{"id" => ^boss_kpi}] = e["kpis"]
+  end
+
   test "the boss profile: heard by one, followed by all, kept by the boss", %{
     server: server,
     dir: dir
