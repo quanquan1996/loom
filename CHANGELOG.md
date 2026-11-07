@@ -25,6 +25,13 @@ that ran live. Format after [Keep a Changelog](https://keepachangelog.com/).
 - **One card for the night's sleep**: every project's Dream proposals gather in
   one notice; its session asks one question per project, and a project with
   nothing to ask posts nothing.
+- **Employees do it in the chat**: when you ask an employee something in its
+  chat, it does it there; it adds a KPI only when you ask for one, and can
+  remove a KPI it added. What it can't see (calls, SFDC), it asks about
+  ("done yet?") instead of calling it undone.
+- **Cheaper idle wake-ups**: an employee's work session turns over at 150k
+  tokens instead of 60k, and wake-up sections that haven't changed are sent
+  as one line.
 
 ## [0.6.0] – 2026-11-04
 
