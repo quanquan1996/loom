@@ -33,6 +33,10 @@ that ran live. Format after [Keep a Changelog](https://keepachangelog.com/).
   tokens instead of 60k, and wake-up sections that haven't changed are sent
   as one line.
 
+### Fixed
+- **iPhone dialogs clear the notch**: in the iPhone home-screen app, tall
+  dialogs such as Devices no longer run under the notch and home indicator.
+
 ## [0.6.0] – 2026-11-04
 
 ### Added
