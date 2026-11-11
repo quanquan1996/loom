@@ -17,6 +17,9 @@ that ran live. Format after [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Changed
+- **Project files open on the project page**: a Markdown, image, video, PDF,
+  web page, table or text file in the Files tab now opens in place with the
+  canvas's viewers; the download mark on its row still downloads it.
 - **A bell notice's session is a chat like any other once you answer in it**:
   it can be continued in a new chat and referenced from another one.
 - **The bell acts on your answer**: a notice's session now carries out what you
