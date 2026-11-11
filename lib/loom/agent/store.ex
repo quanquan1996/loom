@@ -200,6 +200,19 @@ defmodule Loom.Agent.Store do
   end
 
   @doc """
+  Whether a session (its header, or `Loom.Agent.info/1`) is a chat of the
+  user's own: one of Recents' plain ones, or a bell notice's own session once
+  the user wrote in it (from then on it is listed in Recents too). Those may be
+  continued in a new chat (`Loom.Agent.Carry`), referenced from another
+  (`Loom.Agent.Refs`) and read with `loom-session read`. Employee, Dream,
+  task, incognito and bell sessions are not.
+  """
+  def own_chat?(info) when is_map(info) do
+    info[:employee_id] == nil and
+      (info[:kind] == nil or (info[:kind] == "notice" and (info[:turns] || 0) > 0))
+  end
+
+  @doc """
   Read one session's header, or `:error` if it is missing, unreadable, or not
   a header we recognise.
 

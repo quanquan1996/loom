@@ -19,6 +19,7 @@ import {
   type AgentInfo,
   type Project,
   type TreeFile,
+  isOwnChat,
 } from "./api"
 import { RenameInput } from "./Confirm"
 import { build, formatTime, iconFor, type Node as TreeNode } from "./FileBrowser"
@@ -334,7 +335,7 @@ function Sessions({
           anchor={menu.anchor}
           onRename={() => onRename(menuFor.id)}
           onPin={(on) => onPin(menuFor.id, on)}
-          onContinue={menuFor.kind == null && !menuFor.employee_id ? (backend?: AgentBackend) => onContinue(menuFor.id, backend) : undefined}
+          onContinue={isOwnChat(menuFor) ? (backend?: AgentBackend) => onContinue(menuFor.id, backend) : undefined}
           onMove={(projectId) => onMove(menuFor.id, projectId)}
           onArchive={(on) => onArchive(menuFor.id, on)}
           onDelete={() => onDelete(menuFor.id)}

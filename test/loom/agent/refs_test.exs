@@ -24,12 +24,19 @@ defmodule Loom.Agent.RefsTest do
     meta.("a_other", %{})
     meta.("a_incog", %{kind: "incognito"})
     meta.("a_emp", %{employee_id: "e_1"})
+    meta.("a_notice", %{kind: "notice", turns: 1})
+    meta.("a_notice0", %{kind: "notice", turns: 0})
     :ok
   end
 
   test "describes ordinary sessions, drops itself and repeats" do
     assert {:ok, [%{id: "a_plain", title: "T a_plain"}, %{id: "a_other"}]} =
              Refs.verify("a_self", ["a_plain", "a_self", "a_other", "a_plain"])
+  end
+
+  test "a bell notice's session once the user wrote in it, not before" do
+    assert {:ok, [%{id: "a_notice"}]} = Refs.verify("a_self", ["a_notice"])
+    assert {:error, {:not_a_session, "a_notice0"}} = Refs.verify("a_self", ["a_notice0"])
   end
 
   test "refuses what is not an ordinary session" do

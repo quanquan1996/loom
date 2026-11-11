@@ -47,8 +47,7 @@ defmodule Loom.Agent.Refs do
   defp describe(id) do
     with true <- Regex.match?(~r/\A[A-Za-z0-9_-]{1,64}\z/, id),
          {:ok, meta} <- Store.read_meta(id),
-         nil <- meta[:kind],
-         nil <- meta[:employee_id] do
+         true <- Store.own_chat?(meta) do
       %{id: id, title: meta[:title] || id}
     else
       _ -> nil

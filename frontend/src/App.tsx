@@ -45,6 +45,7 @@ import {
   type Employee,
   type Notice,
   type Project,
+  isOwnChat,
 } from "./api"
 import { NoticesSheet } from "./Notices"
 import { dropSocket } from "./socket"
@@ -810,7 +811,7 @@ function App() {
     },
     focus: focusNotice ? { notice: focusNotice, onAnswered: upsertNotice } : null,
     onContinue:
-      active.kind == null && !active.employee_id
+      isOwnChat(active)
         ? (backend?: AgentBackend) => carryOn(active.id, backend)
         : undefined,
     onSwitch: narrow && working.length > 0 ? () => setSwitching(true) : undefined,

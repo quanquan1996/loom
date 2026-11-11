@@ -1344,3 +1344,8 @@ export async function shareImage(id: string, html: string, css: string): Promise
   }
   return res.blob()
 }
+
+/** A chat of the user's own: Recents' plain ones, and a bell notice's once they wrote in it.
+ *  These may be continued in a new chat and referenced from another. */
+export const isOwnChat = (s: Pick<AgentInfo, "kind" | "employee_id" | "turns">) =>
+  !s.employee_id && (s.kind == null || (s.kind === "notice" && s.turns > 0))

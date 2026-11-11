@@ -93,6 +93,7 @@ import {
   type AgentInfo,
   type Notice,
   type OutputFile,
+  isOwnChat,
 } from "./api"
 import "./Chat.css"
 
@@ -475,7 +476,7 @@ export function Chat({
           attachments={attachments}
           refs={refs}
           setRefs={setRefs}
-          recent={(recent ?? []).filter((s) => s.id !== session.id && s.kind == null)}
+          recent={(recent ?? []).filter((s) => s.id !== session.id && isOwnChat(s))}
           onSubmit={send}
           onInterrupt={interrupt}
           tools={<EffortButton session={session} />}

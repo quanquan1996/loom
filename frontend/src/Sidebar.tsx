@@ -24,6 +24,7 @@ import {
 } from "lucide-react"
 import { useEffect, useState, type MouseEvent } from "react"
 import type { AgentBackend, AgentInfo, Device, Employee, Notice, Project } from "./api"
+import { isOwnChat } from "./api"
 import { Avatar, BudgetRing, short, STATUS, StatusIcon } from "./Employees"
 import { BellButton } from "./Notices"
 import { RenameInput } from "./Confirm"
@@ -475,7 +476,7 @@ export function Sidebar({
           anchor={menu.anchor}
           onRename={() => onRename(menuFor.id)}
           onPin={(on) => onPin(menuFor.id, on)}
-          onContinue={menuFor.kind == null && !menuFor.employee_id ? (backend?: AgentBackend) => onContinue(menuFor.id, backend) : undefined}
+          onContinue={isOwnChat(menuFor) ? (backend?: AgentBackend) => onContinue(menuFor.id, backend) : undefined}
           onMove={(projectId) => onMove(menuFor.id, projectId)}
           onArchive={(on) => onArchive(menuFor.id, on)}
           onDone={working.some((w) => w.id === menuFor.id) ? () => onDone(menuFor.id) : undefined}

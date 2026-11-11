@@ -63,13 +63,14 @@ defmodule Loom.Agent.Carry do
   defp fork(_how, _id), do: []
 
   # Only the sidebar's own: an employee's, Dream's or the bell's sessions are
-  # carried on by what runs them.
+  # carried on by what runs them. A bell notice's own session is the user's
+  # once they wrote in it, and it is listed in Recents from then on.
   defp source(id) do
     info = if Agent.exists?(id), do: Agent.info(id)
 
     cond do
       info == nil -> {:error, "#{id}: no such session"}
-      info.kind != nil or info[:employee_id] != nil -> {:error, "#{id}: not a chat of yours"}
+      not Loom.Agent.Store.own_chat?(info) -> {:error, "#{id}: not a chat of yours"}
       true -> {:ok, info}
     end
   catch

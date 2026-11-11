@@ -340,8 +340,10 @@ defmodule LoomWeb.TidyController do
   defp plain(id) do
     case safe_info(id) do
       nil -> {:error, "#{id}: no such session"}
-      %{kind: nil} = info when not is_map_key(info, :employee_id) or info.employee_id == nil -> {:ok, info}
-      _ -> {:error, "#{id}: not in Recents, not for reading"}
+      info ->
+        if Loom.Agent.Store.own_chat?(info),
+          do: {:ok, info},
+          else: {:error, "#{id}: not in Recents, not for reading"}
     end
   end
 

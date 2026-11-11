@@ -17,6 +17,8 @@ that ran live. Format after [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Changed
+- **A bell notice's session is a chat like any other once you answer in it**:
+  it can be continued in a new chat and referenced from another one.
 - **The bell acts on your answer**: a notice's session now carries out what you
   decided itself, then tells the employee or task that asked what it did.
 - **Suggested answers in a notice's session**: the answers the employee or task
