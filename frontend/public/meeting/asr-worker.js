@@ -77,7 +77,8 @@ function recognizerConfig(hotwords) {
     .split("\n")
     .map((l) => l.trim())
     .filter((l) => l && !l.startsWith("#"))
-    .map((l) => l.toUpperCase())
+    // A colon inside a word ("re:Invent") aborts the wasm; only " :score" may have one.
+    .map((l) => l.replace(/:(?!\s*[\d.]+\s*$)/g, " ").toUpperCase())
   const empty = { encoder: "", decoder: "" }
   return {
     featConfig: { sampleRate: 16000, featureDim: 80 },
