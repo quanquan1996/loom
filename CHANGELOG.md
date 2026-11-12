@@ -41,6 +41,8 @@ that ran live. Format after [Keep a Changelog](https://keepachangelog.com/).
 ### Fixed
 - **iPhone dialogs clear the notch**: in the iPhone home-screen app, tall
   dialogs such as Devices no longer run under the notch and home indicator.
+- **Hotwords with a colon**: in meeting mode, a hotword containing a colon
+  (such as re:Invent) no longer makes Start fail.
 
 ## [0.6.0] – 2026-11-04
 
