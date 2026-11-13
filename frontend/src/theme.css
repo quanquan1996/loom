@@ -2150,3 +2150,55 @@ body.sidebar-resizing iframe {
   float: right;
   font-variant-numeric: tabular-nums;
 }
+
+/* Settings → Sign-in, and the sign-in request (SignIn.tsx). */
+.signin-page .settings-label {
+  margin: 0;
+}
+
+.signin-gap {
+  margin-top: 16px !important;
+}
+
+.signin-page .archived-open {
+  cursor: default;
+}
+
+.signin-add {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.signin-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  font-size: 0.875rem;
+}
+
+.signin-error {
+  color: var(--red);
+  font-size: 0.8125rem;
+}
+
+.signin-request {
+  max-width: 360px;
+}
+
+.signin-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.signin-allow {
+  background: var(--fg);
+  color: var(--bg);
+  border-color: var(--fg);
+}

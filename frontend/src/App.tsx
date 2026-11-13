@@ -11,6 +11,7 @@ import { Login } from "./Login"
 import { usePush, useVisible } from "./push"
 import { ProjectDialog } from "./Projects"
 import { SettingsDialog } from "./Settings"
+import { SignInRequest } from "./SignIn"
 import { useSettings } from "./settings"
 import { Tasks } from "./Tasks"
 import { focused, isOpen, PROJECTS_SECTION, Sidebar, sidebarGroups, sidebarOrder } from "./Sidebar"
@@ -144,6 +145,7 @@ function App() {
     notices,
     upsertNotice,
     todos,
+    authPending,
     loaded,
     upsert,
     drop,
@@ -1134,6 +1136,7 @@ function App() {
           {oops}
         </div>
       )}
+      <SignInRequest pending={authPending} />
       <WhichKey pending={pending} keymap={keymap} groups={{ "Space n": "new session" }} />
       {help && (
         <KeyHelp

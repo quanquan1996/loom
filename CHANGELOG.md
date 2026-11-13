@@ -16,6 +16,17 @@ that ran live. Format after [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added
+- **Passkey sign-in and approval from a signed-in device**: Settings → Sign-in
+  adds a passkey on this device (Face ID, Touch ID, Windows Hello, Android
+  screen lock; the password is asked again), which then signs in with one tap.
+  Once any device is signed in, the password alone no longer lets a new one
+  in: every signed-in device shows *Sign-in request · Allow / Deny* (and the
+  phone gets a push) for two minutes. Each device is its own login, listed in
+  Settings → Sign-in and signed out from there; one unused for 30 days lapses.
+  Existing logins carry over without signing in again. Passkey checks ported
+  from upstream e7a6339; the approval step and per-client brake are ours.
+
 ### Changed
 - **Project files open on the project page**: a Markdown, image, video, PDF,
   web page, table or text file in the Files tab now opens in place with the
