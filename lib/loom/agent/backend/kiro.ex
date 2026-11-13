@@ -1,9 +1,10 @@
 defmodule Loom.Agent.Backend.Kiro do
   @moduledoc """
-  Kiro CLI over the Agent Client Protocol: `kiro-cli-chat acp`, JSON-RPC on
+  Kiro CLI over the Agent Client Protocol: `kiro-cli acp`, JSON-RPC on
   stdio, one process per session — Claude Code's model (see `ClaudeCode`):
   spawned on the first turn, kept warm between turns, killed by `release/1`.
-  Measured on kiro-cli 1.28.1.
+  Measured on kiro-cli 1.28.1; 3.3.0 (2026-11-13) speaks the same ACP and
+  loads conversations 1.28.1 wrote.
 
   ## A spawn is a handshake, then the turn
 
@@ -29,7 +30,9 @@ defmodule Loom.Agent.Backend.Kiro do
   `kiro-cli` is a launcher for `kiro-cli-chat`; the launcher killed, the child
   lives on and holds the conversation's lock ("Session is active in another
   process"), so the next `session/load` fails. The child is spawned directly,
-  and killed with its descendants (`ClaudeCode.kill_tree/1`).
+  and killed with its descendants (`ClaudeCode.kill_tree/1`). From 3.x there
+  is no `kiro-cli-chat`: `kiro-cli acp` is the one process, spawned the same
+  way. 1.x servers refuse the client (`UnsupportedClientVersionException`).
 
   ## It outlives the node
 
@@ -665,11 +668,20 @@ defmodule Loom.Agent.Backend.Kiro do
   # ── Misc ────────────────────────────────────────────────────────────────
 
   defp executable do
-    configured = Application.get_env(:loom, Loom.Agent, [])[:kiro_cli] || "kiro-cli-chat"
+    names =
+      case Application.get_env(:loom, Loom.Agent, [])[:kiro_cli] do
+        nil -> ["kiro-cli-chat", "kiro-cli"]
+        configured -> [configured]
+      end
 
-    case System.find_executable(configured) ||
-           System.find_executable(Path.expand("~/.local/bin/" <> configured)) do
-      nil -> {:error, "could not find the `#{configured}` executable on PATH"}
+    found =
+      Enum.find_value(names, fn name ->
+        System.find_executable(name) ||
+          System.find_executable(Path.expand("~/.local/bin/" <> name))
+      end)
+
+    case found do
+      nil -> {:error, "could not find `#{Enum.join(names, "` or `")}` on PATH"}
       path -> {:ok, path}
     end
   end

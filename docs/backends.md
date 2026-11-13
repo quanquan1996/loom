@@ -282,7 +282,10 @@ kept warm, released when idle.
   answers. Dropped: they are history.
 - **Spawn `kiro-cli-chat`, kill the tree.** `kiro-cli` is a launcher; killed,
   it leaves `kiro-cli-chat` holding the conversation's lock, and the next load
-  fails with "Session is active in another process".
+  fails with "Session is active in another process". kiro-cli 3.x (3.3.0,
+  2026-11-13) dropped `kiro-cli-chat`: `kiro-cli acp` is a single process, and
+  Loom falls back to it. 1.x is now refused by the service
+  (`UnsupportedClientVersionException`); `kiro-cli update -y` fixes that.
 - **No system prompt in ACP.** Each session gets a Kiro agent,
   `~/.kiro/agents/loom-<session>.json`, whose `prompt` is Loom's instructions,
   with every tool, named by `--agent`. Unlike Claude Code it is read on every
