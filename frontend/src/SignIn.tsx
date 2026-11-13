@@ -13,6 +13,9 @@ import {
   type PendingSignIn,
 } from "./api"
 
+// An IPv6 address is too long for a phone's row; its first half says enough.
+const shortIp = (ip: string) => (ip.includes(":") ? ip.split(":").slice(0, 4).join(":") + ":…" : ip)
+
 const since = (iso: string | null) => {
   if (!iso) return "never"
   const s = Math.max(0, (Date.now() - Date.parse(iso)) / 1000)
@@ -73,10 +76,10 @@ export function SignInPage() {
       </p>
       {overview.passkeys.length === 0 && <p className="settings-hint">None yet.</p>}
       {overview.passkeys.map((p) => (
-        <div className="archived-item" key={p.id}>
-          <div className="archived-open">
-            <span className="archived-title">{p.name}</span>
-            <span className="archived-project">used {since(p.last_used_at)}</span>
+        <div className="signin-item" key={p.id}>
+          <div className="signin-body">
+            <span className="signin-name">{p.name}</span>
+            <span className="signin-meta">used {since(p.last_used_at)}</span>
           </div>
           <button
             className="icon-btn"
@@ -121,19 +124,24 @@ export function SignInPage() {
       )}
 
       <p className="settings-label signin-gap">Signed-in devices</p>
-      <p className="settings-hint">Each signs out after {overview.idle_days} days unused.</p>
-      {overview.logins.map((l) => {
+      <p className="settings-hint">
+        Each signs out after {overview.idle_days} days unused. A device shows up here the next time it
+        opens Loom.
+      </p>
+      {[...overview.logins]
+        .sort((a, b) => Number(b.id === overview.current) - Number(a.id === overview.current))
+        .map((l) => {
         const me = l.id === overview.current
         return (
-          <div className="archived-item" key={l.id}>
-            <div className="archived-open">
-              <span className="archived-title">
+          <div className="signin-item" key={l.id}>
+            <div className="signin-body">
+              <span className="signin-name">
                 {l.name}
-                {me ? " (this device)" : ""}
+                {me && <span className="signin-me">This device</span>}
               </span>
-              <span className="archived-project">
+              <span className="signin-meta" title={l.ip ?? undefined}>
                 {l.method} · {since(l.last_seen_at)}
-                {l.ip ? ` · ${l.ip}` : ""}
+                {l.ip ? ` · ${shortIp(l.ip)}` : ""}
               </span>
             </div>
             <button
