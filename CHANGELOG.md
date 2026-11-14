@@ -48,12 +48,22 @@ that ran live. Format after [Keep a Changelog](https://keepachangelog.com/).
 - **Cheaper idle wake-ups**: an employee's work session turns over at 150k
   tokens instead of 60k, and wake-up sections that haven't changed are sent
   as one line.
+- **Model menu follows the newest**: *Opus (latest)* and *Fable (latest)* move
+  on as new versions come out, instead of being pinned to one; *Other…* takes
+  any model id, for one newer than the list.
 
 ### Fixed
 - **iPhone dialogs clear the notch**: in the iPhone home-screen app, tall
   dialogs such as Devices no longer run under the notch and home indicator.
 - **Hotwords with a colon**: in meeting mode, a hotword containing a colon
   (such as re:Invent) no longer makes Start fail.
+- **Kiro with kiro-cli 3.x**: Kiro sessions work again after kiro-cli 3.x,
+  which dropped `kiro-cli-chat` (the old 1.x client is now refused by the
+  service).
+
+### Security
+- Dependencies with security fixes: bandit 1.14.1, plug_crypto 2.2.1,
+  vite 8.3.8.
 
 ## [0.6.0] – 2026-11-04
 
