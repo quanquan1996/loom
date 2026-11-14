@@ -1167,8 +1167,9 @@ const BACKENDS: { id: AgentBackend; label: string; hint: string }[] = [
 // Each agent's models, its best first: what an employee starts on.
 const MODELS: Record<AgentBackend, [string, string][]> = {
   claude_code: [
-    ["opus", "Opus"],
-    ["sonnet", "Sonnet"],
+    ["opus", "Opus (latest)"],
+    ["fable", "Fable (latest)"],
+    ["us.anthropic.claude-sonnet-5-5", "Sonnet 5.5"],
   ],
   kiro: [
     ["claude-opus-5.5", "Claude Opus 5.5"],

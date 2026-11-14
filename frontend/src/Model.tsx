@@ -10,6 +10,7 @@ export const modelLabel = (model: string | null | undefined) => (model ? modelNa
  * The models a session can be on: the agent's default, then `MODELS` for its
  * backend. A pick is the session's, kept by the server and given to the agent
  * as the next turn starts; a turn already running keeps the one it began with.
+ * "Other…" takes any id the agent knows, for a model newer than the list.
  */
 export function ModelList({
   session,
@@ -46,6 +47,16 @@ export function ModelList({
           {model === current && <Check className="session-menu-more" />}
         </button>
       ))}
+      <button
+        role="menuitem"
+        onClick={() => {
+          const typed = window.prompt("Model id", current ?? "")?.trim()
+          if (typed) pick(typed)
+          else onDone()
+        }}
+      >
+        <span className="session-menu-label">Other…</span>
+      </button>
       <div className="session-menu-note">From the next message on.</div>
     </>
   )

@@ -627,15 +627,17 @@ export const EFFORTS: Record<AgentBackend, string[]> = {
 }
 
 /**
- * The models offered for each agent, besides its default: Bedrock's for
- * Claude Code, Bedrock Mantle's for Codex (`~/.codex/config.toml`), and what
+ * The models offered for each agent, besides its default and "Other…" (any
+ * id, typed): Bedrock's for Claude Code — `opus` and `fable` are Claude
+ * Code's aliases for the newest of each, so they move on as it updates
+ * (its `sonnet`/`haiku` still mean 4.5 on Bedrock, hence the full ids) — Bedrock Mantle's for Codex (`~/.codex/config.toml`), and what
  * `kiro-cli chat --list-models` lists. The server takes any id; this is only
  * the menu.
  */
 export const MODELS: Record<AgentBackend, string[]> = {
   claude_code: [
-    "us.anthropic.claude-opus-5-5",
-    "us.anthropic.claude-fable-5-1[1m]",
+    "opus",
+    "fable",
     "us.anthropic.claude-sonnet-5-5",
     "us.anthropic.claude-haiku-5-5",
   ],
@@ -657,6 +659,8 @@ export const MODELS: Record<AgentBackend, string[]> = {
  * `claude-opus-5.5` are both "Opus 5.5", `openai.gpt-6-astra` "GPT-6 Astra".
  */
 export function modelName(id: string): string {
+  const alias = id.match(/^(opus|fable|sonnet|haiku)(\[1m\])?$/)
+  if (alias) return `${alias[1][0].toUpperCase()}${alias[1].slice(1)} (latest)`
   const bare = id.replace(/\[.*\]$/, "").replace(/^(us|eu|apac|global)\./, "").replace(/^(anthropic|openai)\./, "")
   const claude = bare.match(/^claude-([a-z]+)-(\d+)(?:[-.](\d))?(?![\d])/)
   if (claude) {
