@@ -1038,8 +1038,19 @@ async function apiCall<T>(url: string, init: RequestInit): Promise<T> {
   return body
 }
 
-/** Sessions whose conversation mentions `q`, newest match first; see `Loom.Agent.Search`. */
-export type SearchHit = { id: string; seq: number; at: number; snippet: string }
+/**
+ * Sessions with all the words of `q`, in the order to show them; see
+ * `Loom.Agent.Search.ranked/2`. Tier 1: recent ones the user wrote in; 2: the
+ * rest. `match`: where the words are. `snippet` is null for a title match.
+ */
+export type SearchHit = {
+  id: string
+  tier: 1 | 2
+  match: "title" | "mine" | "said"
+  seq: number | null
+  at: number
+  snippet: string | null
+}
 export async function searchSessions(q: string, signal?: AbortSignal): Promise<SearchHit[]> {
   const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`, { headers: authHeaders(), signal })
   if (res.status === 401) throw unauthorized()

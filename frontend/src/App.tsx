@@ -49,6 +49,7 @@ import {
   isOwnChat,
 } from "./api"
 import { NoticesSheet } from "./Notices"
+import { SearchSheet } from "./Search"
 import { dropSocket } from "./socket"
 import "./App.css"
 // Last, so it decides the look over every other stylesheet.
@@ -450,6 +451,7 @@ function App() {
   // brief; an older one without, to the turn it came from, with the notice
   // under it.
   const [bellOpen, setBellOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
   const [focusId, setFocusId] = useState<string | null>(null)
   const focusNotice = focusId ? notices.find((n) => n.id === focusId) : undefined
   const openNotice = (n: Notice) => {
@@ -788,6 +790,10 @@ function App() {
         setBellOpen(true)
         setDrawerOpen(false)
       }}
+      onOpenSearch={() => {
+        setSearchOpen(true)
+        setDrawerOpen(false)
+      }}
       activeEmployeeId={view === "chat" ? (activeEmployee?.id ?? null) : null}
       onOpenEmployee={(id) => openEmployee(id, "updates")}
       onHire={() => {
@@ -1103,6 +1109,13 @@ function App() {
           }}
           onChat={() => void setupChat()}
           onClose={() => setHiring(false)}
+        />
+      )}
+      {searchOpen && (
+        <SearchSheet
+          sessions={everything.filter((s) => s.kind !== "incognito")}
+          onSelect={select}
+          onClose={() => setSearchOpen(false)}
         />
       )}
       {bellOpen && (
