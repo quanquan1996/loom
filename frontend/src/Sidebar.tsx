@@ -16,6 +16,7 @@ import {
   MoreHorizontal,
   PanelLeft,
   PinOff,
+  Search,
   Settings,
   SquarePen,
   UserPlus,
@@ -167,6 +168,7 @@ type Props = {
   // The bell, whose button sits beside Search; see Notices.tsx.
   notices: Notice[]
   onOpenBell: () => void
+  onOpenSearch: () => void
 }
 
 export function Sidebar({
@@ -209,6 +211,7 @@ export function Sidebar({
   onHire,
   notices,
   onOpenBell,
+  onOpenSearch,
 }: Props) {
   // Ages are relative, so they go stale without any new data. A local clock,
   // not a poll: nothing is fetched.
@@ -326,6 +329,9 @@ export function Sidebar({
       <div className="sidebar-head">
         <span className="brand">loom</span>
         <span className="sidebar-actions">
+          <button className="icon-btn search-btn" onClick={onOpenSearch} title="Search chats">
+            <Search />
+          </button>
           <BellButton notices={notices} onClick={onOpenBell} />
           {/* A phone's drawer is put away by a swipe or a tap beside it. */}
           {!narrow && (

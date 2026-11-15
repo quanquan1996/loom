@@ -1761,10 +1761,24 @@ body.sidebar-resizing iframe {
 }
 
 .search-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  font-size: 1rem;
+}
+
+.search-title-text {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  font-size: 1rem;
+  min-width: 0;
+}
+
+.search-tag {
+  flex: none;
+  color: var(--fg-dim);
+  font-size: 0.75rem;
 }
 
 .search-snippet {
@@ -1780,6 +1794,29 @@ body.sidebar-resizing iframe {
 .search-row b {
   color: var(--fg);
   font-weight: 600;
+}
+
+/* Behind it, what the sidebar does not list: archived, employees', … */
+.search-more {
+  display: block;
+  margin: 6px auto 0;
+  padding: 8px 16px;
+  border: 1px solid color-mix(in srgb, var(--fg) 18%, transparent);
+  border-radius: 999px;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.search-more:hover {
+  background: color-mix(in srgb, var(--fg) 6%, transparent);
+}
+
+.search-more-count {
+  color: var(--fg-dim);
+  margin-left: 4px;
 }
 
 .search-empty {

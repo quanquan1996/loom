@@ -255,6 +255,7 @@
 
 /* On a phone, round like Search beside it. */
 @media (max-width: 640px) {
+  .sidebar .sidebar-head .search-btn,
   .sidebar .sidebar-head .bell-btn {
     display: grid;
     place-items: center;
@@ -266,6 +267,7 @@
     color: var(--fg);
   }
 
+  .sidebar .sidebar-head .search-btn svg,
   .sidebar .sidebar-head .bell-btn svg {
     width: 20px;
     height: 20px;
