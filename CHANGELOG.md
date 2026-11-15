@@ -26,6 +26,10 @@ that ran live. Format after [Keep a Changelog](https://keepachangelog.com/).
   Settings → Sign-in and signed out from there; one unused for 30 days lapses.
   Existing logins carry over without signing in again. Passkey checks ported
   from upstream e7a6339; the approval step and per-client brake are ours.
+- **Search is back**: the magnifier at the top of the sidebar finds a chat by
+  words anywhere in it (each word separately, in any order). The chats the
+  sidebar lists come first; archived ones and those of employees, notices,
+  tasks and Dreams are behind *More*. Incognito chats are never shown.
 
 ### Changed
 - **Project files open on the project page**: a Markdown, image, video, PDF,
