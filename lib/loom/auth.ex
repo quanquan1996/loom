@@ -25,9 +25,11 @@ defmodule Loom.Auth do
     `@idle_days` without using it. A device in use never has to sign in again.
   - **The password's fingerprint** rides in every token, so changing
     `LOOM_PASSWORD` still retires every token at once.
-  - **Tokens from before logins** (`%{ok: true, ...}`) still work until their
+  - **Tokens from before logins** (`%{ok: true, pw: _}`) still work until their
     old 30-day limit, and are swapped for a login of their own the first time
-    the app opens (`upgrade/1`), so the change signs nobody out.
+    the app opens (`upgrade/1`), so the change signs nobody out. One with no
+    password fingerprint is refused: whoever has the signing key (dev's is
+    in the repo) could mint it without the password.
   - A new sign-in is announced on every device with notifications on.
 
   Truth is `~/.loom/auth.json` (mode 0600): passkeys and logins. Challenges
@@ -92,7 +94,7 @@ defmodule Loom.Auth do
       {:ok, %{ok: true} = legacy} ->
         with {:ok, _} <-
                Phoenix.Token.verify(LoomWeb.Endpoint, @salt, token, max_age: @legacy_max_age),
-             true <- legacy[:pw] == nil or same_password?(legacy.pw) do
+             true <- is_binary(legacy[:pw]) and same_password?(legacy.pw) do
           {:ok, :legacy}
         else
           _ -> {:error, :invalid}

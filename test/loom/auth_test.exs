@@ -85,7 +85,15 @@ defmodule Loom.AuthTest do
   end
 
   test "a token from before logins works, and is swapped for a login", %{server: s} do
-    legacy = Phoenix.Token.sign(LoomWeb.Endpoint, "loom auth token", %{ok: true})
+    key = LoomWeb.Endpoint.config(:secret_key_base)
+    pw = Application.get_env(:loom, :password)
+
+    fp =
+      :crypto.mac(:hmac, :sha256, key, "loom-password:" <> pw)
+      |> binary_part(0, 8)
+      |> Base.url_encode64(padding: false)
+
+    legacy = Phoenix.Token.sign(LoomWeb.Endpoint, "loom auth token", %{ok: true, pw: fp})
     assert {:ok, :legacy} = Auth.verify_token(legacy, s)
     assert {:ok, token} = Auth.upgrade(@info, s)
     assert {:ok, id} = Auth.verify_token(token, s)

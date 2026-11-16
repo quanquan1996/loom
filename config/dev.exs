@@ -15,8 +15,14 @@ config :loom, LoomWeb.Endpoint,
   http: [ip: {127, 0, 0, 1}],
   check_origin: false,
   code_reloader: true,
-  debug_errors: true,
-  secret_key_base: "8q2gDRHkWQsTUvtXV71GPb8wPMREHXgQUpdc17Or6ZHW1sh5cW7rSbb4GoZcaRKk"
+  # A real SECRET_KEY_BASE means this dev server is reachable by others:
+  # sign with it, not the public key below, and hide stack traces.
+  debug_errors: System.get_env("SECRET_KEY_BASE") in [nil, ""],
+  secret_key_base:
+    (case System.get_env("SECRET_KEY_BASE") do
+       k when k in [nil, ""] -> "8q2gDRHkWQsTUvtXV71GPb8wPMREHXgQUpdc17Or6ZHW1sh5cW7rSbb4GoZcaRKk"
+       k -> k
+     end)
 
 # ## SSL Support
 #

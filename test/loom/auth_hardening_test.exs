@@ -32,9 +32,10 @@ defmodule Loom.AuthHardeningTest do
     assert {:error, _} = Auth.verify_token(token)
   end
 
-  test "tokens from before the password fingerprint still verify" do
+  test "a token without the password fingerprint is refused" do
+    # Anyone holding the signing key (dev's is in the repo) could mint this.
     legacy = Phoenix.Token.sign(LoomWeb.Endpoint, "loom auth token", %{ok: true})
-    assert {:ok, :legacy} = Auth.verify_token(legacy)
+    assert {:error, :invalid} = Auth.verify_token(legacy)
   end
 
   test "five wrong passwords lock the client out; the right one then waits too", %{conn: conn} do
@@ -69,7 +70,7 @@ defmodule Loom.AuthHardeningTest do
 
     legacy = Phoenix.Token.sign(LoomWeb.Endpoint, "loom auth token", %{ok: true})
     refused = build_conn() |> put_req_header("authorization", "Bearer " <> legacy) |> post("/api/auth/pending/#{id}/approve")
-    assert refused.status == 403
+    assert refused.status == 401
 
     shown = build_conn() |> put_req_header("authorization", "Bearer " <> mac) |> get("/api/auth")
     assert Enum.any?(json_response(shown, 200)["pending"], &(&1["id"] == id and &1["name"] == "Windows · Chrome"))
