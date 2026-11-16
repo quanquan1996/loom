@@ -68,6 +68,9 @@ that ran live. Format after [Keep a Changelog](https://keepachangelog.com/).
 ### Security
 - Dependencies with security fixes: bandit 1.14.1, plug_crypto 2.2.1,
   vite 8.3.8.
+- Sign-in: an old-style login token without the password fingerprint is
+  refused. A dev server reachable from outside no longer signs with the public
+  dev key when `SECRET_KEY_BASE` is set. Reported by Jinhao Zhang's Loom agent.
 
 ## [0.6.0] – 2026-11-04
 
