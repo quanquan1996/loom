@@ -57,6 +57,12 @@ that ran live. Format after [Keep a Changelog](https://keepachangelog.com/).
   any model id, for one newer than the list.
 
 ### Fixed
+- **No more `:emfile` / "claude exited with status ?" after ~1000 sessions**:
+  every session held its transcript file open, so the node ran out of file
+  descriptors and no turn could start; a failed liveness read then marked live
+  agents dead and left them running unread. Appends now open and close the
+  file, only a missing process counts as dead, and the unit sets
+  `LimitNOFILE=65536:524288`.
 - **iPhone dialogs clear the notch**: in the iPhone home-screen app, tall
   dialogs such as Devices no longer run under the notch and home indicator.
 - **Hotwords with a colon**: in meeting mode, a hotword containing a colon
