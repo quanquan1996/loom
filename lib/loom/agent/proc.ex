@@ -170,11 +170,19 @@ defmodule Loom.Agent.Proc do
     end
   end
 
-  @doc "Whether our process is still running."
+  @doc """
+  Whether our process is still running.
+
+  Only a missing `/proc/<pid>` means it is gone. Any other read error (`:emfile`
+  when the node is out of descriptors) says nothing about the process, and
+  calling it dead orphaned live agents: the turn was reported failed while the
+  process ran on with no one reading it.
+  """
   def alive?(%__MODULE__{dir: dir, pid: pid}) do
     case File.read("/proc/#{pid}/cmdline") do
       {:ok, cmdline} -> String.contains?(cmdline, @marker) and String.contains?(cmdline, dir)
-      _ -> false
+      {:error, reason} when reason in [:enoent, :esrch] -> false
+      {:error, _unknown} -> true
     end
   end
 
