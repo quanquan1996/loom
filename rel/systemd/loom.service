@@ -12,6 +12,10 @@ StartLimitBurst=5
 
 [Service]
 Type=exec
+# systemd's default soft limit is 1024 descriptors. Loom keeps a process per
+# session plus ports, pipes and sockets for every agent it spawns; running out
+# shows up as `:emfile` and no turn can start.
+LimitNOFILE=65536:524288
 User=ubuntu
 WorkingDirectory=/home/ubuntu/loom
 Environment=HOME=/home/ubuntu

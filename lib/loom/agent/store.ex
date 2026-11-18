@@ -32,7 +32,7 @@ defmodule Loom.Agent.Store do
 
   ## Durability
 
-  Logs are opened with `:sync`, so each append reaches the disk before it
+  Each append is written with `:sync`, so it reaches the disk before it
   returns. An agent turn takes seconds, so a few milliseconds of fsync per line
   is free — and it means the state on disk is never behind the state the model
   has already acted on.
@@ -270,35 +270,30 @@ defmodule Loom.Agent.Store do
   @doc """
   Open a session's logs for appending.
 
-  Returns a handle to pass to `append_event/2`. The owning session holds it for
-  its lifetime and closes it in `terminate/2`; re-opening per write would cost
-  two syscalls per line for no benefit.
+  Returns a handle to pass to `append_event/2`. The handle is only the path:
+  every session is restored at boot and lives for the life of the node, so a
+  descriptor held per session ran the node out of them (`:emfile` at ~1000
+  sessions, under systemd's 1024 soft limit) and then nothing could spawn.
+  Each append opens, writes and closes; next to the fsync that is free.
   """
   def open_logs(id) do
     dir = session_dir(id)
     File.mkdir_p!(dir)
 
-    with {:ok, events} <- open_append(Path.join(dir, @events_file)) do
-      {:ok, %{events: events}}
-    end
+    {:ok, %{events: Path.join(dir, @events_file)}}
   end
 
-  defp open_append(path), do: :file.open(path, [:append, :binary, :sync, :raw])
-
-  @doc "Close a log handle. Safe to call with `nil`."
-  def close_logs(nil), do: :ok
-
-  def close_logs(%{events: events}) do
-    :file.close(events)
-    :ok
-  end
+  @doc "Close a log handle. Nothing is held open, so this is a no-op."
+  def close_logs(_logs), do: :ok
 
   @doc "Append one transcript event."
   def append_event(%{events: io}, event), do: append_line(io, event)
   def append_event(nil, _event), do: :ok
 
-  defp append_line(io, term) do
-    case :file.write(io, [Jason.encode_to_iodata!(term), "\n"]) do
+  defp append_line(path, term) do
+    line = [Jason.encode_to_iodata!(term), "\n"]
+
+    case :file.write_file(path, line, [:append, :binary, :sync, :raw]) do
       :ok ->
         :ok
 
