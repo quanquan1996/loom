@@ -43,6 +43,10 @@ config :loom, Loom.Agent,
   # the model composes absolute paths from it.
   workspace: System.get_env("LOOM_WORKSPACE")
 
+# Outer proxies whose X-Forwarded-For hop is not the client: IPs or CIDR
+# blocks, see `LoomWeb.ClientAddress`.
+config :loom, :trusted_proxies, System.get_env("LOOM_TRUSTED_PROXIES")
+
 # Parses `LOOM_BIND`, defaulting to loopback. A hostname is not accepted: a
 # typo there would silently fall back to all interfaces in most parsers, which
 # is the one mistake that must not be easy to make.

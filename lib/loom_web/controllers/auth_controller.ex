@@ -177,19 +177,21 @@ defmodule LoomWeb.AuthController do
 
   defp info(conn), do: %{name: device_name(ua(conn)), ip: client(conn)}
 
-  # Who is asking. Behind CloudFront (or another proxy) `remote_ip` is the
-  # proxy, so take the last X-Forwarded-For hop — the one the proxy appended
-  # itself, which a client cannot forge. Direct connections have no header.
+  # Who is asking. Behind a proxy `remote_ip` is the proxy, so the client is
+  # read from X-Forwarded-For: the last hop, which the proxy appended itself
+  # and a client cannot forge, or the one before the proxies named in
+  # LOOM_TRUSTED_PROXIES (`LoomWeb.ClientAddress`). Direct connections have
+  # no header.
   defp client(conn) do
-    forwarded =
+    hops =
       conn
       |> get_req_header("x-forwarded-for")
       |> Enum.join(",")
       |> String.split(",", trim: true)
       |> Enum.map(&String.trim/1)
-      |> List.last()
 
-    forwarded || conn.remote_ip |> :inet.ntoa() |> to_string()
+    LoomWeb.ClientAddress.pick(hops, LoomWeb.ClientAddress.trusted()) ||
+      conn.remote_ip |> :inet.ntoa() |> to_string()
   end
 
   defp ua(conn) do
