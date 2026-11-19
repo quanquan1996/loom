@@ -290,7 +290,10 @@ when idle.
   tool; without it each shell call sends `session/request_permission`, which
   Loom answers allow-once anyway. `_kiro/userInput` (a question for the user)
   is answered that nobody is there. The file goes with the session
-  (`Kiro.forget/1`).
+  (`Kiro.forget/1`), with any v2 `.json` and kiro-cli's `.json.bak` of it.
+- **Every agent is a sub-agent.** v3 offers each file in `~/.kiro/agents` as a
+  `subagent_<name>` tool, so every session saw the others' (~50 tools);
+  `excludedTools: ["subagent_loom-*"]` drops them (66 tools → 16, measured).
 - **No hooks.** v3 runs no hooks from an agent file (both the object form and
   `[{trigger: preToolUse, action: {type: command}}]` measured, neither fires),
   so a session with a workstation (`Loom.Agent.Guard`) refuses to start on Kiro.

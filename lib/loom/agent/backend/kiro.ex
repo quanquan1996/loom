@@ -312,8 +312,14 @@ defmodule Loom.Agent.Backend.Kiro do
 
   @doc "A deleted session's agent goes with it, so `kiro-cli agent list` keeps only live ones."
   def forget(loom_id) do
-    File.rm(agent_path(loom_id))
-    File.rm(legacy_agent_path(loom_id))
+    # `.json.bak`: kiro-cli's own backup when it upgraded the JSON agents.
+    for path <- [
+          agent_path(loom_id),
+          legacy_agent_path(loom_id),
+          legacy_agent_path(loom_id) <> ".bak"
+        ],
+        do: File.rm(path)
+
     :ok
   end
 
@@ -326,6 +332,10 @@ defmodule Loom.Agent.Backend.Kiro do
         name: agent_name(handle),
         description: "A Loom session (#{handle.loom_id}); written by Loom before every start.",
         tools: "*",
+        # v3 offers every agent in ~/.kiro/agents as a sub-agent tool: the
+        # other sessions' would be ~50 tools of context and a way to start
+        # someone else's conversation by mistake.
+        excludedTools: ["subagent_loom-*"],
         includeMcpJson: true,
         # Every tool call allowed, without a permission request; the user's
         # own Kiro settings stay as they are.
@@ -343,6 +353,7 @@ defmodule Loom.Agent.Backend.Kiro do
     path = agent_path(handle.loom_id)
     File.mkdir_p!(Path.dirname(path))
     File.rm(legacy_agent_path(handle.loom_id))
+    File.rm(legacy_agent_path(handle.loom_id) <> ".bak")
     tmp = path <> ".tmp"
 
     with :ok <- File.write(tmp, agent_file(handle)),

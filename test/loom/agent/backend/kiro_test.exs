@@ -254,6 +254,7 @@ defmodule Loom.Agent.Backend.KiroTest do
     assert [_, front, body] = String.split(file, "---\n", parts: 3)
     assert front =~ ~s(name: "loom-a_test")
     assert front =~ ~s(tools: "*")
+    assert front =~ ~s(excludedTools: ["subagent_loom-*"])
     assert front =~ ~s(model: "claude-sonnet-5")
     assert front =~ ~s("capability":"all")
     assert front =~ ~s("effect":"allow")
