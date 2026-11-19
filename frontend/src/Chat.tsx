@@ -1678,6 +1678,7 @@ function LocalFiles({ files, sending }: { files: LocalFile[]; sending: boolean }
         <FileCard
           key={i}
           name={file.name}
+          label={sending && file.sent !== undefined ? `${Math.floor((file.sent / file.size) * 100)}%` : undefined}
           image={file.preview}
           busy={sending}
           error={null}

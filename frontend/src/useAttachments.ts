@@ -18,6 +18,8 @@ export type LocalFile = {
   // The bytes, scaled down if an image (shrink.ts). Memory only: a message
   // kept across a reload has lost them, and says so.
   blob?: Blob
+  // Bytes on the server so far, for a file large enough to go in parts.
+  sent?: number
 }
 
 /** One row in the composer's attachment tray. */

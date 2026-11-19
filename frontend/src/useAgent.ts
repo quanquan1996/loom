@@ -320,7 +320,14 @@ export function useAgent(
     if (uploads.some((u) => !u.blob)) return fail("its files were lost when the page reloaded — attach them again")
 
     const blobs = uploads.map((u) => (u.blob instanceof File ? u.blob : new File([u.blob!], u.name, { type: u.type })))
-    whenMade(sessionId).then(() => uploadAgentFiles(sessionId, blobs)).then(
+    // A large file reports how far it is; the bubble's card shows it.
+    const progress = (index: number, sent: number) =>
+      setTranscript((t) => {
+        const now = t.pending.find((q) => q.clientMsgId === p.clientMsgId)
+        if (!now?.uploads?.[index]) return t
+        return updatePending(t, { ...now, uploads: now.uploads.map((u, i) => (i === index ? { ...u, sent } : u)) })
+      })
+    whenMade(sessionId).then(() => uploadAgentFiles(sessionId, blobs, progress)).then(
       (stored) => {
         // Moved to another session meanwhile: this one's copy, kept on the
         // device, shows it as not got through; a resend uploads again.

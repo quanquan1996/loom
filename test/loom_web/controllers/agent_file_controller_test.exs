@@ -174,4 +174,60 @@ defmodule LoomWeb.AgentFileControllerTest do
       refute File.exists?(Path.join(Store.files_dir(id), "a.txt"))
     end
   end
+
+  describe "a file sent in parts" do
+    defp part(conn, id, upload, offset, size, body, name \\ "big.bin") do
+      conn
+      |> recycle()
+      |> put_req_header("authorization", "Bearer " <> Loom.Auth.mint_token())
+      |> put_req_header("content-type", "application/octet-stream")
+      |> put(~p"/api/agents/#{id}/files/parts/#{upload}?#{[offset: offset, size: size, name: name]}", body)
+    end
+
+    test "parts are appended in order and the last one names the file", %{conn: conn, id: id} do
+      assert %{"received" => 4} = conn |> part(id, "upload-0001", 0, 10, "abcd") |> json_response(200)
+      assert Loom.Agent.Files.list(id) == []
+      assert %{"received" => 8} = conn |> part(id, "upload-0001", 4, 10, "efgh") |> json_response(200)
+      assert %{"file" => file} = conn |> part(id, "upload-0001", 8, 10, "ij") |> json_response(200)
+
+      assert file["name"] == "big.bin"
+      assert file["size"] == 10
+      assert File.read!(file["path"]) == "abcdefghij"
+      assert [%{path: "big.bin"}] = Loom.Agent.Files.list(id)
+      assert {:ok, [_]} = Loom.Agent.Files.verify(id, [file["path"]])
+    end
+
+    test "a part that does not start where the file ends is refused, and says where that is", %{conn: conn, id: id} do
+      conn |> part(id, "upload-0002", 0, 10, "abcd") |> json_response(200)
+      assert %{"received" => 4} = conn |> part(id, "upload-0002", 0 + 6, 10, "ghij") |> json_response(409)
+      # The reply to a part was lost and it is sent again: the same answer.
+      assert %{"received" => 4} = conn |> part(id, "upload-0002", 2, 10, "cd") |> json_response(409)
+      assert %{"file" => _} = conn |> part(id, "upload-0002", 4, 10, "efghij") |> json_response(200)
+    end
+
+    test "a part at 0 starts over; a part past the end is dropped", %{conn: conn, id: id} do
+      conn |> part(id, "upload-0003", 0, 6, "xxxx") |> json_response(200)
+      conn |> part(id, "upload-0003", 0, 6, "abc") |> json_response(200)
+      assert conn |> part(id, "upload-0003", 3, 6, "defgh") |> json_response(413)
+      assert %{"file" => file} = conn |> part(id, "upload-0003", 3, 6, "def") |> json_response(200)
+      assert File.read!(file["path"]) == "abcdef"
+    end
+
+    test "the name is made safe and never reuses one that is taken", %{conn: conn, id: id} do
+      assert %{"file" => a} = conn |> part(id, "upload-0004", 0, 1, "a", "../../etc/x.txt") |> json_response(200)
+      assert %{"file" => b} = conn |> part(id, "upload-0005", 0, 1, "b", "x.txt") |> json_response(200)
+      assert a["path"] == Path.join(Store.files_dir(id), "x.txt")
+      assert b["name"] == "x-1.txt"
+    end
+
+    test "what is refused outright", %{conn: conn, id: id} do
+      assert conn |> part(id, "upload-0006", 0, 600 * 1024 * 1024, "a") |> json_response(413)
+      assert conn |> part(id, "../../x", 0, 4, "a") |> json_response(422)
+      assert conn |> part(id, "bad id!!", 0, 4, "a") |> json_response(422)
+      assert conn |> part(id, "upload-0007", 4, 10, "a") |> json_response(404)
+      assert conn |> part(id, "upload-0008", 0, 0, "") |> json_response(422)
+      assert conn |> part("a_nosuchsession", "upload-0009", 0, 4, "a") |> json_response(404)
+      refute File.exists?(Path.join(Store.files_dir("a_nosuchsession"), ".part-upload-0009"))
+    end
+  end
 end

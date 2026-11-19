@@ -17,6 +17,13 @@ that ran live. Format after [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Added
+- **Large attachments, sent in parts**: a file over 20 MB (up to 500 MB) is
+  uploaded as 8 MB requests the server appends, so it passes a proxy that caps
+  a request's body (Cloudflare: 100 MB), shows how far it is on its card, and
+  a dropped connection resends one part instead of the file. Smaller files go
+  together as before, all or none. Free disk space is checked first.
+- **`LOOM_TRUSTED_PROXIES`**: with a CDN in front of the tunnel, sign-in
+  notices and the login brake see the visitor's address, not the CDN's.
 - **Passkey sign-in and approval from a signed-in device**: Settings → Sign-in
   adds a passkey on this device (Face ID, Touch ID, Windows Hello, Android
   screen lock; the password is asked again), which then signs in with one tap.

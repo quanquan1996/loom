@@ -38,6 +38,13 @@ defmodule Loom.Agent.Files do
   @max_bytes 25 * 1024 * 1024
   @max_name_length 100
 
+  # A file sent in parts (`open_part/4`): meant to be large, so the cap is
+  # there for the disk, checked against what is free before the first part.
+  @max_part_bytes 500 * 1024 * 1024
+  @part_request 16 * 1024 * 1024
+  @part_spare 1024 * 1024 * 1024
+  @part_stale 24 * 60 * 60
+
   @doc """
   Store one upload under `session_id` and describe where it went.
 
@@ -58,6 +65,122 @@ defmodule Loom.Agent.Files do
 
       {:ok, %{name: name, path: dest, size: size, content_type: MIME.from_path(name)}}
     end
+  end
+
+  @doc "The most one request may carry of a file sent in parts."
+  def part_request, do: @part_request
+
+  @doc """
+  Open a file sent in parts for its next part, which starts at `offset`.
+
+  A proxy in front may cap a request's body (Cloudflare: 100 MB), and a phone
+  loses its connection mid-upload, so a large file comes as a run of small
+  requests, each appended to `files/.part-<upload>`: hidden, so neither
+  `list/1` nor `verify/2` sees it until `close_part/5` gives it its name.
+  `upload` is the client's own random id for the file.
+
+  The part must start where the file ends. `{:error, {:offset, size}}` says
+  where that is, which is also how a client that lost a reply finds out the
+  part did arrive. A part at 0 starts over.
+  """
+  def open_part(session_id, upload, offset, total) do
+    dir = Store.files_dir(session_id)
+
+    with :ok <- part_id(upload),
+         :ok <- part_range(offset, total),
+         path = Path.join(dir, ".part-" <> upload),
+         :ok <- part_start(dir, path, offset, total),
+         {:ok, io} <- File.open(path, [:append, :binary, :raw]) do
+      {:ok, io, path}
+    end
+  end
+
+  @doc """
+  The part is written (`written` bytes from `offset`): `{:more, size}`, or the
+  stored file once all `total` bytes are there, named as `store/2` would.
+  """
+  def close_part(path, offset, written, total, filename) do
+    size = offset + written
+
+    cond do
+      written == 0 -> {:error, :empty}
+      size > total -> undo_part(path, offset, :too_large)
+      size < total -> {:more, size}
+      true -> finish_part(path, filename)
+    end
+  end
+
+  @doc "Drop what a failed request wrote, so the same part can be sent again."
+  def undo_part(path, offset, reason \\ :interrupted) do
+    with {:ok, io} <- :file.open(path, [:read, :write, :raw]) do
+      :file.position(io, offset)
+      :file.truncate(io)
+      :file.close(io)
+    end
+
+    {:error, reason}
+  end
+
+  defp finish_part(path, filename) do
+    dir = Path.dirname(path)
+    dest = Path.join(dir, unique(dir, safe_name(filename)))
+
+    with :ok <- File.rename(path, dest), do: {:ok, describe(dest)}
+  end
+
+  defp part_id(upload) do
+    if is_binary(upload) and upload =~ ~r/\A[A-Za-z0-9_-]{8,64}\z/, do: :ok, else: {:error, :bad_upload}
+  end
+
+  defp part_range(_offset, total) when not is_integer(total) or total <= 0, do: {:error, :empty}
+  defp part_range(_offset, total) when total > @max_part_bytes, do: {:error, :too_large}
+  defp part_range(offset, total) when is_integer(offset) and offset >= 0 and offset < total, do: :ok
+  defp part_range(_offset, _total), do: {:error, :bad_upload}
+
+  defp part_start(dir, path, 0, total) do
+    File.mkdir_p!(dir)
+    sweep_parts(dir)
+
+    case free_bytes(dir) do
+      free when is_integer(free) and free < total + @part_spare -> {:error, :no_space}
+      _ -> File.write(path, "")
+    end
+  end
+
+  defp part_start(_dir, path, offset, _total) do
+    case File.stat(path) do
+      {:ok, %{size: ^offset}} -> :ok
+      {:ok, %{size: size}} -> {:error, {:offset, size}}
+      {:error, _} -> {:error, :unknown_upload}
+    end
+  end
+
+  # Parts nobody finished: a closed tab, a phone that went away.
+  defp sweep_parts(dir) do
+    now = System.os_time(:second)
+
+    for name <- File.ls!(dir),
+        String.starts_with?(name, ".part-"),
+        path = Path.join(dir, name),
+        {:ok, %{mtime: mtime}} <- [File.stat(path, time: :posix)],
+        now - mtime > @part_stale,
+        do: File.rm(path)
+
+    :ok
+  end
+
+  # Free space where `dir` is, or nil when `df` has no answer: the check is a
+  # courtesy, not a guarantee.
+  defp free_bytes(dir) do
+    with {out, 0} <- System.cmd("df", ["-Pk", dir], stderr_to_stdout: true),
+         [_, _, _, free | _] <- out |> String.split("\n", trim: true) |> List.last() |> String.split(),
+         {kb, ""} <- Integer.parse(free) do
+      kb * 1024
+    else
+      _ -> nil
+    end
+  rescue
+    _ -> nil
   end
 
   @doc """

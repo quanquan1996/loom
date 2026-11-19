@@ -34,6 +34,55 @@ defmodule LoomWeb.AgentFileController do
     end
   end
 
+  # PUT /api/agents/:id/files/parts/:upload?offset=&size=&name= — the next part
+  # of a large file, as the raw body. `200 %{received:}` until the last part,
+  # which answers `%{file:}` as `create` would; `409 %{received:}` when the
+  # part does not start where the file ends. See `Files.open_part/4`.
+  def part(conn, %{"id" => id, "upload" => upload} = params) do
+    with true <- Agent.exists?(id),
+         {offset, ""} <- Integer.parse(params["offset"] || ""),
+         {total, ""} <- Integer.parse(params["size"] || ""),
+         {:ok, io, path} <- Files.open_part(id, upload, offset, total) do
+      {result, conn} = read_part(conn, io, 0)
+      File.close(io)
+
+      case result do
+        {:ok, written} -> part_done(conn, Files.close_part(path, offset, written, total, params["name"] || "file"))
+        {:error, reason} -> part_done(conn, Files.undo_part(path, offset, reason))
+      end
+    else
+      false -> conn |> put_status(:not_found) |> json(%{error: "unknown session"})
+      {:error, reason} -> part_done(conn, {:error, reason})
+      _ -> conn |> put_status(:unprocessable_entity) |> json(%{error: "offset and size are needed"})
+    end
+  end
+
+  defp read_part(conn, io, written) do
+    case read_body(conn, length: 1_000_000, read_length: 1_000_000) do
+      {state, data, conn} when state in [:ok, :more] ->
+        written = written + byte_size(data)
+
+        cond do
+          written > Files.part_request() -> {{:error, :part_too_large}, conn}
+          :file.write(io, data) != :ok -> {{:error, :interrupted}, conn}
+          state == :more -> read_part(conn, io, written)
+          true -> {{:ok, written}, conn}
+        end
+
+      {:error, _reason} ->
+        {{:error, :interrupted}, conn}
+    end
+  end
+
+  defp part_done(conn, {:ok, file}), do: json(conn, %{file: file})
+  defp part_done(conn, {:more, size}), do: json(conn, %{received: size})
+
+  defp part_done(conn, {:error, {:offset, size}}),
+    do: conn |> put_status(:conflict) |> json(%{error: "the part does not start where the file ends", received: size})
+
+  defp part_done(conn, {:error, reason}),
+    do: conn |> put_status(status_for(reason)) |> json(%{error: message_for(reason)})
+
   # GET /api/agents/:id/files/:name — an attachment read back, for the
   # thumbnail in the bubble that sent it. The same check as a submit: only a
   # regular file inside this session's own `files/` is served.
@@ -88,9 +137,17 @@ defmodule LoomWeb.AgentFileController do
   end
 
   defp status_for(:too_large), do: :request_entity_too_large
+  defp status_for(:part_too_large), do: :request_entity_too_large
+  defp status_for(:no_space), do: :insufficient_storage
+  defp status_for(:unknown_upload), do: :not_found
   defp status_for(_other), do: :unprocessable_entity
 
-  defp message_for(:too_large), do: "a file is larger than 25 MB"
+  defp message_for(:too_large), do: "a file is larger than the limit (25 MB at once, 500 MB in parts)"
+  defp message_for(:part_too_large), do: "a part is larger than 16 MB"
+  defp message_for(:no_space), do: "not enough disk space on the server for this file"
+  defp message_for(:unknown_upload), do: "this upload is not known; start it again"
+  defp message_for(:bad_upload), do: "not a valid part"
+  defp message_for(:interrupted), do: "the upload was interrupted"
   defp message_for(:empty), do: "a file is empty"
   defp message_for(reason), do: "could not store the file: #{inspect(reason)}"
 

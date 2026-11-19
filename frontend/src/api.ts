@@ -962,26 +962,110 @@ export function projectBase(id: string): Promise<string> {
  *
  * Over HTTP rather than the channel: a 20 MB screenshot sent as a WebSocket
  * frame would sit in front of every event and delta on the same socket.
+ *
+ * Small files go together in one request, all or none. A file over
+ * `PART_FROM` goes alone, in parts (`uploadInParts`): a proxy in front may cap
+ * a request's body, and a phone that loses its connection should not start a
+ * large file over. `onProgress(i, sent)` follows those, by the file's place in
+ * `files`. When anything fails, what did arrive is taken back, so a message
+ * still goes with all of its files or none.
  */
+export const PART_FROM = 20 * 1024 * 1024
+export const PART_MAX = 500 * 1024 * 1024
+const PART_SIZE = 8 * 1024 * 1024
+const TOGETHER_MAX = 80 * 1024 * 1024
+
 export async function uploadAgentFiles(
   id: string,
   files: File[],
+  onProgress?: (index: number, sent: number) => void,
 ): Promise<AgentFile[]> {
-  const body = new FormData()
-  for (const file of files) body.append("files[]", file)
+  const tooBig = files.find((f) => f.size > PART_MAX)
+  if (tooBig) throw new Error(`${tooBig.name} is larger than 500 MB`)
 
-  // No Content-Type header: the browser has to set the multipart boundary.
-  const res = await fetch(`/api/agents/${id}/files`, {
-    method: "POST",
-    headers: authHeaders(),
-    body,
+  const stored: (AgentFile | undefined)[] = files.map(() => undefined)
+  // Small files share one request while they fit under a proxy's cap; the
+  // ones that would push it over go in parts like a large file.
+  const small: { file: File; i: number }[] = []
+  let together = 0
+  files.forEach((file, i) => {
+    if (file.size > PART_FROM || together + file.size > TOGETHER_MAX) return
+    together += file.size
+    small.push({ file, i })
   })
-  if (res.status === 401) throw unauthorized()
-  if (!res.ok) {
-    const detail = await res.json().catch(() => null)
-    throw new Error(detail?.error ?? `upload failed: ${res.status}`)
+  const inParts = files.map((_, i) => !small.some((s) => s.i === i))
+
+  try {
+    if (small.length > 0) {
+      const body = new FormData()
+      for (const { file } of small) body.append("files[]", file)
+
+      // No Content-Type header: the browser has to set the multipart boundary.
+      const res = await fetch(`/api/agents/${id}/files`, { method: "POST", headers: authHeaders(), body })
+      if (res.status === 401) throw unauthorized()
+      if (!res.ok) throw new Error((await res.json().catch(() => null))?.error ?? `upload failed: ${res.status}`)
+      const got: AgentFile[] = (await res.json()).files
+      small.forEach(({ i }, n) => (stored[i] = got[n]))
+    }
+
+    for (let i = 0; i < files.length; i++) {
+      if (inParts[i]) stored[i] = await uploadInParts(id, files[i], (sent) => onProgress?.(i, sent))
+    }
+  } catch (e) {
+    for (const file of stored) {
+      if (file) fetch(attachmentUrl(id, file.path), { method: "DELETE", headers: authHeaders() }).catch(() => {})
+    }
+    throw e
   }
-  return (await res.json()).files
+  return stored as AgentFile[]
+}
+
+/**
+ * One large file as a run of `PART_SIZE` requests, each appended by the server
+ * (`PUT /api/agents/:id/files/parts/:upload`). A part that fails is sent
+ * again, a few times, from where the server says the file ends, so a dropped
+ * connection costs one part and not the file.
+ */
+async function uploadInParts(id: string, file: File, onSent: (sent: number) => void): Promise<AgentFile> {
+  // Not randomUUID: that needs a secure context, and a LAN address is not one.
+  const upload = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, "0")).join("")
+  const query = (offset: number) => new URLSearchParams({ offset: String(offset), size: String(file.size), name: file.name })
+  let offset = 0
+  let failures = 0
+
+  for (;;) {
+    let res: Response | null = null
+    try {
+      res = await fetch(`/api/agents/${id}/files/parts/${upload}?${query(offset)}`, {
+        method: "PUT",
+        headers: { ...authHeaders(), "Content-Type": "application/octet-stream" },
+        body: file.slice(offset, offset + PART_SIZE),
+      })
+    } catch {
+      // The network: counted and tried again below.
+    }
+
+    if (res?.status === 401) throw unauthorized()
+    const detail = res ? await res.json().catch(() => null) : null
+
+    if (res?.ok && detail?.file) {
+      onSent(file.size)
+      return detail.file as AgentFile
+    }
+    if ((res?.ok || res?.status === 409) && typeof detail?.received === "number") {
+      // 409: the server has more or less than we thought, a reply was lost.
+      if (res.ok) failures = 0
+      offset = detail.received
+      onSent(offset)
+      if (res.ok) continue
+    }
+    // 4xx other than a lost reply will not get better by asking again.
+    if (res && res.status >= 400 && res.status < 500 && res.status !== 409 && res.status !== 408 && res.status !== 429) {
+      throw new Error(detail?.error ?? `upload failed: ${res.status}`)
+    }
+    if (++failures > 5) throw new Error(detail?.error ?? `${file.name} did not get through — the connection may be weak`)
+    await new Promise((done) => setTimeout(done, 1000 * 2 ** Math.min(failures, 4)))
+  }
 }
 
 export type Tab = {

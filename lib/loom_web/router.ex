@@ -56,6 +56,7 @@ defmodule LoomWeb.Router do
     put "/agents/:id/draft", AgentDraftController, :update
 
     post "/agents/:id/files", AgentFileController, :create
+    put "/agents/:id/files/parts/:upload", AgentFileController, :part
     get "/agents/:id/files/:name", AgentFileController, :show
     patch "/agents/:id/files/:name", AgentFileController, :update
     delete "/agents/:id/files/:name", AgentFileController, :delete
