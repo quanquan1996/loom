@@ -14,6 +14,10 @@ config :loom,
 config :loom, LoomWeb.Endpoint,
   url: [host: "localhost"],
   adapter: Bandit.PhoenixAdapter,
+  # Each proxy in front adds headers of its own (a CDN and a tunnel: over 30
+  # between them), and Bandit's default of 50 leaves a browser no room: a
+  # request one header over is refused with 431.
+  http: [http_1_options: [max_header_count: 200]],
   render_errors: [
     formats: [json: LoomWeb.ErrorJSON],
     layout: false
