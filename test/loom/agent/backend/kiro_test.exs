@@ -1,6 +1,6 @@
 defmodule Loom.Agent.Backend.KiroTest do
   # The ACP translation, as a pure function: no process, so writes go
-  # nowhere. Messages are as kiro-cli 1.28.1 sent them.
+  # nowhere. Messages are as kiro-cli 1.28.1 (v2) and 3.4.0 (v3) sent them.
   use ExUnit.Case, async: true
 
   alias Loom.Agent.Backend.Kiro
@@ -43,7 +43,8 @@ defmodule Loom.Agent.Backend.KiroTest do
 
     assert h.session_id == "new-sid"
     assert h.phase == :running
-    assert h.pending == %{3 => :prompt}
+    # The session's agent is selected first, then the prompt goes.
+    assert h.pending == %{3 => :set_mode, 4 => :prompt}
     assert [{:status, %{status: :running, backend_ref: "new-sid"}}] = events(out)
     assert Kiro.persist(h).kiro_session_id == "new-sid"
   end
@@ -169,7 +170,94 @@ defmodule Loom.Agent.Backend.KiroTest do
     assert [{:turn_failed, %{reason: "kiro: No session found with id"}}] = events(out)
   end
 
-  test "steering is refused, so the session queues the message" do
-    assert {:error, _} = Kiro.steer(handle(), "more")
+  test "steering before the turn is under way is refused, so the session queues it" do
+    assert {:error, _} = Kiro.steer(handle(%{phase: :opening}), "more")
+  end
+
+  test "a steer goes into the running turn; one never injected is the next prompt" do
+    h = handle(%{pending: %{5 => :prompt}, announced?: true, next_id: 6})
+    {:ok, h} = Kiro.steer(h, "also this")
+    assert [{ours, "also this"}] = h.steers
+    assert h.pending[6] == {:steer, ours}
+
+    # Kiro renames it; injection under its name clears it.
+    {h, []} = feed(h, [%{"jsonrpc" => "2.0", "id" => 6, "result" => %{"messageId" => "steer-x"}}])
+    assert h.steers == [{"steer-x", "also this"}]
+
+    # The prompt ends with it still pending: it goes on, no turn_done yet.
+    {h, out} =
+      feed(h, [%{"jsonrpc" => "2.0", "id" => 5, "result" => %{"stopReason" => "end_turn"}}])
+
+    assert events(out) == []
+    assert h.steers == []
+    assert h.pending[7] == :prompt
+
+    # Injected in time instead: nothing left over, the turn simply ends.
+    h = handle(%{pending: %{5 => :prompt}, announced?: true, steers: [{"steer-y", "t"}]})
+
+    {h, []} =
+      feed(h, [
+        update(%{
+          "sessionUpdate" => "session_info_update",
+          "_meta" => %{"kiro" => %{"kind" => "steering_injected", "messageId" => "steer-y"}}
+        })
+      ])
+
+    {_h, out} =
+      feed(h, [%{"jsonrpc" => "2.0", "id" => 5, "result" => %{"stopReason" => "end_turn"}}])
+
+    assert [{:turn_done, _}] = events(out)
+  end
+
+  test "v3: context usage, a summary, and a tool result in content" do
+    {h, out} =
+      feed(handle(%{announced?: true}), [
+        update(%{
+          "sessionUpdate" => "session_info_update",
+          "_meta" => %{"kiro" => %{"kind" => "context_usage", "usagePercentage" => 2.5}}
+        }),
+        update(%{
+          "sessionUpdate" => "session_info_update",
+          "_meta" => %{"kiro" => %{"kind" => "summarization_completed"}}
+        }),
+        update(%{"sessionUpdate" => "tool_call", "toolCallId" => "t2", "kind" => "execute"}),
+        update(%{
+          "sessionUpdate" => "tool_call_update",
+          "toolCallId" => "t2",
+          "status" => "completed",
+          "content" => [%{"type" => "content", "content" => %{"type" => "text", "text" => "hi"}}]
+        })
+      ])
+
+    assert h.context_tokens == 25_000
+    assert [{:compacted, _}, {:tool_use, _}, {:tool_result, %{output: "hi"}}] = events(out)
+  end
+
+  test "a permission request is allowed once; a question for the user is answered" do
+    # No process: the answers go nowhere, and nothing is emitted.
+    {_h, out} =
+      feed(handle(), [
+        %{
+          "jsonrpc" => "2.0",
+          "id" => 9,
+          "method" => "session/request_permission",
+          "params" => %{"options" => [%{"optionId" => "accept", "kind" => "allow_once"}]}
+        },
+        %{"jsonrpc" => "2.0", "id" => 10, "method" => "_kiro/userInput", "params" => %{}}
+      ])
+
+    assert out == []
+  end
+
+  test "the agent file is markdown v3 reads: front matter, then the instructions" do
+    file = Kiro.agent_file(handle(%{model: "claude-sonnet-5"}))
+    assert [_, front, body] = String.split(file, "---\n", parts: 3)
+    assert front =~ ~s(name: "loom-a_test")
+    assert front =~ ~s(tools: "*")
+    assert front =~ ~s(model: "claude-sonnet-5")
+    assert front =~ ~s("capability":"all")
+    assert front =~ ~s("effect":"allow")
+    assert body == "be good\n"
+    refute Kiro.agent_file(handle()) =~ "model:"
   end
 end

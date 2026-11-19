@@ -17,13 +17,17 @@ defmodule Loom.Agent.Backend.Kiro do
   `session/load` replays the whole conversation as `session/update`s before it
   answers. Those are history, not this turn, and are dropped.
 
-  ## The system prompt is an agent
+  ## The v3 engine, and the system prompt is an agent
 
-  ACP has no system prompt. A Kiro *agent* has one (`prompt`), so each session
-  gets its own, `~/.kiro/agents/loom-<session>.json` with every tool, written
-  before every spawn and named with `--agent`. Unlike Claude Code's, it is read
-  again on each spawn, so changed instructions reach a conversation already
-  under way.
+  Spawned as `kiro-cli acp --agent-engine v3 --auth-method cli`: any v2-only
+  flag (`--trust-all-tools`, `--agent`, `--model`) silently selects the old
+  engine (measured on 3.4.0). ACP has no system prompt; a Kiro *agent* has
+  one, so each session gets its own, `~/.kiro/agents/loom-<session>.md`
+  (front matter, then the instructions as the body), written before every
+  spawn and selected with `session/set_mode` after new/load. Its permissions
+  rule allows every tool, so no permission request comes. v3 opens
+  conversations the v2 engine wrote. It does not run an agent file's hooks,
+  so a session with a workstation (`Loom.Agent.Guard`) is refused.
 
   ## Killing is a process group
 
@@ -41,12 +45,14 @@ defmodule Loom.Agent.Backend.Kiro do
   the turn half done (measured), so a restart would always cut it off. On a
   FIFO it carries on, and the next node takes it back with `adopt/1`.
 
-  ## No steering, no cost
+  ## Steering, compaction, no cost
 
-  ACP has one prompt at a time per session, so `steer/2` refuses and the
-  session queues the message for after the turn. Kiro reports no cost, only
-  how full the context is (`_kiro.dev/metadata`, a percentage), which becomes
-  `context_tokens` against the model's window.
+  `_session/steer` queues a message into the running turn at its next
+  boundary (`steering_injected`); one still pending when the prompt replies
+  goes on as the next prompt. `/compact` is `_kiro/session/compact`. Kiro
+  reports no cost, only how full the context is (`session_info_update`
+  `context_usage`, a percentage), which becomes `context_tokens` against the
+  model's window.
   """
   @behaviour Loom.Agent.Backend
 
@@ -97,6 +103,8 @@ defmodule Loom.Agent.Backend.Kiro do
       announced?: false,
       tools: %{},
       interrupted?: false,
+      # Steers sent this turn and not yet injected: {message_id, text}.
+      steers: [],
       context_tokens: 0,
       # What Kiro says the session is on (`currentModelId`), for `turn_done`.
       current_model: nil
@@ -105,7 +113,7 @@ defmodule Loom.Agent.Backend.Kiro do
 
   @impl Backend
   def run_turn(handle, text) when is_binary(text) do
-    handle = %{handle | prompt: text, interrupted?: false, tools: %{}, block: nil}
+    handle = %{handle | prompt: text, interrupted?: false, tools: %{}, block: nil, steers: []}
 
     live? = handle.proc != nil and Proc.alive?(handle.proc)
 
@@ -125,8 +133,17 @@ defmodule Loom.Agent.Backend.Kiro do
 
   def warm(handle), do: spawn_process(handle)
 
+  # Into the running turn, at its next boundary (`steering_injected`). Before
+  # the turn is under way there is nothing to steer: the session queues it.
   @impl Backend
-  def steer(_handle, _text), do: {:error, "kiro takes one prompt at a time"}
+  def steer(%{phase: :running, session_id: sid} = handle, text) when is_binary(sid) do
+    ours = "loom-steer-#{System.unique_integer([:positive])}"
+    params = %{sessionId: sid, message: text, messageId: ours}
+    handle = send_rpc(handle, "_session/steer", params, {:steer, ours})
+    {:ok, %{handle | steers: handle.steers ++ [{ours, text}]}}
+  end
+
+  def steer(_handle, _text), do: {:error, "no running kiro turn to steer"}
 
   @impl Backend
   def interrupt(%{proc: nil} = handle), do: {:ok, handle}
@@ -218,10 +235,14 @@ defmodule Loom.Agent.Backend.Kiro do
   # ── Spawning ────────────────────────────────────────────────────────────
 
   defp spawn_process(handle) do
-    with {:ok, exe} <- executable(),
+    with :ok <- no_workstation(handle),
+         {:ok, exe} <- executable(),
          :ok <- write_agent(handle) do
       File.mkdir_p!(handle.cwd)
-      args = ["acp", "--trust-all-tools", "--agent", agent_name(handle)]
+      # The v3 engine, named: any v2-only flag (`--trust-all-tools`,
+      # `--agent`, `--model`) silently selects the old one. The agent is
+      # selected with `session/set_mode` once the session is open.
+      args = ["acp", "--agent-engine", "v3", "--auth-method", "cli"]
 
       {exe, args} = sandboxed(handle, exe, args)
 
@@ -229,6 +250,19 @@ defmodule Loom.Agent.Backend.Kiro do
         handle = %{handle | proc: proc, buffer: "", pending: %{}, phase: :init}
         init(handle)
       end
+    end
+  end
+
+  # A workstation's guard is a hook before every tool call, and the v3 engine
+  # does not run an agent file's hooks (measured on 3.4.0: neither form fires).
+  # So a guarded employee does not start on Kiro rather than run unchecked.
+  defp no_workstation(handle) do
+    case Loom.Agent.Guard.rules(handle.loom_id) do
+      %{"workstation" => ws} when ws not in [nil, ""] ->
+        {:error, "a workstation needs Claude Code: Kiro's v3 engine runs no tool-call hooks"}
+
+      _ ->
+        :ok
     end
   end
 
@@ -249,6 +283,8 @@ defmodule Loom.Agent.Backend.Kiro do
         handle.cwd,
         Loom.Agent.Store.output_dir(handle.loom_id),
         Path.expand("~/.kiro/sessions"),
+        # v3 indexes its sessions here as it opens them (EROFS otherwise).
+        Path.expand("~/.kiro/session-index"),
         data
       ] ++ Loom.Agent.Sandbox.caches(),
       [Path.join(data, "knowledge_bases")]
@@ -269,31 +305,49 @@ defmodule Loom.Agent.Backend.Kiro do
   def agent_name(handle), do: "loom-" <> handle.loom_id
 
   @doc "Where a session's agent (its system prompt) is kept."
-  def agent_path(loom_id), do: Path.join([kiro_dir(), "agents", "loom-#{loom_id}.json"])
+  def agent_path(loom_id), do: Path.join([kiro_dir(), "agents", "loom-#{loom_id}.md"])
+
+  # Before the v3 engine, a JSON agent named with `--agent`.
+  defp legacy_agent_path(loom_id), do: Path.join([kiro_dir(), "agents", "loom-#{loom_id}.json"])
+
+  @doc "A deleted session's agent goes with it, so `kiro-cli agent list` keeps only live ones."
+  def forget(loom_id) do
+    File.rm(agent_path(loom_id))
+    File.rm(legacy_agent_path(loom_id))
+    :ok
+  end
+
+  @doc false
+  # A markdown agent, as v3 reads them: front matter (each value JSON, which
+  # is YAML), then the instructions as its body. Public for the tests.
+  def agent_file(handle) do
+    front =
+      [
+        name: agent_name(handle),
+        description: "A Loom session (#{handle.loom_id}); written by Loom before every start.",
+        tools: "*",
+        includeMcpJson: true,
+        # Every tool call allowed, without a permission request; the user's
+        # own Kiro settings stay as they are.
+        permissions: %{rules: [%{capability: "all", effect: "allow"}]},
+        resources: claude_rules(),
+        model: handle.model
+      ]
+      |> Enum.reject(fn {_k, v} -> is_nil(v) end)
+      |> Enum.map_join("\n", fn {k, v} -> "#{k}: #{Jason.encode!(v)}" end)
+
+    "---\n" <> front <> "\n---\n" <> (handle.instructions || "") <> "\n"
+  end
 
   defp write_agent(handle) do
-    agent = %{
-      name: agent_name(handle),
-      description: "A Loom session (#{handle.loom_id}); written by Loom before every start.",
-      prompt: handle.instructions,
-      tools: ["*"],
-      allowedTools: ["*"],
-      includeMcpJson: true,
-      resources: claude_rules(),
-      model: handle.model
-    }
-
-    # A virtual employee on a workstation: every tool call is checked first.
-    agent =
-      if Loom.Agent.Guard.guarded?(handle.loom_id),
-        do: Map.put(agent, :hooks, Loom.Agent.Guard.kiro_hooks()),
-        else: agent
-
     path = agent_path(handle.loom_id)
     File.mkdir_p!(Path.dirname(path))
-    # Owner-only: the MCP servers' env can hold keys, as it may in ~/.claude.json.
-    with :ok <- File.write(path, Jason.encode!(agent, pretty: true)),
-         do: File.chmod(path, 0o600)
+    File.rm(legacy_agent_path(handle.loom_id))
+    tmp = path <> ".tmp"
+
+    with :ok <- File.write(tmp, agent_file(handle)),
+         :ok <- File.chmod(tmp, 0o600),
+         do: File.rename(tmp, path)
   end
 
   # Claude Code's global rules, read natively, so Kiro shares them. Its skills
@@ -325,15 +379,41 @@ defmodule Loom.Agent.Backend.Kiro do
     handle
   end
 
-  defp prompt(handle) do
-    params = %{sessionId: handle.session_id, prompt: [%{type: "text", text: handle.prompt}]}
+  # `/compact` typed as text would just be read: it is the engine's own call,
+  # which replies `{success}` once the summary is done (~12 s).
+  defp prompt(%{prompt: text} = handle) do
+    handle = %{handle | phase: :running, prompt: nil, announced?: false}
 
-    send_rpc(
-      %{handle | phase: :running, prompt: nil, announced?: false},
-      "session/prompt",
-      params,
-      :prompt
-    )
+    if String.trim(text) == "/compact" do
+      send_rpc(handle, "_kiro/session/compact", %{sessionId: handle.session_id}, :prompt)
+    else
+      send_text(handle, text)
+    end
+  end
+
+  defp send_text(handle, text) do
+    params = %{sessionId: handle.session_id, prompt: [%{type: "text", text: text}]}
+    send_rpc(handle, "session/prompt", params, :prompt)
+  end
+
+  # After new or load, before anything else: this session's agent, and its
+  # model as the `model` config option (v3 reports the agent file's `model`
+  # as `auto`; `session/set_model` is refused).
+  defp select_agent(handle) do
+    params = %{sessionId: handle.session_id, modeId: agent_name(handle)}
+    handle = send_rpc(handle, "session/set_mode", params, :set_mode)
+
+    case handle.model do
+      model when is_binary(model) and model != "" ->
+        params = %{sessionId: handle.session_id, configId: "model", value: model}
+
+        handle
+        |> send_rpc("session/set_config_option", params, :set_model)
+        |> Map.put(:current_model, model)
+
+      _ ->
+        handle
+    end
   end
 
   # ── Decoding ────────────────────────────────────────────────────────────
@@ -408,8 +488,34 @@ defmodule Loom.Agent.Backend.Kiro do
     end
   end
 
-  # Asked of us: permission (never, under --trust-all-tools), files, terminals
-  # (refused at `initialize`). Answered so the agent does not wait.
+  # Asked of us. Permission should not come (the agent allows all); one that
+  # does is allowed once. A question for the user: nobody is there to ask.
+  defp translate(handle, %{"id" => id, "method" => "session/request_permission"} = m) do
+    options = get_in(m, ["params", "options"]) || []
+
+    choice =
+      Enum.find(options, &(&1["kind"] == "allow_once")) ||
+        Enum.find(options, &(&1["kind"] == "allow_always"))
+
+    outcome =
+      case choice do
+        %{"optionId" => option} -> %{outcome: "selected", optionId: option}
+        _ -> %{outcome: "cancelled"}
+      end
+
+    {write(handle, %{jsonrpc: "2.0", id: id, result: %{outcome: outcome}}), []}
+  end
+
+  defp translate(handle, %{"id" => id, "method" => "_kiro/userInput"}) do
+    answer =
+      "The user is not available to answer questions mid-turn. " <>
+        "Use your best judgement, say what you assumed, and continue."
+
+    {write(handle, %{jsonrpc: "2.0", id: id, result: %{action: "answered", answer: answer}}), []}
+  end
+
+  # Files and terminals (refused at `initialize`), anything else: answered so
+  # the agent does not wait.
   defp translate(handle, %{"id" => id, "method" => method}) do
     Logger.warning("Kiro: unexpected request #{method}")
 
@@ -421,7 +527,14 @@ defmodule Loom.Agent.Backend.Kiro do
 
   defp reply(handle, :initialize, %{"result" => _}) do
     if handle.session_id do
-      params = %{sessionId: handle.session_id, cwd: handle.cwd, mcpServers: []}
+      # Without `noReplay` the load replays the whole conversation first.
+      params = %{
+        sessionId: handle.session_id,
+        cwd: handle.cwd,
+        mcpServers: [],
+        _meta: %{kiro: %{noReplay: true}}
+      }
+
       {send_rpc(%{handle | phase: :opening}, "session/load", params, :load), []}
     else
       params = %{cwd: handle.cwd, mcpServers: []}
@@ -443,9 +556,22 @@ defmodule Loom.Agent.Backend.Kiro do
     {send_rpc(%{handle | session_id: nil}, "session/new", params, :new), []}
   end
 
+  # Steered text the engine had no boundary left for: it goes on as the next
+  # prompt, in the same turn as far as Loom is concerned.
+  defp reply(%{steers: [_ | _], interrupted?: false} = handle, :prompt, %{"result" => _}) do
+    out = close_block(handle)
+    text = Enum.map_join(handle.steers, "\n\n", fn {_id, text} -> text end)
+    {send_text(%{handle | steers: [], block: nil}, text), out}
+  end
+
+  defp reply(handle, :prompt, %{"result" => %{"success" => false}}) do
+    {%{handle | phase: :idle, block: nil, steers: []},
+     close_block(handle) ++ [{:event, :turn_failed, %{reason: "kiro: compaction failed"}}]}
+  end
+
   defp reply(handle, :prompt, %{"result" => result}) do
     out = close_block(handle)
-    handle = %{handle | phase: :idle, block: nil}
+    handle = %{handle | phase: :idle, block: nil, steers: []}
 
     cond do
       handle.interrupted? ->
@@ -475,18 +601,56 @@ defmodule Loom.Agent.Backend.Kiro do
      out ++ [{:event, :turn_failed, %{reason: "kiro: " <> error_text(error)}}]}
   end
 
+  # Kiro renames a steer (`steer-` in front of ours); `steering_injected`
+  # uses its name. Refused: it never queued, so it is not resent either.
+  defp reply(handle, {:steer, ours}, %{"result" => %{"messageId" => theirs}})
+       when is_binary(theirs) do
+    steers =
+      Enum.map(handle.steers, fn
+        {^ours, t} -> {theirs, t}
+        other -> other
+      end)
+
+    {%{handle | steers: steers}, []}
+  end
+
+  defp reply(handle, {:steer, ours}, %{"error" => error}) do
+    Logger.warning("Kiro: steer refused: #{error_text(error)}")
+    {%{handle | steers: List.keydelete(handle.steers, ours, 0)}, []}
+  end
+
+  defp reply(handle, :set_model, %{"error" => error}) do
+    Logger.warning("Kiro: cannot set the model #{inspect(handle.model)}: #{error_text(error)}")
+    {handle, []}
+  end
+
+  defp reply(handle, :set_mode, %{"error" => error}) do
+    Logger.warning("Kiro: cannot select the session's agent: #{error_text(error)}")
+    {handle, []}
+  end
+
   defp reply(handle, _what, _message), do: {handle, []}
 
   defp current_model(handle, %{"models" => %{"currentModelId" => model}}) when is_binary(model),
     do: Map.put(handle, :current_model, model)
 
+  # v3 has no `models`: the model is a config option.
+  defp current_model(handle, %{"configOptions" => options}) when is_list(options) do
+    case Enum.find(options, &(&1["id"] == "model")) do
+      %{"currentValue" => model} when is_binary(model) -> Map.put(handle, :current_model, model)
+      _ -> handle
+    end
+  end
+
   defp current_model(handle, _result), do: handle
 
   # The session is there; the turn begins — unless it was warmed with none.
-  defp opened(%{prompt: nil} = handle), do: {%{handle | phase: :idle}, []}
+  defp opened(handle), do: ready(select_agent(handle))
+
+  defp ready(%{prompt: nil} = handle), do: {%{handle | phase: :idle}, []}
 
   # The session is there; the turn begins.
-  defp opened(handle) do
+  defp ready(handle) do
     announce({prompt(handle), []})
   end
 
@@ -538,7 +702,37 @@ defmodule Loom.Agent.Backend.Kiro do
      ]}
   end
 
+  defp update(handle, %{"sessionUpdate" => "session_info_update"} = u),
+    do: info(handle, get_in(u, ["_meta", "kiro"]) || %{})
+
   defp update(handle, _update), do: {handle, []}
+
+  defp info(handle, %{"kind" => "context_usage"} = kiro) do
+    case kiro["usagePercentage"] || get_in(kiro, ["contextUsage", "usagePercentage"]) do
+      pct when is_number(pct) -> {%{handle | context_tokens: round(pct / 100 * @window)}, []}
+      _ -> {handle, []}
+    end
+  end
+
+  defp info(handle, %{"kind" => "steering_injected", "messageId" => id}),
+    do: {%{handle | steers: List.keydelete(handle.steers, id, 0)}, []}
+
+  # An automatic summary at the threshold (80 %), or the one `/compact` asked for.
+  defp info(handle, %{"kind" => "summarization_completed"} = kiro) do
+    if get_in(kiro, ["summarization", "status"]) in [nil, "success"],
+      do: {handle, [{:event, :compacted, %{trigger: "kiro"}}]},
+      else: {handle, []}
+  end
+
+  defp info(handle, %{"kind" => "model_fallback"} = kiro) do
+    Logger.warning(
+      "Kiro: model fallback #{inspect(kiro["from"])} -> #{inspect(kiro["to"])}: #{kiro["reason"]}"
+    )
+
+    {handle, []}
+  end
+
+  defp info(handle, _kiro), do: {handle, []}
 
   # Streamed text: a block opened on its first chunk and kept until something
   # else comes, when it becomes one event.
@@ -598,11 +792,15 @@ defmodule Loom.Agent.Backend.Kiro do
     end
   end
 
+  # v3 puts the result in `content`; v2 in `rawOutput`.
   defp tool_output(u) do
-    case u["rawOutput"] do
-      %{"items" => items} when is_list(items) -> Enum.map_join(items, "\n", &item_text/1)
-      nil -> content_text(u["content"])
-      other -> Jason.encode!(other)
+    case {content_text(u["content"]), u["rawOutput"]} do
+      {text, _} when text != "" -> text
+      {_, %{"items" => items}} when is_list(items) -> Enum.map_join(items, "\n", &item_text/1)
+      {_, nil} -> ""
+      {_, text} when is_binary(text) -> text
+      {_, %{"output" => text}} when is_binary(text) -> text
+      {_, other} -> Jason.encode!(other)
     end
   end
 

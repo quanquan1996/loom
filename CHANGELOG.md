@@ -32,6 +32,14 @@ that ran live. Format after [Keep a Changelog](https://keepachangelog.com/).
   tasks and Dreams are behind *More*. Incognito chats are never shown.
 
 ### Changed
+- **Kiro runs on its v3 engine**: Loom's `--trust-all-tools` had been silently
+  selecting the old v2 engine. Now `kiro-cli acp --agent-engine v3`, with each
+  session's instructions as a markdown agent (`~/.kiro/agents/loom-<id>.md`)
+  selected over ACP. A message sent mid-turn now steers the running turn as on
+  Claude Code, `/compact` compacts, the model shown per turn is the one Kiro
+  runs, and existing Kiro chats carry on with their history. A session's agent
+  file is deleted with the session. Kiro runs no tool-call hooks, so an
+  employee with a workstation must use Claude Code.
 - **Project files open on the project page**: a Markdown, image, video, PDF,
   web page, table or text file in the Files tab now opens in place with the
   canvas's viewers; the download mark on its row still downloads it.

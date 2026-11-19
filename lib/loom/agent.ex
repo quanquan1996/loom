@@ -124,6 +124,8 @@ defmodule Loom.Agent do
     if incognito?,
       do: File.rm_rf(Loom.Agent.Sandbox.claude_project_dir(Loom.Agent.Sandbox.workspace(id)))
 
+    # Kiro's per-session agent file, so `kiro-cli agent list` keeps only live ones.
+    Loom.Agent.Backend.Kiro.forget(id)
     Loom.Agent.Store.delete_session(id)
   end
 

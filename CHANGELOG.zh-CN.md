@@ -28,6 +28,12 @@
   通知的、定时任务的、Dream 的放在"更多"里。无痕会话不会出现。
 
 ### 变更
+- **Kiro 改用 v3 引擎**：Loom 原来带的 `--trust-all-tools` 会让 Kiro 悄悄退回旧的
+  v2 引擎。现在改为 `kiro-cli acp --agent-engine v3`，每个会话的指令写成 markdown
+  agent（`~/.kiro/agents/loom-<id>.md`），通过 ACP 选中。一轮进行中发的消息会像
+  Claude Code 一样插进当前这一轮，`/compact` 可以压缩，每轮显示的模型就是 Kiro
+  实际用的模型，已有的 Kiro 会话带着历史继续。删除会话时一并删掉它的 agent 文件。
+  Kiro 不执行工具调用前的 hook，所以有工作站的员工只能用 Claude Code。
 - **项目文件可以直接在项目页里看**：Files 里的 Markdown、图片、视频、PDF、
   网页、表格、文本文件点开就在页内显示（用画布的查看器），行尾的下载图标
   照旧下载。

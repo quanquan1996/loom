@@ -267,41 +267,55 @@ there too, so the fallback should be a 1M one when the usual model is.
 
 ## 6.14 Kiro CLI over ACP
 
-Kiro is a third backend (`Loom.Agent.Backend.Kiro`), measured with kiro-cli
-1.28.1 on 2026-10-28. `kiro-cli chat` is a TUI for a person (or one-shot text
-with `--no-interactive`); `kiro-cli acp` speaks the Agent Client Protocol,
-JSON-RPC on stdio, with typed streaming updates, cancel and resume, so that is
-what Loom drives. The process model is Claude Code's: one process per session,
-kept warm, released when idle.
+Kiro is a third backend (`Loom.Agent.Backend.Kiro`), first measured with
+kiro-cli 1.28.1 on 2026-10-28, moved to the v3 engine on 3.4.0 on 2026-11-19.
+`kiro-cli acp` speaks the Agent Client Protocol, JSON-RPC on stdio. The
+process model is Claude Code's: one process per session, kept warm, released
+when idle.
 
+- **The v3 engine, named:** spawned as `kiro-cli acp --agent-engine v3
+  --auth-method cli`. Any v2-only flag (`--trust-all-tools`, `--agent`,
+  `--model`) silently selects the v2 engine; Loom ran on v2 until 2026-11-19
+  for that reason. v3 opens conversations v2 wrote (measured: history intact).
 - **Handshake per spawn:** `initialize`, then `session/new` (the reply names
-  the conversation; persisted as `kiro_session_id`) or `session/load`, then
-  `session/prompt`, whose reply (`stopReason`) ends the turn. Text arrives as
-  `agent_message_chunk`, tools as `tool_call` / `tool_call_update`.
-- **`session/load` replays the conversation** as `session/update`s before it
-  answers. Dropped: they are history.
-- **Spawn `kiro-cli-chat`, kill the tree.** `kiro-cli` is a launcher; killed,
-  it leaves `kiro-cli-chat` holding the conversation's lock, and the next load
-  fails with "Session is active in another process". kiro-cli 3.x (3.3.0,
-  2026-11-13) dropped `kiro-cli-chat`: `kiro-cli acp` is a single process, and
-  Loom falls back to it. 1.x is now refused by the service
-  (`UnsupportedClientVersionException`); `kiro-cli update -y` fixes that.
-- **No system prompt in ACP.** Each session gets a Kiro agent,
-  `~/.kiro/agents/loom-<session>.json`, whose `prompt` is Loom's instructions,
-  with every tool, named by `--agent`. Unlike Claude Code it is read on every
-  spawn, so new instructions reach a running conversation.
-- **One prompt at a time:** no steering; a message mid-turn waits for the
-  turn's end. `session/cancel` (a notification) interrupts; the prompt then
-  answers `cancelled`.
-- **No cost:** `_kiro.dev/metadata` carries only `contextUsagePercentage`,
-  read as tokens of a 1M window. A virtual employee on Kiro (or Codex) has a
-  budget in turns a day instead of dollars.
+  the conversation; persisted as `kiro_session_id`) or `session/load` with
+  `_meta.kiro.noReplay: true`, then `session/set_mode` (the agent) and, when
+  the session has a model, `session/set_config_option {configId: "model"}`,
+  then `session/prompt`, whose reply (`stopReason`) ends the turn.
+- **No system prompt in ACP: an agent.** `~/.kiro/agents/loom-<session>.md`,
+  front matter (each value JSON, which is YAML) then Loom's instructions as the
+  body, written before every spawn, so new instructions reach a running
+  conversation. v3 ignores a `.json` agent (`_kiro/customAgent/not_found`).
+  `permissions: {rules: [{capability: all, effect: allow}]}` approves every
+  tool; without it each shell call sends `session/request_permission`, which
+  Loom answers allow-once anyway. `_kiro/userInput` (a question for the user)
+  is answered that nobody is there. The file goes with the session
+  (`Kiro.forget/1`).
+- **No hooks.** v3 runs no hooks from an agent file (both the object form and
+  `[{trigger: preToolUse, action: {type: command}}]` measured, neither fires),
+  so a session with a workstation (`Loom.Agent.Guard`) refuses to start on Kiro.
+- **Steering:** `_session/steer {sessionId, message, messageId}` replies
+  `{queued: true, messageId: "steer-<ours>"}`; `session_info_update`
+  `steering_injected` says it reached the model. One still pending when the
+  prompt replies is sent as the next prompt.
+- **`/compact`** is `_kiro/session/compact`, which replies `{success}`;
+  `summarization_completed` is `:compacted`.
+- **Context:** `session_info_update` `context_usage` (`usagePercentage`),
+  read against a 1M window. No cost: a virtual employee on Kiro has a budget
+  in turns a day.
+- **Tool results** come in the final `tool_call_update`'s `content` (v3) or
+  `rawOutput` (v2).
+- **Incognito:** under the sandbox v3 also needs `~/.kiro/session-index`
+  writable (EROFS on `session/new` otherwise).
+- **Auto-update:** kiro-cli downloads a ~210 MB `~/.local/bin/.kiro-cli.update-*`
+  at each start and cannot swap it in while Loom's Kiro processes hold the
+  binary, so the files pile up (4 GB in two days, 2026-11-19). Not Loom's to
+  manage: `kiro-cli settings app.disableAutoupdates true`, update by hand.
 - **Login** is Kiro's own (`kiro-cli login`); Loom adds nothing.
 - **EOF on stdin means quit.** On a pipe, a node restart closes stdin and Kiro
-  exits mid-turn: measured on a two-step task, it did step one and dropped step
-  two. Claude Code, with both pipes closed, finished the turn and exited 0. So
-  both run on a FIFO and a file instead of a port (`Loom.Agent.Proc`), and their
-  turns carry on through a restart ([architecture.md §2.3](architecture.md)).
+  exits mid-turn. So it runs on a FIFO and a file instead of a port
+  (`Loom.Agent.Proc`), and its turns carry on through a restart
+  ([architecture.md §2.3](architecture.md)).
 
 ## 7. Not done: permission prompts
 
