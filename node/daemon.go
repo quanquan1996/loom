@@ -180,11 +180,12 @@ type session struct {
 	mu     sync.Mutex
 	execs  map[string]*job
 	writes map[string]*upload
+	terms  map[string]*term
 	wg     sync.WaitGroup
 }
 
 func newSession(c *conn, cfg *config) *session {
-	return &session{c: c, cfg: cfg, execs: map[string]*job{}, writes: map[string]*upload{}}
+	return &session{c: c, cfg: cfg, execs: map[string]*job{}, writes: map[string]*upload{}, terms: map[string]*term{}}
 }
 
 func (s *session) serve(parent context.Context) error {
@@ -201,6 +202,10 @@ func (s *session) serve(parent context.Context) error {
 		u.abort()
 		delete(s.writes, id)
 	}
+	for id, t := range s.terms {
+		delete(s.terms, id)
+		t.kill()
+	}
 	s.mu.Unlock()
 	s.wg.Wait()
 	return err
@@ -215,6 +220,8 @@ type request struct {
 	Path    string `json:"path"`
 	Data    string `json:"data"`
 	Final   bool   `json:"final"`
+	Cols    int    `json:"cols"`
+	Rows    int    `json:"rows"`
 }
 
 func (s *session) handle(event string, payload json.RawMessage) {
@@ -236,6 +243,11 @@ func (s *session) handle(event string, payload json.RawMessage) {
 			u.abort()
 			delete(s.writes, r.ID)
 		}
+		// Out of the map first: input for it must find nothing, not a closed queue.
+		if t := s.terms[r.ID]; t != nil {
+			delete(s.terms, r.ID)
+			t.kill()
+		}
 		s.mu.Unlock()
 	case "read":
 		s.wg.Add(1)
@@ -249,6 +261,12 @@ func (s *session) handle(event string, payload json.RawMessage) {
 		s.c.push(s.ctx, "uninstalled", map[string]any{"id": r.ID})
 		time.Sleep(time.Second) // for the queue to reach the socket
 		os.Exit(selfUninstall())
+	case "pty_open":
+		s.ptyOpen(r)
+	case "pty_in":
+		s.ptyInput(r)
+	case "pty_resize":
+		s.ptyResize(r)
 	default:
 		log.Printf("ignoring unknown event %q", event)
 	}

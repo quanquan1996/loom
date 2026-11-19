@@ -743,6 +743,11 @@ agent ──zsh──> loom-node exec mac -- '…'      CLI, on this host
 - **Skill.** `rel/deploy.sh` builds every target with `make -C node`,
   installs the CLI at `~/.local/bin/loom-node`, and copies `node/SKILL.md`
   into the skill directories of both backends.
+- **Terminals** (`pty_open`, `pty_in`, `pty_resize`; back `pty_opened`,
+  `pty_out`, `pty_exit`) are the user's, from the terminal column's "+", not
+  the CLI's: the device runs its login shell on a PTY, and the session on
+  this side keeps the screen. Like a command, the shell is hung up when
+  the connection drops.
 
 ## 5. A session's backend is for life
 

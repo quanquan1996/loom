@@ -1802,3 +1802,8 @@
   font-size: 13px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 }
+
+/* The "+" on a terminal pane when devices are online: a native select over it. */
+.pane-btn.pane-pick { position: relative; }
+.pane-btn.pane-pick select { position: absolute; inset: 0; opacity: 0; cursor: pointer; font-size: 16px; }
+.pane-node { opacity: 0.6; font-weight: normal; }

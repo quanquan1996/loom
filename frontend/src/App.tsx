@@ -293,6 +293,8 @@ function App() {
   const [filesRev, setFilesRev] = useState(0)
   // PTY session ids, top to bottom in the right-hand column.
   const [ptyIds, setPtyIds] = useState<string[]>([])
+  // The device each one runs on, for those not on this server.
+  const [ptyNodes, setPtyNodes] = useState<Record<string, string>>({})
   const openingTerminal = useRef(false)
 
   // On a phone, swiping right over the chat pulls the drawer out and swiping
@@ -521,6 +523,7 @@ function App() {
     if (live === null) return current.length
 
     const alive = new Set(live.map((s) => s.id))
+    setPtyNodes(Object.fromEntries(live.flatMap((s) => (s.node ? [[s.id, s.node]] : []))))
     const kept = current.filter((id) => alive.has(id))
     const added = [...live]
       .sort((a, b) => a.created_at - b.created_at)
@@ -560,10 +563,14 @@ function App() {
     setTerminalOpen(true)
   }
 
-  const addTerminal = async () => {
-    const session = await createSession("terminal")
+  // On this server, or on one of the user's devices.
+  const addTerminal = async (node?: string) => {
+    const session = await createSession("terminal", node).catch(() => null)
+    if (!session) return
+    if (session.node) setPtyNodes((nodes) => ({ ...nodes, [session.id]: session.node! }))
     setPtyIds((ids) => [...ids, session.id])
   }
+  const onlineDevices = devices.filter((d) => d.online)
 
   const closeTerminal = async (id: string) => {
     const next = ptyIds.filter((p) => p !== id)
@@ -1020,6 +1027,7 @@ function App() {
                       </button>
                     )}
                     terminal {index + 1}
+                    {ptyNodes[id] && <span className="pane-node"> · {ptyNodes[id]}</span>}
                   </span>
                   <span className="pane-actions">
                     {/* On every pane rather than once, so they do not move
@@ -1033,13 +1041,35 @@ function App() {
                         {maximized ? <Minimize /> : <Maximize />}
                       </button>
                     )}
-                    <button
-                      className="pane-btn"
-                      onClick={addTerminal}
-                      title="New terminal"
-                    >
-                      <Plus />
-                    </button>
+                    {onlineDevices.length === 0 ? (
+                      <button className="pane-btn" onClick={() => addTerminal()} title="New terminal">
+                        <Plus />
+                      </button>
+                    ) : (
+                      // A native picker: this server or one of the online
+                      // devices; the select lies invisibly over the button.
+                      <span className="pane-btn pane-pick" title="New terminal">
+                        <Plus />
+                        <select
+                          value=""
+                          aria-label="New terminal"
+                          onChange={(e) => {
+                            const v = e.target.value
+                            void addTerminal(v === "@this-server" ? undefined : v)
+                          }}
+                        >
+                          <option value="" disabled>
+                            New terminal
+                          </option>
+                          <option value={"@this-server"}>On this server</option>
+                          {onlineDevices.map((d) => (
+                            <option key={d.id} value={d.name}>
+                              On {d.name}
+                            </option>
+                          ))}
+                        </select>
+                      </span>
+                    )}
                     <button
                       className="pane-btn"
                       onClick={() => closeTerminal(id)}

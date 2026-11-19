@@ -36,6 +36,7 @@ config :loom, Loom.Auth, path: Path.join(System.tmp_dir!(), "loom-test-#{System.
 config :loom, Loom.Push, path: Path.join(System.tmp_dir!(), "loom-test-#{System.pid()}/push.json")
 config :loom, Loom.Nodes, dir: Path.join(System.tmp_dir!(), "loom-test-#{System.pid()}")
 config :loom, LoomWeb.NodeController, await_ms: 200
+config :loom, Loom.Terminal.Session, open_timeout: 300
 
 # Nor the real projects and their workspaces. No classifier either: it would
 # call the real `claude`; tests that need one put a stand-in here.
