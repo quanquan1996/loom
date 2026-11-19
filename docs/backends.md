@@ -293,7 +293,10 @@ when idle.
   (`Kiro.forget/1`), with any v2 `.json` and kiro-cli's `.json.bak` of it.
 - **Every agent is a sub-agent.** v3 offers each file in `~/.kiro/agents` as a
   `subagent_<name>` tool, so every session saw the others' (~50 tools);
-  `excludedTools: ["subagent_loom-*"]` drops them (66 tools → 16, measured).
+  `excludedTools: ["subagent_loom-*"]` drops those (66 tools → 16, measured).
+  `invoke_sub_agent` still lists their names; a permissions rule
+  `{capability: subagent, match: ["loom-*"], effect: deny}` before the
+  allow-all refuses the call ("Blocked by a permission rule", measured).
 - **No hooks.** v3 runs no hooks from an agent file (both the object form and
   `[{trigger: preToolUse, action: {type: command}}]` measured, neither fires),
   so a session with a workstation (`Loom.Agent.Guard`) refuses to start on Kiro.

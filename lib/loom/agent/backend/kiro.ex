@@ -330,16 +330,23 @@ defmodule Loom.Agent.Backend.Kiro do
     front =
       [
         name: agent_name(handle),
-        description: "A Loom session (#{handle.loom_id}); written by Loom before every start.",
+        description:
+          "A Loom session's own instructions (#{handle.loom_id}); not a sub-agent, never invoke it.",
         tools: "*",
-        # v3 offers every agent in ~/.kiro/agents as a sub-agent tool: the
-        # other sessions' would be ~50 tools of context and a way to start
-        # someone else's conversation by mistake.
+        # v3 offers every agent in ~/.kiro/agents as a sub-agent: as its own
+        # `subagent_<name>` tool (dropped here) and as a name `invoke_sub_agent`
+        # takes (still listed, but denied below), so one session cannot run
+        # another's instructions by mistake.
         excludedTools: ["subagent_loom-*"],
         includeMcpJson: true,
-        # Every tool call allowed, without a permission request; the user's
-        # own Kiro settings stay as they are.
-        permissions: %{rules: [%{capability: "all", effect: "allow"}]},
+        # Every tool call allowed, without a permission request (but other
+        # sessions' agents); the user's own Kiro settings stay as they are.
+        permissions: %{
+          rules: [
+            %{capability: "subagent", match: ["loom-*"], effect: "deny"},
+            %{capability: "all", effect: "allow"}
+          ]
+        },
         resources: claude_rules(),
         model: handle.model
       ]

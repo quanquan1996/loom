@@ -258,6 +258,7 @@ defmodule Loom.Agent.Backend.KiroTest do
     assert front =~ ~s(model: "claude-sonnet-5")
     assert front =~ ~s("capability":"all")
     assert front =~ ~s("effect":"allow")
+    assert front =~ ~s("match":["loom-*"])
     assert body == "be good\n"
     refute Kiro.agent_file(handle()) =~ "model:"
   end
