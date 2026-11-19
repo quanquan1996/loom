@@ -58,6 +58,8 @@
   Claude Code 一样插进当前这一轮，`/compact` 可以压缩，每轮显示的模型就是 Kiro
   实际用的模型，已有的 Kiro 会话带着历史继续。删除会话时一并删掉它的 agent 文件。
   Kiro 不执行工具调用前的 hook，所以有工作站的员工只能用 Claude Code。
+  其他会话的 agent 不再作为子 agent 列出、也调不动，新开的 Kiro 会话上下文从约
+  30k token 降到约 19k。
 - **项目文件可以直接在项目页里看**：Files 里的 Markdown、图片、视频、PDF、
   网页、表格、文本文件点开就在页内显示（用画布的查看器），行尾的下载图标
   照旧下载。
@@ -90,6 +92,9 @@
   又能用了（旧的 1.x 客户端已被服务端拒绝）。
 
 ### 安全
+- **Codex 和 Kiro 改不了 Claude Code 的配置**：它们看到的 `~/.claude` 和
+  `~/.claude.json` 是只读的（装了 `bwrap` 时）。Kiro 直接读 `CLAUDE.md` 作指令，
+  不再镜像一份 skill 和 MCP 配置，配置只在 Claude Code 一处维护。
 - 升级有安全修复的依赖：bandit 1.14.1、plug_crypto 2.2.1、vite 8.3.8。
 - 登录：不带密码指纹的旧式登录令牌一律拒绝；设置了 `SECRET_KEY_BASE` 时，开发服务器不再用公开的开发密钥签名，从外网能访问的开发服务器也不会被人伪造令牌登录。由 Jinhao Zhang 的 Loom agent 报告。
 

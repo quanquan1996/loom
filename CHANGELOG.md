@@ -68,7 +68,9 @@ that ran live. Format after [Keep a Changelog](https://keepachangelog.com/).
   Claude Code, `/compact` compacts, the model shown per turn is the one Kiro
   runs, and existing Kiro chats carry on with their history. A session's agent
   file is deleted with the session. Kiro runs no tool-call hooks, so an
-  employee with a workstation must use Claude Code.
+  employee with a workstation must use Claude Code. Other sessions' agents are
+  no longer offered or callable as sub-agents, so a fresh Kiro chat starts at
+  ~19k context tokens instead of ~30k.
 - **Project files open on the project page**: a Markdown, image, video, PDF,
   web page, table or text file in the Files tab now opens in place with the
   canvas's viewers; the download mark on its row still downloads it.
@@ -109,6 +111,10 @@ that ran live. Format after [Keep a Changelog](https://keepachangelog.com/).
   service).
 
 ### Security
+- **Codex and Kiro cannot change Claude Code's setup**: they see `~/.claude`
+  and `~/.claude.json` read-only (when `bwrap` is installed). Kiro reads
+  `CLAUDE.md` as its instructions instead of a mirrored copy of skills and MCP
+  servers, so Claude Code stays the one place they are configured.
 - Dependencies with security fixes: bandit 1.14.1, plug_crypto 2.2.1,
   vite 8.3.8.
 - Sign-in: an old-style login token without the password fingerprint is
