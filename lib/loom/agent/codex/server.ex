@@ -215,13 +215,16 @@ defmodule Loom.Agent.Codex.Server do
         {:error, "not found on PATH"}
 
       path ->
+        # Claude Code's config read-only for Codex (`Loom.Agent.Sandbox`).
+        {path, args} = Loom.Agent.Sandbox.guard_claude(path, ["app-server"])
+
         {:ok,
          Port.open({:spawn_executable, path}, [
            :binary,
            :exit_status,
            :use_stdio,
            :hide,
-           args: ["app-server"],
+           args: args,
            env: Loom.ChildEnv.port_env()
          ])}
     end

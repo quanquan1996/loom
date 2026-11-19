@@ -49,6 +49,50 @@ defmodule Loom.Agent.Sandbox do
        ["--setenv", "CLAUDE_CODE_DISABLE_AUTO_MEMORY", "1", "--", exe | args]}
   end
 
+  @doc """
+  `exe args` for a backend other than Claude Code (Codex, Kiro) outside
+  incognito: everything writable as usual except Claude Code's own config,
+  `~/.claude` and `~/.claude.json`, bound read-only. Claude Code owns its rules,
+  memory, skills and MCP servers; the other backends read them (through the
+  shell) but cannot change them. Unchanged when bwrap is missing, so Loom still
+  runs without it.
+
+  `--die-with-parent`: the backend goes when bwrap does, so killing the pid
+  Loom knows (bwrap's) still stops it.
+  """
+  def guard_claude(exe, args) do
+    case System.find_executable("bwrap") do
+      nil ->
+        {exe, args}
+
+      bwrap ->
+        ro = Enum.filter([claude_dir(), claude_json()], &File.exists?/1)
+
+        {bwrap,
+         [
+           "--bind",
+           "/",
+           "/",
+           "--dev-bind",
+           "/dev",
+           "/dev",
+           "--proc",
+           "/proc",
+           "--die-with-parent"
+         ] ++
+           Enum.flat_map(ro, &["--ro-bind", &1, &1]) ++ ["--", exe | args]}
+    end
+  end
+
+  defp claude_dir, do: System.get_env("CLAUDE_CONFIG_DIR") || Path.expand("~/.claude")
+
+  defp claude_json do
+    case System.get_env("CLAUDE_CONFIG_DIR") do
+      nil -> Path.expand("~/.claude.json")
+      dir -> Path.join(dir, ".claude.json")
+    end
+  end
+
   @doc "Caches every tool may fill (uv, npm, pip): not pollution, and MCP servers start from them."
   def caches, do: [Path.expand("~/.cache")]
 
