@@ -266,6 +266,12 @@ defmodule Loom.Agent.Backend.AgyTest do
     assert Agy.set_model(h, nil).model == nil
   end
 
+  test "a process that goes between turns fails nothing; mid-turn it fails the turn" do
+    assert {:ok, %{proc: nil}, []} = Agy.died(handle(%{phase: :idle}), 137)
+    assert {:ok, %{proc: nil, phase: :idle}, out} = Agy.died(handle(), 137)
+    assert [{:turn_failed, %{reason: "agy exited with status 137" <> _}}] = events(out)
+  end
+
   test "the backend is known by name" do
     assert Loom.Agent.Backend.parse("agy") == {:ok, :agy}
     assert Loom.Agent.Backend.impl(:agy) == Agy

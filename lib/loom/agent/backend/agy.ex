@@ -344,6 +344,11 @@ defmodule Loom.Agent.Backend.Agy do
 
   @doc false
   # It went away on its own. Public for the tests.
+  # Between turns (killed for memory, say) there is no turn to fail: the next
+  # one spawns and resumes.
+  def died(%{phase: :idle} = handle, _status),
+    do: {:ok, %{handle | proc: nil, saved: nil, pending: %{}}, []}
+
   def died(handle, status) do
     {:ok, %{handle | proc: nil, saved: nil, phase: :idle, pending: %{}},
      close_block(handle) ++
