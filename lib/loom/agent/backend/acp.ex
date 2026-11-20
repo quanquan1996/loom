@@ -47,6 +47,8 @@ defmodule Loom.Agent.Backend.Acp do
   @callback state_dirs() :: [String.t()]
   @doc "Whether `session/set_model` changes the model of an open session."
   @callback model_in_place?() :: boolean()
+  @doc "Whether the instructions go ahead of a new conversation's first message."
+  @callback instructions_in_prompt?() :: boolean()
 
   defmacro __using__(_opts) do
     quote do
@@ -99,8 +101,10 @@ defmodule Loom.Agent.Backend.Acp do
       def model_in_place?, do: false
       @impl Loom.Agent.Backend.Acp
       def session_params(_handle, params), do: params
+      @impl Loom.Agent.Backend.Acp
+      def instructions_in_prompt?, do: false
 
-      defoverridable open: 0, model_in_place?: 0, session_params: 2
+      defoverridable open: 0, model_in_place?: 0, session_params: 2, instructions_in_prompt?: 0
     end
   end
 
@@ -150,6 +154,8 @@ defmodule Loom.Agent.Backend.Acp do
       prompt: nil,
       # The block being streamed: {block_id, :text | :thinking, text so far}.
       block: nil,
+      # A conversation just made, no message in it yet; see `with_instructions/2`.
+      fresh?: false,
       # Whether this turn has said it is running; see `announce/1`.
       announced?: false,
       tools: %{},
@@ -349,10 +355,24 @@ defmodule Loom.Agent.Backend.Acp do
 
   # `/compact` and the agent's other commands are prompts that begin with a slash.
   defp prompt(%{prompt: text} = handle) do
-    handle = %{handle | phase: :running, prompt: nil, announced?: false}
+    text = with_instructions(handle, text)
+    handle = %{handle | phase: :running, prompt: nil, announced?: false, fresh?: false}
     params = %{sessionId: handle.session_id, prompt: [%{type: "text", text: text}]}
     send_rpc(handle, "session/prompt", params, :prompt)
   end
+
+  # A flavour with no way to add to the system prompt gets the session's
+  # instructions ahead of a new conversation's first message; from then on
+  # they are in the conversation, a resumed one included.
+  defp with_instructions(%{instructions: instructions} = handle, text)
+       when is_binary(instructions) and instructions != "" do
+    if Map.get(handle, :fresh?) == true and handle.flavour.instructions_in_prompt?() and
+         not String.starts_with?(text, "/"),
+       do: "<instructions>\n#{instructions}\n</instructions>\n\n#{text}",
+       else: text
+  end
+
+  defp with_instructions(_handle, text), do: text
 
   defp select_model(%{model: model} = handle) when is_binary(model) and model != "" do
     if handle.flavour.model_in_place?() do
@@ -489,7 +509,7 @@ defmodule Loom.Agent.Backend.Acp do
   end
 
   defp reply(handle, :new, %{"result" => %{"sessionId" => id} = result}) do
-    opened(current_model(%{handle | session_id: id}, result))
+    opened(current_model(%{handle | session_id: id, fresh?: true}, result))
   end
 
   # `session/load` answers null.
@@ -508,7 +528,7 @@ defmodule Loom.Agent.Backend.Acp do
 
   defp reply(handle, :prompt, %{"result" => result}) do
     out = close_block(handle)
-    handle = %{handle | phase: :idle, block: nil}
+    handle = last_context(%{handle | phase: :idle, block: nil}, result)
 
     if handle.interrupted? do
       # The cancel we asked for: the session says so itself.
@@ -520,7 +540,7 @@ defmodule Loom.Agent.Backend.Acp do
            {:event, :turn_done,
             %{
               stop_reason: result["stopReason"],
-              usage: turn_usage(result["usage"]),
+              usage: turn_usage(result["usage"] || get_in(result, ["_meta", "usage"])),
               context_tokens: handle.context_tokens,
               context_window: handle.context_window,
               model: handle.current_model || handle.model
@@ -547,10 +567,25 @@ defmodule Loom.Agent.Backend.Acp do
 
   defp reply(handle, _what, _message), do: {handle, []}
 
-  defp current_model(handle, %{"models" => %{"currentModelId" => model}}) when is_binary(model),
-    do: %{handle | current_model: model}
+  defp current_model(handle, %{"models" => %{"currentModelId" => model} = models})
+       when is_binary(model) do
+    # Grok sends no `usage_update`: the window is the model's, told here.
+    window =
+      Enum.find_value(List.wrap(models["availableModels"]), fn
+        %{"modelId" => ^model, "_meta" => %{"totalContextTokens" => n}} when is_integer(n) -> n
+        _ -> nil
+      end)
+
+    %{handle | current_model: model, context_window: window || handle.context_window}
+  end
 
   defp current_model(handle, _result), do: handle
+
+  # Grok: what the turn's last model call held is how full the context is.
+  defp last_context(handle, %{"_meta" => %{"totalTokens" => n}}) when is_integer(n) and n > 0,
+    do: %{handle | context_tokens: n}
+
+  defp last_context(handle, _result), do: handle
 
   # The session is there: its model, then the turn — unless warmed with none.
   defp opened(handle), do: ready(select_model(handle))
@@ -582,7 +617,7 @@ defmodule Loom.Agent.Backend.Acp do
       "input_tokens" => u["inputTokens"] || 0,
       "output_tokens" => (u["outputTokens"] || 0) + (u["thoughtTokens"] || 0),
       "cache_read_input_tokens" => u["cachedReadTokens"] || 0,
-      "cache_creation_input_tokens" => u["cachedWriteTokens"] || 0
+      "cache_creation_input_tokens" => u["cachedWriteTokens"] || u["cacheCreationTokens"] || 0
     }
   end
 
@@ -694,7 +729,8 @@ defmodule Loom.Agent.Backend.Acp do
   # `kind` is the tool (`execute`, `read`, `edit`…); `name` is the agent's own
   # (`run_command`), `title` what it does now.
   defp tool_name(u) do
-    case u["kind"] do
+    # Grok tells the kind in its own `_meta` until the call's first update.
+    case u["kind"] || get_in(u, ["_meta", "x.ai/tool", "kind"]) do
       "execute" -> "Bash"
       "read" -> "Read"
       "edit" -> "Edit"

@@ -367,7 +367,7 @@ module that `use`s it and answers a few callbacks:
 | | agy | CodeBuddy | Grok |
 | --- | --- | --- | --- |
 | spawned as | `agy acp --dangerously-skip-permissions` | `codebuddy --acp -y` | `grok agent --always-approve stdio` |
-| instructions | `_meta.antigravity.systemPrompt.append` on new/resume | `--append-system-prompt` | `--rules` (before `agent`) |
+| instructions | `_meta.antigravity.systemPrompt.append` on new/resume | `--append-system-prompt` | ahead of a new conversation's first message |
 | model | `session/set_model`, in place | `--model`, respawn | `-m`, respawn |
 | a conversation it has | `session/resume` | `session/load` (replay dropped) | `session/resume` |
 | its directory | `~/.gemini` | `~/.codebuddy` | `~/.grok` |
@@ -383,10 +383,19 @@ token usage. It tells a tool call before its arguments exist (`rawInput: {}`,
 kind `other`), streams them as `tool_call_update`s, then tells the call again
 complete (kind `execute`): `Acp` holds such a call back until then. Its tool
 output is `rawOutput: {type: "text", text}`. `session_info_update` carries a
-title for the conversation, not used yet. Not yet measured: `session/load` on
-CodeBuddy, a turn on Grok, whether Grok's `--rules` reaches `agent stdio`, and
-whether a signed-in Grok still wants `authenticate` first (its error says "no
-auth method id provided"). CodeBuddy's `-y` still asks for what it rates
+title for the conversation, not used yet.
+
+Grok signed in (1.0.89): `session/new` needs no `authenticate`. `--rules` does
+not reach `agent stdio` (asked for a word given there, it found none), so the
+instructions lead the first message. A tool call comes once, with its
+arguments and its kind in `_meta["x.ai/tool"]`; the output is in `content`.
+There is no `usage_update`: the prompt's reply has `_meta.usage` (the turn)
+and `_meta.totalTokens` (the last model call, taken as the context used), and
+`session/new`'s `models` gives each model's `totalContextTokens`. Its extra
+events come as `_x.ai/session_notification` and are dropped. Not yet measured:
+a resume on Grok after its process is gone.
+
+CodeBuddy's `-y` still asks for what it rates
 high-risk; such a
 request is allowed once. CodeBuddy also speaks Claude Code's stream-json
 (`-p --input-format stream-json`), which was not used: ACP is one code path

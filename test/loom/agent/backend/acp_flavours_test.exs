@@ -24,12 +24,75 @@ defmodule Loom.Agent.Backend.AcpFlavoursTest do
     assert CodeBuddy.session_params(handle(CodeBuddy, %{})) == %{cwd: "/tmp", mcpServers: []}
   end
 
-  test "Grok: rules before the subcommand, the model inside it" do
-    assert Grok.spawn_args(handle(Grok, %{model: "grok-4.6"})) ==
-             ["--rules", "be good", "agent", "--always-approve", "-m", "grok-4.6", "stdio"]
+  test "Grok: the model is named when it is spawned" do
+    assert Grok.spawn_args(handle(Grok, %{model: "grok-4.7"})) ==
+             ["agent", "--always-approve", "-m", "grok-4.7", "stdio"]
 
-    assert Grok.spawn_args(handle(Grok, %{instructions: ""})) ==
-             ["agent", "--always-approve", "stdio"]
+    assert Grok.spawn_args(handle(Grok, %{})) == ["agent", "--always-approve", "stdio"]
+  end
+
+  test "Grok: instructions lead a new conversation's first message; usage is the reply's" do
+    # As 1.0.89 sent them (2026-11-20), cut down.
+    models = %{
+      "currentModelId" => "grok-4.7",
+      "availableModels" => [
+        %{"modelId" => "grok-4.7", "_meta" => %{"totalContextTokens" => 256_000}}
+      ]
+    }
+
+    h = handle(Grok, %{phase: :opening, prompt: "hi", pending: %{2 => :new}, next_id: 3})
+
+    {h, _} =
+      feed(Grok, h, [
+        %{"jsonrpc" => "2.0", "id" => 2, "result" => %{"sessionId" => "s", "models" => models}}
+      ])
+
+    assert h.phase == :running
+    assert h.fresh? == false
+    assert h.context_window == 256_000
+
+    tool = %{
+      "jsonrpc" => "2.0",
+      "method" => "session/update",
+      "params" => %{
+        "update" => %{
+          "sessionUpdate" => "tool_call",
+          "toolCallId" => "c1",
+          "title" => "run_terminal_command",
+          "rawInput" => %{"command" => "echo hi"},
+          "_meta" => %{"x.ai/tool" => %{"kind" => "execute"}}
+        }
+      }
+    }
+
+    done = %{
+      "jsonrpc" => "2.0",
+      "id" => 3,
+      "result" => %{
+        "stopReason" => "end_turn",
+        "_meta" => %{
+          "totalTokens" => 19_446,
+          "usage" => %{
+            "inputTokens" => 38_167,
+            "outputTokens" => 587,
+            "cachedReadTokens" => 20_864,
+            "cacheCreationTokens" => 0
+          }
+        }
+      }
+    }
+
+    {_h, out} = feed(Grok, h, [tool, done])
+
+    assert {:event, :tool_use, %{name: "Bash", input: %{"command" => "echo hi"}}} =
+             Enum.at(out, 1)
+
+    assert {:event, :turn_done, turn} = List.last(out)
+    assert turn.context_tokens == 19_446
+    assert turn.context_window == 256_000
+    assert turn.usage["input_tokens"] == 38_167
+    assert turn.usage["cache_read_input_tokens"] == 20_864
+    assert turn.model == "grok-4.7"
   end
 
   test "CodeBuddy loads a conversation it has, and the replay is not a turn" do

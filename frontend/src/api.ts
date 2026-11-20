@@ -670,7 +670,7 @@ export const MODELS: Record<AgentBackend, string[]> = {
   // From `codebuddy --help`; which of them an account may use depends on its login.
   codebuddy: ["hy4-preview", "deepseek-v4.1-flash", "glm-5.3", "kimi-k3", "gpt-6-astra", "gpt-5.6-sol", "gemini-3.5-flash"],
   // What `grok agent stdio` lists when it starts.
-  grok: ["grok-4.6", "grok-4.5"],
+  grok: ["grok-4.7"],
 }
 
 /**
