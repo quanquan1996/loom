@@ -246,6 +246,26 @@ defmodule LoomWeb.ProjectControllerTest do
                Enum.find(events, &(&1.kind == :project_moved))
     end
 
+    test "the queue a waiting first message showed is cleared when its turn starts", %{
+      conn: conn
+    } do
+      create_project(conn, %{name: "Blog"})
+      with_classifier(nil)
+
+      %{"id" => id} =
+        conn |> post(~p"/api/agents", %{backend: "claude_code"}) |> json_response(201)
+
+      {:ok, :started} = Agent.submit(id, "what is 2 + 2")
+      # A client joining now sees the message waiting in the queue...
+      assert {:ok, %{meta: %{queue: [_]}}} = Agent.attach(id)
+      assert BackendStub.await_turn() == "what is 2 + 2"
+
+      # ...and must be told it went out, though the status never changed.
+      {:ok, %{events: events, meta: meta}} = Agent.attach(id)
+      assert meta.queue == []
+      assert %{payload: %{messages: []}} = events |> Enum.filter(&(&1.kind == :queue)) |> List.last()
+    end
+
     test "nowhere when no project fits, and only for the first message", %{conn: conn} do
       create_project(conn, %{name: "Blog"})
       with_classifier(nil)

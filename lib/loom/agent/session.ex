@@ -1456,7 +1456,15 @@ defmodule Loom.Agent.Session do
         # `:starting` rather than `:running`: Claude Code takes seconds to boot
         # before it says anything, and a UI with no state for that gap looks
         # hung. The backend's own status event moves us to `:running`.
-        set_status(checkpoint(%{state | handle: handle, queue: [], notice: nil}), :starting)
+        state = checkpoint(%{state | handle: handle, queue: [], notice: nil})
+
+        # Already `:starting` when a first message waited for its project
+        # (`classify/2`): `set_status` is then a no-op, so nothing would tell
+        # a client that joined during the wait — its snapshot showed the
+        # message queued — that the queue went out.
+        if state.status == :starting,
+          do: persist_and_broadcast_queue(state),
+          else: set_status(state, :starting)
 
       {:error, reason} ->
         # The queue is cleared only on success. Dropping the user's message
