@@ -19,6 +19,7 @@ import { ProjectPage, type ProjectTab } from "./ProjectPage"
 import { isDream, scopeOf, Sleep, type SleepTab } from "./Sleep"
 import { EmployeePage, HireDialog, isEmployeeSession, type EmployeeTab } from "./Employees"
 import { Terminal } from "./Terminal"
+import { TerminalPick } from "./TerminalPick"
 // noVNC is only for the browser pane, so it loads when that is first opened.
 const Browser = lazy(() => import("./Browser").then((m) => ({ default: m.Browser })))
 import { lastActive, useLobby } from "./useLobby"
@@ -571,6 +572,8 @@ function App() {
     setPtyIds((ids) => [...ids, session.id])
   }
   const onlineDevices = devices.filter((d) => d.online)
+  // The "+" menu's anchor while it is open.
+  const [termPick, setTermPick] = useState<DOMRect | null>(null)
 
   const closeTerminal = async (id: string) => {
     const next = ptyIds.filter((p) => p !== id)
@@ -1046,29 +1049,16 @@ function App() {
                         <Plus />
                       </button>
                     ) : (
-                      // A native picker: this server or one of the online
-                      // devices; the select lies invisibly over the button.
-                      <span className="pane-btn pane-pick" title="New terminal">
+                      <button
+                        className="pane-btn pane-pick"
+                        title="New terminal"
+                        onClick={(e) => {
+                          const r = e.currentTarget.getBoundingClientRect()
+                          setTermPick((open) => (open ? null : r))
+                        }}
+                      >
                         <Plus />
-                        <select
-                          value=""
-                          aria-label="New terminal"
-                          onChange={(e) => {
-                            const v = e.target.value
-                            void addTerminal(v === "@this-server" ? undefined : v)
-                          }}
-                        >
-                          <option value="" disabled>
-                            New terminal
-                          </option>
-                          <option value={"@this-server"}>On this server</option>
-                          {onlineDevices.map((d) => (
-                            <option key={d.id} value={d.name}>
-                              On {d.name}
-                            </option>
-                          ))}
-                        </select>
-                      </span>
+                      </button>
                     )}
                     <button
                       className="pane-btn"
@@ -1084,6 +1074,14 @@ function App() {
                 </div>
               </div>
             ))}
+            {termPick && (
+              <TerminalPick
+                anchor={termPick}
+                devices={onlineDevices.map((d) => d.name)}
+                onPick={(node) => void addTerminal(node)}
+                onClose={() => setTermPick(null)}
+              />
+            )}
           </div>
         )}
       </main>
