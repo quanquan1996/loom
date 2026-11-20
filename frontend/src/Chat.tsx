@@ -1201,6 +1201,8 @@ type ItemProps = {
   item: TimelineItem
   sessionId: string
   onAnswer: (text: string) => void
+  /** Inside an opened "used N tools" card: already asked for, so shown open. */
+  nested?: boolean
 }
 
 /**
@@ -1234,7 +1236,7 @@ function same(a: unknown, b: unknown): boolean {
   return ka.every((k) => k in rb && same(ra[k], rb[k]))
 }
 
-function ItemView({ item, sessionId, onAnswer }: ItemProps) {
+function ItemView({ item, sessionId, onAnswer, nested }: ItemProps) {
   switch (item.kind) {
     case "user":
       // Meeting mode's prompt and transcript batches: folded, on every screen.
@@ -1278,9 +1280,9 @@ function ItemView({ item, sessionId, onAnswer }: ItemProps) {
     case "thinking":
       // Opus returns thinking blocks with empty text under the default
       // display, so the fallback is the normal case rather than an edge case.
-      return (
-        <div className="thinking">{item.text.trim() || "thought for a moment"}</div>
-      )
+      if (item.text.trim() === "" || nested)
+        return <div className="thinking">{item.text.trim() || "thought for a moment"}</div>
+      return <ThinkingFold text={item.text} streaming={item.streaming} />
 
     case "tool":
       return <ToolCard item={item} />
@@ -1954,10 +1956,28 @@ function ToolGroup({
       {open && (
         <div className="group-steps">
           {item.steps.map((step) => (
-            <Item key={step.key} item={step} sessionId={sessionId} onAnswer={onAnswer} />
+            <Item key={step.key} item={step} sessionId={sessionId} onAnswer={onAnswer} nested />
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+/**
+ * Thinking with words in it, folded to one line like ChatGPT's "Thought":
+ * some models (CodeBuddy's hy4, Codex) send their whole reasoning, which
+ * pushes the answer down. Tap to read it.
+ */
+function ThinkingFold({ text, streaming }: { text: string; streaming: boolean }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="thinking-fold">
+      <button type="button" className="thinking-head" onClick={() => setOpen((v) => !v)}>
+        {streaming ? "thinking…" : "thought"}
+        {open ? <ChevronDown /> : <ChevronRight />}
+      </button>
+      {open && <div className="thinking">{text.trim()}</div>}
     </div>
   )
 }

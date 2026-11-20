@@ -551,6 +551,28 @@
   white-space: pre-wrap;
 }
 
+.thinking-head {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--fg-dim);
+  font-family: inherit;
+  font-size: 0.923rem;
+  cursor: pointer;
+}
+
+.thinking-head svg {
+  width: 14px;
+  height: 14px;
+}
+
+.thinking-fold .thinking {
+  margin-top: 4px;
+}
+
 .show-earlier {
   align-self: center;
   padding: 4px 10px;
