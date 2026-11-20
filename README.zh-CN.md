@@ -104,6 +104,7 @@ Loom 是一个单用户使用的编程 agent 网页端。agent 跑在你的服�
 ### 终端
 
 - 聊天旁边可以开真正的 PTY shell，同时开多个。关掉页面也不会断，两台设备可以共用一个 shell。OSC 52 剪贴板写入（tmux、nvim）能传到浏览器的剪贴板。
+- *+* 也可以在你某台在线设备上开 shell（macOS/Linux，经 `loom-node`），不只在服务器上。
 
 ### Canvas 和幻灯片
 

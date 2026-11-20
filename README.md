@@ -182,6 +182,8 @@ See the [changelog](CHANGELOG.md) for what came in which version.
 
 - Real PTY shells beside the chat, several at once, that outlive the tab and
   can be shared by two devices. OSC 52 clipboard writes reach the browser.
+- The *+* can open the shell on one of your online devices (macOS/Linux, via
+  `loom-node`) instead of the server.
 
 ### Canvas and slides
 

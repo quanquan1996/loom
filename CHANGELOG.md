@@ -39,6 +39,10 @@ that ran live. Format after [Keep a Changelog](https://keepachangelog.com/).
   used and each turn's tokens are shown. It signs in with a personal Google
   account, which Google refuses from cloud addresses, so it is for a Loom at
   home. `LOOM_AGY_CLI` pins the binary. See docs/backends.md §6.15.
+- **Terminals on your own devices**: the terminal column's *+* opens a shell
+  on an online device as well as on the server, through `loom-node`; it stays
+  open like a local one. macOS and Linux only for now; on Windows it says so
+  at once. Ported from upstream 16c18b0.
 - **Large attachments, sent in parts**: a file over 20 MB (up to 500 MB) is
   uploaded as 8 MB requests the server appends, so it passes a proxy that caps
   a request's body (Cloudflare: 100 MB), shows how far it is on its card, and
