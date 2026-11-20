@@ -86,6 +86,63 @@ defmodule Loom.Agent.Backend.AcpFlavoursTest do
     assert h.pending == %{2 => :resume}
   end
 
+  test "CodeBuddy: a tool call waits for its arguments, then its result is text" do
+    # As 2.185.0 sent them (2026-11-20), without their _meta.
+    up = fn u ->
+      %{"jsonrpc" => "2.0", "method" => "session/update", "params" => %{"update" => u}}
+    end
+
+    id = "chatcmpl-tool-1"
+    h = handle(CodeBuddy, %{session_id: "sid", phase: :running, announced?: true})
+
+    {h, out} =
+      feed(CodeBuddy, h, [
+        up.(%{
+          "sessionUpdate" => "tool_call",
+          "toolCallId" => id,
+          "title" => "Bash",
+          "kind" => "other",
+          "status" => "in_progress",
+          "rawInput" => %{}
+        }),
+        up.(%{
+          "sessionUpdate" => "tool_call_update",
+          "toolCallId" => id,
+          "rawInput" => %{"command" => "echo lo"}
+        })
+      ])
+
+    assert out == []
+
+    {h, out} =
+      feed(CodeBuddy, h, [
+        up.(%{
+          "sessionUpdate" => "tool_call",
+          "toolCallId" => id,
+          "status" => "pending",
+          "title" => "`echo loom`",
+          "kind" => "execute",
+          "rawInput" => %{"command" => "echo loom"}
+        })
+      ])
+
+    assert [{:delta, %{type: :tool_use_start, name: "Bash"}}, {:event, :tool_use, use}] = out
+    assert %{id: ^id, name: "Bash", input: %{"command" => "echo loom"}} = use
+
+    {_h, out} =
+      feed(CodeBuddy, h, [
+        up.(%{
+          "sessionUpdate" => "tool_call_update",
+          "toolCallId" => id,
+          "status" => "completed",
+          "rawOutput" => %{"type" => "text", "text" => "Stdout: loom"}
+        })
+      ])
+
+    assert [{:event, :tool_result, %{id: ^id, name: "Bash", status: :ok, output: "Stdout: loom"}}] =
+             out
+  end
+
   test "a new model lets the process go: it is named at the next spawn" do
     h = handle(CodeBuddy, %{session_id: "sid", phase: :idle, model: "a"})
     assert CodeBuddy.set_model(h, "a") == h

@@ -597,8 +597,35 @@ defmodule Loom.Agent.Backend.Acp do
        do: chunk(handle, :thinking, text)
 
   # Told once per call, already under way; a second telling is not a new call.
+  # CodeBuddy tells a call before the model has written its arguments (an
+  # empty `rawInput`), streams them, then tells it again complete: such a call
+  # waits, and is shown when its arguments are whole, or with its result.
   defp update(handle, %{"sessionUpdate" => "tool_call", "toolCallId" => id} = u)
        when not is_map_key(handle.tools, id) do
+    if tool_args(u) == %{} and u["status"] not in ["completed", "failed"],
+      do: {%{handle | tools: Map.put(handle.tools, id, {:waiting, u})}, []},
+      else: tool_start(handle, id, u)
+  end
+
+  defp update(handle, %{"sessionUpdate" => kind, "toolCallId" => id} = u)
+       when kind in ["tool_call", "tool_call_update"] do
+    case {Map.get(handle.tools, id), u["status"]} do
+      {{:waiting, first}, status} when kind == "tool_call" or status in ["completed", "failed"] ->
+        {handle, out} = tool_start(handle, id, Map.merge(first, u))
+        {handle, out ++ tool_end(handle, id, u)}
+
+      # Its arguments, as far as they are written.
+      {{:waiting, first}, _} ->
+        {%{handle | tools: Map.put(handle.tools, id, {:waiting, Map.merge(first, u)})}, []}
+
+      _ ->
+        {handle, tool_end(handle, id, u)}
+    end
+  end
+
+  defp update(handle, _update), do: {handle, []}
+
+  defp tool_start(handle, id, u) do
     out = close_block(handle)
     {block_id, handle} = next_block(%{handle | block: nil})
     name = tool_name(u)
@@ -612,21 +639,19 @@ defmodule Loom.Agent.Backend.Acp do
        ]}
   end
 
-  defp update(handle, %{"sessionUpdate" => kind, "toolCallId" => id, "status" => status} = u)
-       when kind in ["tool_call", "tool_call_update"] and status in ["completed", "failed"] do
-    {handle,
-     [
-       {:event, :tool_result,
-        %{
-          id: id,
-          name: Map.get(handle.tools, id, "tool"),
-          status: if(status == "failed", do: :error, else: :ok),
-          output: tool_output(u)
-        }}
-     ]}
+  defp tool_end(handle, id, %{"status" => status} = u) when status in ["completed", "failed"] do
+    [
+      {:event, :tool_result,
+       %{
+         id: id,
+         name: Map.get(handle.tools, id, "tool"),
+         status: if(status == "failed", do: :error, else: :ok),
+         output: tool_output(u)
+       }}
+    ]
   end
 
-  defp update(handle, _update), do: {handle, []}
+  defp tool_end(_handle, _id, _update), do: []
 
   # Streamed text: a block opened on its first chunk and kept until something
   # else comes, when it becomes one event.
@@ -681,6 +706,13 @@ defmodule Loom.Agent.Backend.Acp do
   end
 
   # A shell command as Claude Code names it, so it reads the same in the chat.
+  defp tool_args(u) do
+    case u["rawInput"] || u["args"] do
+      %{} = input -> input
+      _ -> %{}
+    end
+  end
+
   defp tool_input(u) do
     case u["rawInput"] || u["args"] do
       %{"CommandLine" => command} when is_binary(command) -> %{"command" => command}
@@ -693,6 +725,7 @@ defmodule Loom.Agent.Backend.Acp do
     case {content_text(u["content"]), u["rawOutput"]} do
       {text, _} when text != "" -> text
       {_, %{"output" => text}} when is_binary(text) -> text
+      {_, %{"text" => text}} when is_binary(text) -> text
       {_, text} when is_binary(text) -> text
       {_, nil} -> ""
       {_, other} -> Jason.encode!(other)

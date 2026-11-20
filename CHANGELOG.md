@@ -25,7 +25,7 @@ that ran live. Format after [Keep a Changelog](https://keepachangelog.com/).
   ones offered. With Claude Code off, the other agents are no longer bound
   read-only to `~/.claude`, and the bell's, a notice's and the hiring chat's
   sessions run on the default agent instead of Claude Code.
-- **CodeBuddy and Grok as agents** (not yet run against a signed-in account):
+- **CodeBuddy and Grok as agents** (Grok not yet run against a signed-in account):
   Tencent's `codebuddy --acp` and xAI's `grok agent stdio`, both over ACP.
   The ACP code that Antigravity brought is now one shared module
   (`Loom.Agent.Backend.Acp`), and each CLI a short flavour of it: its spawn

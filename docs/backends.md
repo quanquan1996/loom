@@ -376,10 +376,18 @@ Kiro keeps its own module: it is older, and writes an agent file.
 
 Measured without a login (CodeBuddy 2.185.0, Grok 1.0.89, 2026-11-20): both
 answer `initialize`, accept the arguments above, and refuse `session/new` with
-"Authentication required". Not yet measured: a turn's updates and usage on
-either, whether Grok's `--rules` reaches `agent stdio`, and whether a signed-in
-Grok still wants `authenticate` first (its error says "no auth method id
-provided"). CodeBuddy's `-y` still asks for what it rates high-risk; such a
+"Authentication required". CodeBuddy was then run signed in (mainland site):
+a turn with a shell command ends `end_turn`, `--append-system-prompt` is
+honoured, `usage_update` gives used/size, and the prompt's reply carries no
+token usage. It tells a tool call before its arguments exist (`rawInput: {}`,
+kind `other`), streams them as `tool_call_update`s, then tells the call again
+complete (kind `execute`): `Acp` holds such a call back until then. Its tool
+output is `rawOutput: {type: "text", text}`. `session_info_update` carries a
+title for the conversation, not used yet. Not yet measured: `session/load` on
+CodeBuddy, a turn on Grok, whether Grok's `--rules` reaches `agent stdio`, and
+whether a signed-in Grok still wants `authenticate` first (its error says "no
+auth method id provided"). CodeBuddy's `-y` still asks for what it rates
+high-risk; such a
 request is allowed once. CodeBuddy also speaks Claude Code's stream-json
 (`-p --input-format stream-json`), which was not used: ACP is one code path
 for three CLIs.
