@@ -31,7 +31,7 @@ Loom 是一个单用户使用的编程 agent 网页端。agent 跑在你的服�
 
 ## 亮点
 
-- **三个 agent，一个界面。** Claude Code、Codex、Kiro CLI（ACP 协议）按会话选。模型也按会话选，每一轮都标出是哪个模型答的。
+- **三个 agent，一个界面。** Claude Code、Codex、Kiro CLI（ACP 协议）按会话选。谷歌的 Antigravity CLI（`agy`，同样走 ACP）也能选，适合跑在家里的 Loom 上。模型也按会话选，每一轮都标出是哪个模型答的。
 - **为手机设计。** ChatGPT 风格的界面，尺寸照它的 iOS 版量的：Working 卡片可以左右滑，建议回复点一下就能答，点一下就能复制，草稿跟着你换设备。
 - **重启不断。** 一轮跑到一半时升级或重启 Loom，Claude Code 和 Kiro 会继续干活，Loom 起来后接着收。
 - **agent 能自己干活。** 一句话建定时任务；虚拟员工有预算和 KPI；夜里 Sleep 自动整理记忆；需要你拍板的事推到铃铛里。

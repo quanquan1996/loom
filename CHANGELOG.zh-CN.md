@@ -16,6 +16,12 @@
 ## [Unreleased]
 
 ### 新增
+- **第四个 agent：Antigravity**。谷歌的 `agy` CLI，和 Kiro 一样走 ACP
+  （`agy acp`；新建会话菜单、设置、`Space n g` 里都能选）。会话指令作为系统
+  提示词的追加部分传入，模型在会话顶部从 `agy models` 的 id 里选，重启不断，
+  显示上下文占用和每轮 token。它用个人 Google 账号登录，谷歌拒绝云服务器的
+  地址，所以适合放在家里的 Loom 上用。`LOOM_AGY_CLI` 可以指定程序路径。
+  详见 docs/backends.md §6.15。
 - **大附件分片上传**：超过 20 MB 的文件（上限 500 MB）切成每片 8 MB 的请求，
   服务器逐片拼接。这样能通过限制请求体大小的代理（Cloudflare 是 100 MB），
   文件卡片上显示进度，断线只重传一片而不是整个文件。小文件和以前一样一起

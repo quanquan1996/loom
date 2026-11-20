@@ -6,7 +6,7 @@ defmodule Loom.Agent do
   @doc """
   Start a new agent session (or return the existing one for `id`).
 
-  `:backend` is required and permanent: `:claude_code`, `:codex` or `:kiro`. The
+  `:backend` is required and permanent: `:claude_code`, `:codex`, `:kiro` or `:agy`. The
   conversation lives in that engine's own store, so there is nothing to migrate
   if it changes.
   """

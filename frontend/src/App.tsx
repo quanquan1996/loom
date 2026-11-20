@@ -666,6 +666,7 @@ function App() {
     "Space n c": { desc: "new Claude Code session", run: () => void create("claude_code") },
     "Space n x": { desc: "new Codex session", run: () => void create("codex") },
     "Space n k": { desc: "new Kiro session", run: () => void create("kiro") },
+    "Space n g": { desc: "new Antigravity session", run: () => void create("agy") },
   }
   const keymap: Keymap = treeWalk
     ? {
@@ -967,6 +968,9 @@ function App() {
                 </button>
                 <button className="text-btn" onClick={() => create("kiro")}>
                   new Kiro session
+                </button>
+                <button className="text-btn" onClick={() => create("agy")}>
+                  new Antigravity session
                 </button>
               </div>
             </div>

@@ -323,6 +323,41 @@ when idle.
   (`Loom.Agent.Proc`), and its turns carry on through a restart
   ([architecture.md §2.3](architecture.md)).
 
+## 6.15 Antigravity CLI over ACP
+
+Google's `agy` is a fourth backend (`Loom.Agent.Backend.Agy`), measured on
+agy 1.5.13 on 2026-11-20. `agy acp` speaks the same Agent Client Protocol as
+Kiro, and the module has Kiro's shape: one process per session on a
+`Loom.Agent.Proc`, `initialize`, then the session, then `session/prompt`.
+What differs:
+
+- **Resume, not load.** `session/resume` opens a conversation by id without
+  replaying it; `session/load` replays every message as `session/update`s. Loom
+  uses resume, and starts afresh when agy no longer has the conversation.
+- **The system prompt is appended.** `initialize` advertises
+  `_meta.antigravity.systemPrompt.append`; the session's instructions go as
+  that `_meta` on `session/new` and `session/resume`. No agent file.
+- **Models** are `agy models`' ids (`gemini-4-neon-high`,
+  `claude-opus-5-5-high`, …), the level of thinking being part of the id, set
+  with `session/set_model` — in place on a warm process. No efforts.
+- **No permission requests:** spawned with `--dangerously-skip-permissions`.
+- **Usage:** `usage_update` carries `used` and `size` (the context and its
+  window); the prompt's reply carries the turn's tokens
+  (`inputTokens`, `outputTokens`, `thoughtTokens`, `cachedReadTokens`). No cost.
+- **Tools:** `tool_call` arrives `in_progress`, then `tool_call_update`
+  `completed` or `failed`, with `kind` (`execute`, …), agy's own `name`
+  (`run_command`) and `rawInput.CommandLine` for a shell command.
+- **Cancel:** `session/cancel`; the running tool fails and the prompt replies
+  `cancelled`.
+- **Missing:** steering (the session queues the message) and tool-call hooks
+  (a session with a workstation is refused, as on Kiro).
+- **Login** is agy's own: run `agy` once and sign in with Google; the token is
+  kept in `~/.gemini/antigravity-cli`. Google refuses a personal account's
+  requests from cloud addresses (429 from AWS, measured 2026-11-19) and from
+  regions it does not serve ("User location is not supported"), so this
+  backend is for a Loom that runs at home or behind an exit Google places in a
+  supported country.
+
 ## 7. Not done: permission prompts
 
 Codex has proper approval requests. CC auto-denies under

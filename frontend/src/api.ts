@@ -350,7 +350,7 @@ export async function deleteSession(id: string): Promise<void> {
 // opaque rather than being flattened into a lowest common denominator.
 export type AgentUsage = Record<string, unknown>
 
-export type AgentBackend = "claude_code" | "codex" | "kiro"
+export type AgentBackend = "claude_code" | "codex" | "kiro" | "agy"
 
 /**
  * `starting` is the gap between asking the backend to begin and it saying
@@ -620,12 +620,13 @@ export async function renameAgent(
 /**
  * The thinking levels each agent takes, lowest first: Claude Code's
  * `--effort`, Codex's per-turn `effort`. Mirrors `Loom.Agent.Backend.efforts/1`;
- * Kiro has none.
+ * Kiro has none, and Antigravity's level is part of the model id.
  */
 export const EFFORTS: Record<AgentBackend, string[]> = {
   claude_code: ["low", "medium", "high", "xhigh", "max"],
   codex: ["low", "medium", "high", "xhigh"],
   kiro: [],
+  agy: [],
 }
 
 /**
@@ -633,7 +634,7 @@ export const EFFORTS: Record<AgentBackend, string[]> = {
  * id, typed): Bedrock's for Claude Code — `opus` and `fable` are Claude
  * Code's aliases for the newest of each, so they move on as it updates
  * (its `sonnet`/`haiku` still mean 4.5 on Bedrock, hence the full ids) — Bedrock Mantle's for Codex (`~/.codex/config.toml`), and what
- * `kiro-cli chat --list-models` lists. The server takes any id; this is only
+ * `kiro-cli chat --list-models` and `agy models` list. The server takes any id; this is only
  * the menu.
  */
 export const MODELS: Record<AgentBackend, string[]> = {
@@ -654,6 +655,16 @@ export const MODELS: Record<AgentBackend, string[]> = {
     "glm-5",
     "deepseek-3.2",
   ],
+  // Antigravity's ids end in the thinking level; its default is the account's.
+  agy: [
+    "gemini-4-neon-high",
+    "gemini-4-neon-medium",
+    "gemini-4-argon-high",
+    "gemini-4-hydrogen-high",
+    "gemini-3.8-flash-medium",
+    "claude-opus-5-5-high",
+    "claude-sonnet-5-5-high",
+  ],
 }
 
 /**
@@ -664,6 +675,12 @@ export function modelName(id: string): string {
   const alias = id.match(/^(opus|fable|sonnet|haiku)(\[1m\])?$/)
   if (alias) return `${alias[1][0].toUpperCase()}${alias[1].slice(1)} (latest)`
   const bare = id.replace(/\[.*\]$/, "").replace(/^(us|eu|apac|global)\./, "").replace(/^(anthropic|openai)\./, "")
+  // Antigravity's: `gemini-4-neon-high` is "Gemini 4 Neon (High)", and its Claude ids keep their level too.
+  const level = bare.match(/^(gemini|claude)-(.+)-(low|medium|high|xhigh)$/)
+  if (level) {
+    const base = level[1] === "claude" ? modelName(`claude-${level[2]}`) : "Gemini " + level[2].split("-").map((w) => w[0].toUpperCase() + w.slice(1)).join(" ")
+    return `${base} (${level[3] === "xhigh" ? "XHigh" : level[3][0].toUpperCase() + level[3].slice(1)})`
+  }
   const claude = bare.match(/^claude-([a-z]+)-(\d+)(?:[-.](\d))?(?![\d])/)
   if (claude) {
     const [, family, major, minor] = claude

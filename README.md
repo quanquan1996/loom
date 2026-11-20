@@ -85,7 +85,8 @@ See the [changelog](CHANGELOG.md) for what came in which version.
 - **Claude Code, Codex and Kiro**, chosen per session. Claude Code keeps one
   warm `claude -p` per session, so replies start in about 2s instead of 10s.
   Kiro runs over the Agent Client Protocol and gets Claude Code's MCP servers
-  and skills.
+  and skills. Google's Antigravity CLI (`agy`) is there too, also over ACP,
+  for a Loom that runs at home.
 - **Model and thinking level per session**, switched from the header; each
   turn shows which model answered. `LOOM_CLAUDE_FALLBACK_MODEL` takes over
   when the usual model is overloaded.

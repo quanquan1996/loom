@@ -1178,6 +1178,8 @@ const MODELS: Record<AgentBackend, [string, string][]> = {
     ["auto", "Auto (Kiro picks)"],
   ],
   codex: [["", "Codex's default"]],
+  // Not offered to employees (not in BACKENDS): only here for the type.
+  agy: [["", "Antigravity's default"]],
 }
 
 function ModelField({ backend, value, onChange }: { backend: AgentBackend; value: string | undefined; onChange: (model: string) => void }) {

@@ -8,6 +8,7 @@ export const BACKENDS: { id: AgentBackend; label: string }[] = [
   { id: "claude_code", label: "Claude Code" },
   { id: "codex", label: "Codex" },
   { id: "kiro", label: "Kiro" },
+  { id: "agy", label: "Antigravity" },
 ]
 
 type Kind = "chat" | "incognito"

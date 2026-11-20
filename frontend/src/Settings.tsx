@@ -106,6 +106,7 @@ export function SettingsDialog({
                   ["claude_code", "Claude Code"],
                   ["codex", "Codex"],
                   ["kiro", "Kiro"],
+                  ["agy", "Antigravity"],
                 ]}
                 onChange={(backend) => onChange({ backend })}
               />

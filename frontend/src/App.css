@@ -1040,6 +1040,10 @@
   color: #9b6bff;
 }
 
+.session-backend.agy {
+  color: #4285f4;
+}
+
 .session-queued {
   flex: 0 0 auto;
   min-width: 14px;

@@ -77,7 +77,7 @@ defmodule LoomWeb.AgentSessionController do
     conn
     |> put_status(:unprocessable_entity)
     |> json(%{
-      error: "`backend` must be \"claude_code\", \"codex\" or \"kiro\"",
+      error: "`backend` must be \"claude_code\", \"codex\", \"kiro\" or \"agy\"",
       given: given
     })
   end
