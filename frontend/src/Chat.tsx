@@ -64,7 +64,7 @@ import {
 import { getSocket } from "./socket"
 import { itemForAttachment, itemForOutput, itemForPath, type CanvasItem } from "./canvasItems"
 import { BackendIcon } from "./BackendIcon"
-import { BACKENDS } from "./NewMenu"
+import { useOffered } from "./backends"
 import { formatBytes } from "./format"
 import { isComposing } from "./ime"
 import { Markdown, MessageCopy, OutputLink } from "./markdown"
@@ -805,6 +805,7 @@ function PaneMenu({
 }) {
   const [at, setAt] = useState<{ top: number; right: number } | null>(null)
   const [view, setView] = useState<"main" | "model" | "continue">("main")
+  const offered = useOffered(session.backend)
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -850,7 +851,7 @@ function PaneMenu({
                   <ChevronLeft /> Continue in new chat
                 </button>
                 <div className="session-menu-sep" />
-                {BACKENDS.map((b) => (
+                {offered.map((b) => (
                   <button
                     key={b.id}
                     role="menuitem"

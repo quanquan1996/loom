@@ -13,6 +13,7 @@ import { ProjectDialog } from "./Projects"
 import { SettingsDialog } from "./Settings"
 import { SignInRequest } from "./SignIn"
 import { useSettings } from "./settings"
+import { BACKENDS, refreshBackends, useBackends } from "./backends"
 import { Tasks } from "./Tasks"
 import { focused, isOpen, PROJECTS_SECTION, Sidebar, sidebarGroups, sidebarOrder } from "./Sidebar"
 import { ProjectPage, type ProjectTab } from "./ProjectPage"
@@ -202,6 +203,11 @@ function App() {
   const narrow = useNarrow()
   // This device's appearance and default agent; see settings.ts.
   const [settings, changeSettings] = useSettings()
+  // Which agents are offered and the default one: the server's, for every device.
+  const backends = useBackends()
+  useEffect(() => {
+    if (authed) void refreshBackends()
+  }, [authed])
   const [settingsOpen, setSettingsOpen] = useState(false)
 
   // The token outlives the app now (see `getToken`), so a stored one can be
@@ -783,7 +789,7 @@ function App() {
         if (projectId) reveal()
       }}
       onCollapse={() => (narrow ? setDrawerOpen(false) : setSidebarOpen(false))}
-      defaultBackend={settings.backend}
+      defaultBackend={backends.default}
       onOpenSettings={() => {
         setSettingsOpen(true)
         setDrawerOpen(false)
@@ -954,24 +960,11 @@ function App() {
             <div className="placeholder">
               <p>No session selected.</p>
               <div className="backend-choice">
-                <button
-                  className="text-btn"
-                  onClick={() => create("claude_code")}
-                >
-                  new Claude Code session
-                </button>
-                <button
-                  className="text-btn"
-                  onClick={() => create("codex")}
-                >
-                  new Codex session
-                </button>
-                <button className="text-btn" onClick={() => create("kiro")}>
-                  new Kiro session
-                </button>
-                <button className="text-btn" onClick={() => create("agy")}>
-                  new Antigravity session
-                </button>
+                {BACKENDS.filter((b) => backends.enabled.includes(b.id)).map((b) => (
+                  <button key={b.id} className="text-btn" onClick={() => create(b.id)}>
+                    new {b.label} session
+                  </button>
+                ))}
               </div>
             </div>
           )}

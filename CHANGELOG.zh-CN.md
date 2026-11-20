@@ -16,6 +16,12 @@
 ## [Unreleased]
 
 ### 新增
+- **Agent 开关**：设置里列出四个 agent CLI，每个一个开关，并可设默认。关掉的
+  不再出现在新建会话、"继续"和招聘员工的菜单里（只剩一个时，New chat 连选择
+  引擎的箭头都没有）；开关只管界面，不会拒绝已有或新建在它上面的会话。设置存
+  在服务器上（`backends.json`），所有设备一致；没设过时，机器上装了哪些 CLI
+  就显示哪些。Claude Code 关掉后，其他 agent 不再被只读地挡在 `~/.claude`
+  之外，铃铛、通知和招聘对话这些 Loom 自己开的会话改用默认 agent。
 - **第四个 agent：Antigravity**。谷歌的 `agy` CLI，和 Kiro 一样走 ACP
   （`agy acp`；新建会话菜单、设置、`Space n g` 里都能选）。会话指令作为系统
   提示词的追加部分传入，模型在会话顶部从 `agy models` 的 id 里选，重启不断，

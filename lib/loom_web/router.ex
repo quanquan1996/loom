@@ -112,6 +112,9 @@ defmodule LoomWeb.Router do
     post "/projects/:id/canvas", CanvasController, :project_token
     post "/agents/:id/canvas", CanvasController, :token
 
+    get "/backends", BackendsController, :show
+    put "/backends", BackendsController, :update
+
     get "/layout", LayoutController, :show
     put "/layout", LayoutController, :update
 

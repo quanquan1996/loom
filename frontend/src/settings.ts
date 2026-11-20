@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react"
-import type { AgentBackend } from "./api"
 
 /**
- * This device's preferences, from the Settings dialog: how Loom looks, how
- * big its text is, and which engine a new session starts on. Kept in
+ * This device's preferences, from the Settings dialog: how Loom looks and how
+ * big its text is. (Which agents are offered is the server's; see backends.ts.) Kept in
  * localStorage — a phone and a laptop may well want different ones — and
  * applied as soon as they change.
  */
@@ -24,8 +23,6 @@ export type Settings = {
   cardTitleScale: number
   cardTextScale: number
   cardBodyScale: number
-  // What "+" makes, with nothing to choose. Codex is a setting away.
-  backend: AgentBackend
 }
 
 const KEY = "loom_settings"
@@ -38,7 +35,6 @@ const DEFAULTS: Settings = {
   cardTitleScale: 1,
   cardTextScale: 1,
   cardBodyScale: 1,
-  backend: "claude_code",
 }
 
 function load(): Settings {

@@ -300,7 +300,7 @@ async function authDelete(path: string): Promise<void> {
   if (!res.ok) throw new Error(`${path} failed: ${res.status}`)
 }
 
-function authHeaders(): Record<string, string> {
+export function authHeaders(): Record<string, string> {
   const t = getToken()
   return t ? { Authorization: `Bearer ${t}` } : {}
 }

@@ -813,7 +813,7 @@ defmodule Loom.Notices do
     id = Agent.new_id()
 
     with {:ok, _} <-
-           Agent.start_session(id, [backend: :claude_code, kind: "bell", title: "Bell"] ++ extra),
+           Agent.start_session(id, [backend: Loom.Backends.internal(), kind: "bell", title: "Bell"] ++ extra),
          do: {:ok, id}
   end
 
@@ -931,7 +931,7 @@ defmodule Loom.Notices do
 
     title = String.slice(n["summary"], 0, 60)
 
-    opts = [backend: :claude_code, kind: "notice", title: title, title_by: "tidy"]
+    opts = [backend: Loom.Backends.internal(), kind: "notice", title: title, title_by: "tidy"]
     opts = if is_binary(project), do: [{:project, project} | opts], else: opts
 
     with {:ok, _} <- Agent.start_session(id, opts),

@@ -3,7 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from
 import { createPortal } from "react-dom"
 import { isArchived, type AgentBackend, type AgentInfo, type Project } from "./api"
 import { BackendIcon } from "./BackendIcon"
-import { BACKENDS } from "./NewMenu"
+import { useOffered } from "./backends"
 
 /**
  * What can be done to one session, from the `…` on its row: rename, pin,
@@ -46,6 +46,7 @@ export function SessionMenu({
   onClose: () => void
 }) {
   const [view, setView] = useState<"main" | "move" | "continue">("main")
+  const offered = useOffered(session.backend)
   const [error, setError] = useState<string | null>(null)
   const ref = useRef<HTMLDivElement>(null)
   const [place, setPlace] = useState<{ top: number; left: number } | null>(null)
@@ -171,7 +172,7 @@ export function SessionMenu({
             <ChevronLeft /> Continue in new chat
           </button>
           <div className="session-menu-sep" />
-          {BACKENDS.map((b) => (
+          {offered.map((b) => (
             <button key={b.id} role="menuitem" onClick={() => run(() => onContinue(b.id))}>
               <BackendIcon backend={b.id} /> <span className="session-menu-label">{b.label}</span>
               {b.id === session.backend && <Check className="session-menu-more" />}

@@ -4,13 +4,15 @@ import { createPortal } from "react-dom"
 import type { AgentBackend, AgentInfo, Project } from "./api"
 import type { Appearance, Settings } from "./settings"
 import { Slider } from "./Slider"
+import { BACKENDS, saveBackends, useBackends } from "./backends"
+import { BackendIcon } from "./BackendIcon"
 import { BossPage, BossRow } from "./Boss"
 import { lastActive } from "./useLobby"
 import { SignInPage } from "./SignIn"
 
 /**
  * The gear at the foot of the sidebar: this device's appearance and text sizes, the
- * engine "+" starts a session on, the boss profile the employees share, and
+ * agents this Loom offers and the default one, the boss profile the employees share, and
  * the archived and the incognito sessions. Each choice takes
  * effect as it is made; there is nothing to save.
  */
@@ -99,18 +101,7 @@ export function SettingsDialog({
 
             <TextSizes settings={settings} onChange={onChange} />
 
-            <Row label="New sessions" hint="The agent + starts. A session keeps its agent for good.">
-              <Segmented<AgentBackend>
-                value={settings.backend}
-                options={[
-                  ["claude_code", "Claude Code"],
-                  ["codex", "Codex"],
-                  ["kiro", "Kiro"],
-                  ["agy", "Antigravity"],
-                ]}
-                onChange={(backend) => onChange({ backend })}
-              />
-            </Row>
+            <Agents />
 
             <BossRow onOpen={() => setPage("boss")} />
 
@@ -230,6 +221,59 @@ function TextSizes({ settings, onChange }: { settings: Settings; onChange: (patc
 }
 
 /** A row that opens a page of its own, like Boss profile's. */
+/**
+ * The agent CLIs: a switch each, and which one "+" starts a session on. For
+ * the whole Loom, not this device. Off only takes it out of the menus; the
+ * last one on cannot be switched off.
+ */
+function Agents() {
+  const { enabled, default: def, installed } = useBackends()
+  const toggle = (id: AgentBackend) => {
+    const next = enabled.includes(id) ? enabled.filter((b) => b !== id) : [...enabled, id]
+    if (next.length) void saveBackends(next, def)
+  }
+  return (
+    <div className="settings-row agents">
+      <div className="settings-text">
+        <span className="settings-label">Agents</span>
+        <span className="settings-hint">
+          Switch off the ones you don't use and the menus get shorter. New chats start on the default.
+        </span>
+      </div>
+      <div className="agent-list">
+        {BACKENDS.map((b) => {
+          const on = enabled.includes(b.id)
+          return (
+            <div key={b.id} className={"agent-row" + (on ? "" : " off")}>
+              <BackendIcon backend={b.id} />
+              <span className="agent-name">
+                {b.label}
+                {!installed.includes(b.id) && <small> · not installed</small>}
+              </span>
+              {on &&
+                (b.id === def ? (
+                  <span className="agent-default on">Default</span>
+                ) : (
+                  <button className="agent-default" onClick={() => void saveBackends(enabled, b.id)}>
+                    Set default
+                  </button>
+                ))}
+              <button
+                role="switch"
+                aria-checked={on}
+                aria-label={b.label}
+                className={"switch" + (on ? " on" : "")}
+                disabled={on && enabled.length === 1}
+                onClick={() => toggle(b.id)}
+              />
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 function PageRow({ label, hint, onOpen }: { label: string; hint: string; onOpen: () => void }) {
   return (
     <div className="settings-row archived">

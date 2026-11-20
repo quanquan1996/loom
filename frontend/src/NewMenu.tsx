@@ -3,13 +3,9 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "re
 import { createPortal } from "react-dom"
 import type { AgentBackend } from "./api"
 import { BackendIcon } from "./BackendIcon"
+import { BACKENDS, useOffered } from "./backends"
 
-export const BACKENDS: { id: AgentBackend; label: string }[] = [
-  { id: "claude_code", label: "Claude Code" },
-  { id: "codex", label: "Codex" },
-  { id: "kiro", label: "Kiro" },
-  { id: "agy", label: "Antigravity" },
-]
+export { BACKENDS }
 
 type Kind = "chat" | "incognito"
 
@@ -17,7 +13,9 @@ type Kind = "chat" | "incognito"
  * What a new session is, in the session menu's look. From New chat: a chat or
  * an incognito one (out of Recents, sandboxed; see `Loom.Agent.Sandbox`), on
  * the default engine — or, behind each one's arrow, on any engine; the model
- * is the engine's default, picked later in the header. From a project page's "+" (`engines`): just which engine. Opens
+ * is the engine's default, picked later in the header. Only the engines switched
+ * on in Settings are listed, and with one of them there is no arrow at all.
+ * From a project page's "+" (`engines`): just which engine. Opens
  * upwards when there is no room below, as from the phone's floating pill.
  */
 export function NewMenu({
@@ -40,6 +38,7 @@ export function NewMenu({
   const [place, setPlace] = useState<{ top: number; left: number } | null>(null)
   // Which one's engines are shown, in place of the two.
   const [models, setModels] = useState<Kind | null>(null)
+  const offered = useOffered()
 
   useLayoutEffect(() => {
     const el = ref.current
@@ -73,14 +72,16 @@ export function NewMenu({
         {icon}
         <span className="session-menu-label">{label}</span>
       </button>
-      <button className="new-menu-more" title="Choose the engine" onClick={() => setModels(k)}>
-        <ChevronRight />
-      </button>
+      {offered.length > 1 && (
+        <button className="new-menu-more" title="Choose the engine" onClick={() => setModels(k)}>
+          <ChevronRight />
+        </button>
+      )}
     </div>
   )
 
   const body = engines ? (
-    BACKENDS.map((b) => (
+    offered.map((b) => (
       <button key={b.id} role="menuitem" onClick={() => onPick(b.id, null, false)}>
         <BackendIcon backend={b.id} /> {b.label}
       </button>
@@ -91,7 +92,7 @@ export function NewMenu({
         <ChevronLeft /> {models === "incognito" ? "Incognito chat" : "Chat"}
       </button>
       <div className="session-menu-sep" />
-      {BACKENDS.map((b) => (
+      {offered.map((b) => (
         <button key={b.id} role="menuitem" onClick={() => onPick(b.id, null, models === "incognito")}>
           <BackendIcon backend={b.id} /> {b.label}
         </button>

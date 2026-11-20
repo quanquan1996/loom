@@ -24,6 +24,7 @@ import {
 } from "lucide-react"
 import { useEffect, useState, type ComponentProps, type ComponentType, type ReactNode } from "react"
 import { createPortal } from "react-dom"
+import { useBackends } from "./backends"
 import { Chat } from "./Chat"
 import { Confirm } from "./Confirm"
 import { Markdown } from "./markdown"
@@ -1063,7 +1064,11 @@ export function HireDialog({
     budget_usd: 50,
     budget_turns: 40,
   })
-  const backend = draft.backend ?? "claude_code"
+  // Only the agents switched on in Settings; the form starts on the first of them.
+  const { enabled } = useBackends()
+  const offered = BACKENDS.filter((b) => enabled.includes(b.id))
+  const backend =
+    offered.length && !offered.some((b) => b.id === draft.backend) ? offered[0].id : (draft.backend ?? "claude_code")
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -1102,7 +1107,7 @@ export function HireDialog({
         <div className="emp-field">
           <span className="emp-field-label">Agent</span>
           <div className="emp-chips">
-            {BACKENDS.map((b) => (
+            {(offered.length ? offered : BACKENDS).map((b) => (
               <button
                 type="button"
                 key={b.id}

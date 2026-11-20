@@ -197,7 +197,7 @@ defmodule Loom.Employees do
       title = if e, do: "Set up #{e["name"]}", else: "Hire an employee"
 
       with {:ok, _} <-
-             Agent.start_session(id, backend: :claude_code, kind: "employee_setup", title: title) do
+             Agent.start_session(id, backend: Loom.Backends.internal(), kind: "employee_setup", title: title) do
         devices = Loom.Nodes.list() |> Enum.map(&%{id: &1.id, name: &1.name})
         projects = Loom.Projects.list() |> Enum.map(&%{id: &1.id, name: &1.name})
         Agent.tell(id, Prompt.setup_context(e, projects, devices))

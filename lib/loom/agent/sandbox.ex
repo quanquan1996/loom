@@ -55,14 +55,15 @@ defmodule Loom.Agent.Sandbox do
   `~/.claude` and `~/.claude.json`, bound read-only. Claude Code owns its rules,
   memory, skills and MCP servers; the other backends read them (through the
   shell) but cannot change them. Unchanged when bwrap is missing, so Loom still
-  runs without it.
+  runs without it, and when Claude Code is switched off (`Loom.Backends`): with
+  no owner, the directory is whatever the other backends make of it.
 
   `--die-with-parent`: the backend goes when bwrap does, so killing the pid
   Loom knows (bwrap's) still stops it.
   """
   def guard_claude(exe, args) do
-    case System.find_executable("bwrap") do
-      nil ->
+    case Loom.Backends.enabled?(:claude_code) && System.find_executable("bwrap") do
+      off when off in [nil, false] ->
         {exe, args}
 
       bwrap ->

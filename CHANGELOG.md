@@ -17,6 +17,14 @@ that ran live. Format after [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Added
+- **Agent switches**: Settings lists the four agent CLIs with a switch each
+  and a default. One that is off leaves the new-session, Continue and hiring
+  menus (with one left, New chat has no engine arrow at all); nothing refuses
+  a session on it. The choice is the server's (`backends.json`), the same on
+  every device, and until it is made the CLIs installed on the machine are the
+  ones offered. With Claude Code off, the other agents are no longer bound
+  read-only to `~/.claude`, and the bell's, a notice's and the hiring chat's
+  sessions run on the default agent instead of Claude Code.
 - **Antigravity as a fourth agent**: Google's `agy` CLI over ACP, beside Kiro
   (`agy acp`; new session menu, Settings, `Space n g`). The session's
   instructions go in as the system prompt's appendix, the model is picked in
