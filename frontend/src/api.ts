@@ -350,7 +350,7 @@ export async function deleteSession(id: string): Promise<void> {
 // opaque rather than being flattened into a lowest common denominator.
 export type AgentUsage = Record<string, unknown>
 
-export type AgentBackend = "claude_code" | "codex" | "kiro" | "agy"
+export type AgentBackend = "claude_code" | "codex" | "kiro" | "agy" | "codebuddy" | "grok"
 
 /**
  * `starting` is the gap between asking the backend to begin and it saying
@@ -627,6 +627,8 @@ export const EFFORTS: Record<AgentBackend, string[]> = {
   codex: ["low", "medium", "high", "xhigh"],
   kiro: [],
   agy: [],
+  codebuddy: [],
+  grok: [],
 }
 
 /**
@@ -665,6 +667,10 @@ export const MODELS: Record<AgentBackend, string[]> = {
     "claude-opus-5-5-high",
     "claude-sonnet-5-5-high",
   ],
+  // From `codebuddy --help`; which of them an account may use depends on its login.
+  codebuddy: ["hy4-preview", "deepseek-v4.1-flash", "glm-5.3", "kimi-k3", "gpt-6-astra", "gpt-5.6-sol", "gemini-3.5-flash"],
+  // What `grok agent stdio` lists when it starts.
+  grok: ["grok-4.6", "grok-4.5"],
 }
 
 /**

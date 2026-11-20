@@ -73,7 +73,7 @@ defmodule Loom.Agent.Backend do
   """
 
   @typedoc "Which engine a session is bound to. Chosen at creation, never changed."
-  @type kind :: :claude_code | :codex | :kiro | :agy
+  @type kind :: :claude_code | :codex | :kiro | :agy | :codebuddy | :grok
 
   @typedoc """
   Backend-private state. Holds whatever identifies the live conversation and any
@@ -325,7 +325,7 @@ defmodule Loom.Agent.Backend do
       config :loom, Loom.Agent, backends: %{claude_code: MyStub}
   """
   @spec impl(kind) :: module()
-  def impl(kind) when kind in [:claude_code, :codex, :kiro, :agy] do
+  def impl(kind) when kind in [:claude_code, :codex, :kiro, :agy, :codebuddy, :grok] do
     configured = Application.get_env(:loom, Loom.Agent, [])[:backends] || %{}
     Map.get(configured, kind, default_impl(kind))
   end
@@ -334,6 +334,8 @@ defmodule Loom.Agent.Backend do
   defp default_impl(:codex), do: Loom.Agent.Backend.Codex
   defp default_impl(:kiro), do: Loom.Agent.Backend.Kiro
   defp default_impl(:agy), do: Loom.Agent.Backend.Agy
+  defp default_impl(:codebuddy), do: Loom.Agent.Backend.CodeBuddy
+  defp default_impl(:grok), do: Loom.Agent.Backend.Grok
 
   @doc """
   Parse a persisted or user-supplied backend name.
@@ -343,11 +345,13 @@ defmodule Loom.Agent.Backend do
   lives in that engine's own store, so there is nothing to migrate).
   """
   @spec parse(term()) :: {:ok, kind} | :error
-  def parse(kind) when kind in [:claude_code, :codex, :kiro, :agy], do: {:ok, kind}
+  def parse(kind) when kind in [:claude_code, :codex, :kiro, :agy, :codebuddy, :grok], do: {:ok, kind}
   def parse("claude_code"), do: {:ok, :claude_code}
   def parse("codex"), do: {:ok, :codex}
   def parse("kiro"), do: {:ok, :kiro}
   def parse("agy"), do: {:ok, :agy}
+  def parse("codebuddy"), do: {:ok, :codebuddy}
+  def parse("grok"), do: {:ok, :grok}
   def parse(_other), do: :error
 
   @doc "Human-facing label for the session list."
@@ -356,6 +360,8 @@ defmodule Loom.Agent.Backend do
   def label(:codex), do: "Codex"
   def label(:kiro), do: "Kiro"
   def label(:agy), do: "Antigravity"
+  def label(:codebuddy), do: "CodeBuddy"
+  def label(:grok), do: "Grok"
 
   @doc """
   Read one field out of a persisted header, by atom or string key.

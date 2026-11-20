@@ -19,7 +19,7 @@ const OPENAI = [
 const KIRO =
   "M4.594 6.677C6.67-2.226 18.746-2.211 21.16 6.632c.353 1.297 1.725 7.582-1.673 13.747-1.545 2.797-5.841 5.49-6.99 1.883C8.6 25.477 3.315 24.1 5.789 18.609l-.318.143c-3.57 1.305-3.863-1.208-3.173-2.513.45-.84.727-1.335.937-1.897.353-.975.458-1.568.593-2.498.27-1.837.277-3.607.765-5.167z"
 
-const NAMES: Record<string, string> = { claude_code: "Claude Code", codex: "Codex", kiro: "Kiro", agy: "Antigravity" }
+const NAMES: Record<string, string> = { claude_code: "Claude Code", codex: "Codex", kiro: "Kiro", agy: "Antigravity", codebuddy: "CodeBuddy", grok: "Grok" }
 
 export function BackendIcon({ backend, title }: { backend: string; title?: string }) {
   const label = title ?? NAMES[backend] ?? backend
@@ -46,6 +46,23 @@ export function BackendIcon({ backend, title }: { backend: string; title?: strin
       <>
         <path d="M4.5 20.5c1.6-6.4 4.2-16 7.5-16s5.9 9.6 7.5 16" />
         <path d="M8.8 15.2c2-1.3 4.4-1.3 6.4 0" />
+      </>
+    )
+  else if (backend === "codebuddy")
+    body = (
+      // Our own mark, not Tencent's: a round head with two eyes, in code brackets.
+      <>
+        <path d="M6.5 7 3 12l3.5 5M17.5 7 21 12l-3.5 5" />
+        <circle cx="12" cy="12" r="3.6" />
+        <path d="M10.7 11.4v1.2M13.3 11.4v1.2" />
+      </>
+    )
+  else if (backend === "grok")
+    body = (
+      // Our own mark, not xAI's: a ring with a stroke through it.
+      <>
+        <circle cx="12" cy="12" r="7.2" />
+        <path d="M5 19 19 5" />
       </>
     )
   else return <span className={"session-backend " + backend}>{backend}</span>

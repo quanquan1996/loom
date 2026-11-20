@@ -36,6 +36,8 @@ config :loom, Loom.Agent,
   claude_cli: System.get_env("LOOM_CLAUDE_CLI") || "claude",
   codex_cli: System.get_env("LOOM_CODEX_CLI") || "codex",
   agy_cli: System.get_env("LOOM_AGY_CLI") || "agy",
+  codebuddy_cli: System.get_env("LOOM_CODEBUDDY_CLI"),
+  grok_cli: System.get_env("LOOM_GROK_CLI") || "grok",
   # Claude Code's `--fallback-model`: a model id, or several comma-separated,
   # for when the usual one is overloaded. Unset, there is none.
   claude_fallback_model: System.get_env("LOOM_CLAUDE_FALLBACK_MODEL"),

@@ -406,6 +406,8 @@ defmodule Loom.Agent.Session do
       cc_fork_from: Keyword.get(opts, :fork_from),
       kiro_cwd: cwd,
       agy_cwd: cwd,
+      codebuddy_cwd: cwd,
+      grok_cwd: cwd,
       kiro_model: Keyword.get(opts, :kiro_model),
       instructions: instructions(id, project, employee)
     }
@@ -1768,7 +1770,8 @@ defmodule Loom.Agent.Session do
         do: meta[:model],
         else:
           Backend.meta_get(meta, :cc_model) || Backend.meta_get(meta, :kiro_model) ||
-            Backend.meta_get(meta, :agy_model)
+            Backend.meta_get(meta, :agy_model) || Backend.meta_get(meta, :codebuddy_model) ||
+            Backend.meta_get(meta, :grok_model)
 
     if model?(model), do: model
   end

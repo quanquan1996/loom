@@ -1044,6 +1044,14 @@
   color: #4285f4;
 }
 
+.session-backend.codebuddy {
+  color: #19b37d;
+}
+
+.session-backend.grok {
+  color: var(--fg-dim);
+}
+
 .session-queued {
   flex: 0 0 auto;
   min-width: 14px;

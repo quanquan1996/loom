@@ -19,6 +19,8 @@ export const BACKENDS: { id: AgentBackend; label: string }[] = [
   { id: "codex", label: "Codex" },
   { id: "kiro", label: "Kiro" },
   { id: "agy", label: "Antigravity" },
+  { id: "codebuddy", label: "CodeBuddy" },
+  { id: "grok", label: "Grok" },
 ]
 
 const KEY = "loom_backends"

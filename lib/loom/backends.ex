@@ -21,7 +21,7 @@ defmodule Loom.Backends do
 
   alias Loom.Agent.Backend
 
-  @kinds [:claude_code, :codex, :kiro, :agy]
+  @kinds [:claude_code, :codex, :kiro, :agy, :codebuddy, :grok]
 
   @type t :: %{enabled: [Backend.kind()], default: Backend.kind(), installed: [Backend.kind()]}
 
@@ -97,7 +97,9 @@ defmodule Loom.Backends do
     case kind do
       :claude_code -> [config[:claude_cli] || "claude"]
       :codex -> [config[:codex_cli] || "codex"]
-      :agy -> [config[:agy_cli] || "agy"]
+      :agy -> Loom.Agent.Backend.Agy.executables()
+      :codebuddy -> Loom.Agent.Backend.CodeBuddy.executables()
+      :grok -> Loom.Agent.Backend.Grok.executables()
       :kiro -> if(config[:kiro_cli], do: [config[:kiro_cli]], else: ["kiro-cli-chat", "kiro-cli"])
     end
   end

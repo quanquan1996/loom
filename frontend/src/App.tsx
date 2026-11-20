@@ -673,6 +673,8 @@ function App() {
     "Space n x": { desc: "new Codex session", run: () => void create("codex") },
     "Space n k": { desc: "new Kiro session", run: () => void create("kiro") },
     "Space n g": { desc: "new Antigravity session", run: () => void create("agy") },
+    "Space n b": { desc: "new CodeBuddy session", run: () => void create("codebuddy") },
+    "Space n r": { desc: "new Grok session", run: () => void create("grok") },
   }
   const keymap: Keymap = treeWalk
     ? {

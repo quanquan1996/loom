@@ -37,7 +37,7 @@ Optional settings:
   by commas or spaces, so sign-in notices and the login brake see the visitor
   and not that proxy. Unset, the last `X-Forwarded-For` hop is the client.
 - `LOOM_WORKSPACE`
-- `LOOM_CLAUDE_CLI`, `LOOM_CODEX_CLI` and `LOOM_AGY_CLI`
+- `LOOM_CLAUDE_CLI`, `LOOM_CODEX_CLI`, `LOOM_AGY_CLI`, `LOOM_CODEBUDDY_CLI` and `LOOM_GROK_CLI`
 - `LOOM_CLAUDE_FALLBACK_MODEL`: Claude Code's `--fallback-model`, for when
   the usual model is overloaded (see docs/backends.md §6.13)
 

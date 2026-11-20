@@ -358,6 +358,32 @@ What differs:
   backend is for a Loom that runs at home or behind an exit Google places in a
   supported country.
 
+## 6.16 One ACP module, a flavour per CLI
+
+`Loom.Agent.Backend.Acp` holds what the ACP CLIs share: the process, the
+handshake, the translation of `session/update`, usage, cancel. A CLI is a
+module that `use`s it and answers a few callbacks:
+
+| | agy | CodeBuddy | Grok |
+| --- | --- | --- | --- |
+| spawned as | `agy acp --dangerously-skip-permissions` | `codebuddy --acp -y` | `grok agent --always-approve stdio` |
+| instructions | `_meta.antigravity.systemPrompt.append` on new/resume | `--append-system-prompt` | `--rules` (before `agent`) |
+| model | `session/set_model`, in place | `--model`, respawn | `-m`, respawn |
+| a conversation it has | `session/resume` | `session/load` (replay dropped) | `session/resume` |
+| its directory | `~/.gemini` | `~/.codebuddy` | `~/.grok` |
+
+Kiro keeps its own module: it is older, and writes an agent file.
+
+Measured without a login (CodeBuddy 2.185.0, Grok 1.0.89, 2026-11-20): both
+answer `initialize`, accept the arguments above, and refuse `session/new` with
+"Authentication required". Not yet measured: a turn's updates and usage on
+either, whether Grok's `--rules` reaches `agent stdio`, and whether a signed-in
+Grok still wants `authenticate` first (its error says "no auth method id
+provided"). CodeBuddy's `-y` still asks for what it rates high-risk; such a
+request is allowed once. CodeBuddy also speaks Claude Code's stream-json
+(`-p --input-format stream-json`), which was not used: ACP is one code path
+for three CLIs.
+
 ## 7. Not done: permission prompts
 
 Codex has proper approval requests. CC auto-denies under
