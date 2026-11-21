@@ -7,6 +7,7 @@ that ran live. Format after [Keep a Changelog](https://keepachangelog.com/).
 
 | Version | Date | Theme |
 | --- | --- | --- |
+| [0.7.0](#070--2026-11-21) | 2026-11-21 | Six agents with switches, terminals on your devices, passkey sign-in, a bell that acts, large attachments |
 | [0.6.0](#060--2026-11-04) | 2026-11-04 | Reference a chat, share as an image, titles that keep up, a session per bell notice, security fixes |
 | [0.5.0](#050--2026-11-03) | 2026-11-03 | Meeting mode, hiring in a chat, hard employee permissions, only the bell rings, loom-home |
 | [0.4.0](#040--2026-11-02) | 2026-11-02 | Model picker, Continue, incognito, Working, Android |
@@ -16,8 +17,10 @@ that ran live. Format after [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.7.0] – 2026-11-21
+
 ### Added
-- **Agent switches**: Settings lists the four agent CLIs with a switch each
+- **Agent switches**: Settings lists the agent CLIs with a switch each
   and a default. One that is off leaves the new-session, Continue and hiring
   menus (with one left, New chat has no engine arrow at all); nothing refuses
   a session on it. The choice is the server's (`backends.json`), the same on
@@ -25,7 +28,7 @@ that ran live. Format after [Keep a Changelog](https://keepachangelog.com/).
   ones offered. With Claude Code off, the other agents are no longer bound
   read-only to `~/.claude`, and the bell's, a notice's and the hiring chat's
   sessions run on the default agent instead of Claude Code.
-- **CodeBuddy and Grok as agents** (Grok not yet run against a signed-in account):
+- **CodeBuddy and Grok as agents**:
   Tencent's `codebuddy --acp` and xAI's `grok agent stdio`, both over ACP.
   The ACP code that Antigravity brought is now one shared module
   (`Loom.Agent.Backend.Acp`), and each CLI a short flavour of it: its spawn
@@ -65,6 +68,8 @@ that ran live. Format after [Keep a Changelog](https://keepachangelog.com/).
   tasks and Dreams are behind *More*. Incognito chats are never shown.
 
 ### Changed
+- **Thinking folds to one line**: a reply's thinking shows as one line under
+  the turn; tap it to read the rest.
 - **Kiro runs on its v3 engine**: Loom's `--trust-all-tools` had been silently
   selecting the old v2 engine. Now `kiro-cli acp --agent-engine v3`, with each
   session's instructions as a markdown agent (`~/.kiro/agents/loom-<id>.md`)

@@ -37,7 +37,8 @@ commits on top. It does not track upstream.
 
 ## Highlights
 
-- **Three agents, one UI.** Claude Code, Codex and Kiro CLI (ACP), picked per
+- **Six agents, one UI.** Claude Code, Codex, Kiro, Antigravity, CodeBuddy and
+  Grok (the last four over ACP), each with a switch in Settings, picked per
   session, with the model picked per session too and shown on every turn.
 - **Built for the phone.** A ChatGPT-style interface measured from its iOS
   app: swipeable Working cards, tap-to-answer suggested replies, one-tap copy,
