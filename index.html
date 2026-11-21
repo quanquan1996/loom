@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Loom — 一个安全的 Web 对话框，管你的一切</title>
-<meta name="description" content="Loom: one self-hosted chat for everything. Claude Code, Codex and Kiro on your server, reaching every computer, phone and home device you own — from your phone, in one sentence.">
+<meta name="description" content="Loom: one self-hosted chat for everything. Claude Code, Codex, Kiro and more on your server, reaching every computer, phone and home device you own — from your phone, in one sentence.">
 <meta property="og:title" content="Loom — One chat for everything">
 <meta property="og:description" content="Self-hosted, phone-first. Your coding agents, your computers, your phone, your home — all from one chat box.">
 <meta name="theme-color" content="#000000">
@@ -242,15 +242,15 @@ html.zh h1.h2s{letter-spacing:-.005em}
 
 <header class="hero" id="top"><div class="wrap">
   <div class="txt">
-    <span class="pill"><b>v0.6</b><span class="zh">引用会话 · 分享长图 · 标题跟着话题走 · 安全加固</span><span class="en">Reference a chat · Share as an image · Titles that keep up · Hardening</span></span>
+    <span class="pill"><b>v0.7</b><span class="zh">六个 agent · 在自己设备上开终端 · Passkey 登录 · 铃铛直接办事</span><span class="en">Six agents · Terminals on your devices · Passkeys · A bell that acts</span></span>
     <h1 class="h2s"><span class="zh"><span class="l1"><span class="nw">一个安全的</span> <span class="nw">Web 对话框，</span></span><br><span class="soft">管你的一切。</span></span><span class="en"><span class="l1"><span class="nw">A secure web</span> <span class="nw">chat box,</span></span><br><span class="soft">for everything.</span></span></h1>
     <p class="lead"><span class="zh">写代码、开电脑、动手机、关家里的灯、读邮件、记饮食 —— 在手机上说一句就行。Loom 是一个网页：Claude Code 跑在你自己的服务器上，手机加到主屏就是 App，你所有的设备都接进来。</span><span class="en">Write code, drive your computers and phone, turn off the lights at home, read your mail, log a meal — one sentence on your phone. Loom is a web page: Claude Code runs on your own server, your phone adds it to the home screen as an app, and every device you have plugs in.</span></p>
-    <div class="sec"><span><span class="zh">密码登录</span><span class="en">Password login</span></span><span><span class="zh">设备只往外连，不开端口</span><span class="en">Devices dial out, no open ports</span></span><span><span class="zh">数据只在你的服务器</span><span class="en">Data stays on your server</span></span></div>
+    <div class="sec"><span><span class="zh">Passkey 登录，新设备要已登录设备批准</span><span class="en">Passkeys; new devices need approval</span></span><span><span class="zh">设备只往外连，不开端口</span><span class="en">Devices dial out, no open ports</span></span><span><span class="zh">数据只在你的服务器</span><span class="en">Data stays on your server</span></span></div>
     <div class="cta">
       <a class="btn primary" href="https://github.com/quanquan1996/loom"><span class="zh">在 GitHub 上查看</span><span class="en">View on GitHub</span></a>
       <a class="btn" href="#say"><span class="zh">看看它能做什么</span><span class="en">See what it does</span></a>
     </div>
-    <div class="chips"><span>Web · PWA</span><span>Claude Code</span><span>Codex</span><span>Kiro</span><span>Mac · Windows · Linux · Android</span></div>
+    <div class="chips"><span>Web · PWA</span><span>Claude Code</span><span>Codex</span><span>Kiro</span><span>Antigravity</span><span>CodeBuddy</span><span>Grok</span><span>Mac · Windows · Linux · Android</span></div>
   </div>
   <div>
     <div class="phone">
@@ -301,8 +301,8 @@ html.zh h1.h2s{letter-spacing:-.005em}
   <div class="eyebrow rv">Less, not more</div>
   <h2 class="rv"><span class="zh">不做第二个 Claude Code。<br><span class="soft">只让它离你更近。</span></span><span class="en">Not another Claude Code.<br><span class="soft">Just Claude Code, closer to you.</span></span></h2>
   <div class="three">
-    <div class="card rv"><h3><span class="zh">智能交给 CC</span><span class="en">Leave the smarts to CC</span></h3><p><span class="zh">Claude Code 已经足够强。Loom 不调模型 API、不重写 agent，只让 claude、codex、kiro 这些 CLI 一直在线、到处可用。</span><span class="en">Claude Code is already strong enough. Loom calls no model API and rewrites no agent; it keeps the claude, codex and kiro CLIs running and reachable from anywhere.</span></p><div class="tags"><span>claude</span><span>codex</span><span>kiro‑cli</span></div></div>
-    <div class="card rv"><h3><span class="zh">什么都接进来</span><span class="en">Plug everything in</span></h3><p><span class="zh">Mac、Windows、Linux 一行命令，Android 一个 APK。设备只往外连、不开端口，躲在家用路由器后面也能用。</span><span class="en">One command for Mac, Windows and Linux, one APK for Android. Devices only dial out, no open ports, fine behind a home router.</span></p><div class="tags"><span>curl … | sh</span><span>irm … | iex</span><span>APK</span></div></div>
+    <div class="card rv"><h3><span class="zh">智能交给 CC</span><span class="en">Leave the smarts to CC</span></h3><p><span class="zh">Claude Code 已经足够强。Loom 不调模型 API、不重写 agent，只让 claude、codex、kiro、agy、codebuddy、grok 这些 CLI 一直在线、到处可用，设置里一个开关选开哪些。</span><span class="en">Claude Code is already strong enough. Loom calls no model API and rewrites no agent; it keeps the claude, codex, kiro, agy, codebuddy and grok CLIs running and reachable from anywhere, each with a switch in Settings.</span></p><div class="tags"><span>claude</span><span>codex</span><span>kiro‑cli</span><span>agy</span><span>codebuddy</span><span>grok</span></div></div>
+    <div class="card rv"><h3><span class="zh">什么都接进来</span><span class="en">Plug everything in</span></h3><p><span class="zh">Mac、Windows、Linux 一行命令，Android 一个 APK。设备只往外连、不开端口，躲在家用路由器后面也能用；终端也能直接开在这些设备上。</span><span class="en">One command for Mac, Windows and Linux, one APK for Android. Devices only dial out, no open ports, fine behind a home router; a terminal can open right on one of them.</span></p><div class="tags"><span>curl … | sh</span><span>irm … | iex</span><span>APK</span></div></div>
     <div class="card rv"><h3><span class="zh">越用越简单</span><span class="en">Simpler over time</span></h3><p><span class="zh">能用 skill 解决的不写代码，能点一下的不打字。说过一次的规矩记下来，下次不用再说。</span><span class="en">A skill instead of code, a tap instead of typing. Say a rule once and it's remembered.</span></p><div class="tags"><span>skills</span><span>memory</span><span>tap to reply</span></div></div>
   </div>
 </div></section>
@@ -314,7 +314,7 @@ html.zh h1.h2s{letter-spacing:-.005em}
     <p class="sub rv"><span class="zh">好几件事一起跑，在地铁上一个个看、一个个点。像 ChatGPT 一样顺手，但背后是你自己的机器。</span><span class="en">Several things in flight; check and tap through them on the train. As easy as ChatGPT, on machines you own.</span></p>
     <div class="rows rv">
       <div class="row"><div class="ic">⚡</div><div><b>Working</b><span class="zh">最近一小时的会话排在最上面，左右滑切换、上滑完成；10 分钟没回会自动写一段进展。</span><span class="en">The last hour's chats on top; swipe to switch, throw up for Done, with a recap after ten quiet minutes.</span></div></div>
-      <div class="row"><div class="ic">👆</div><div><b><span class="zh">点一下就回复</span><span class="en">Tap to reply</span></b><span class="zh">能猜到你怎么答，就给你按钮；有事找你，就摇一下铃铛，按轻重缓急排好。</span><span class="en">When your answer can be foreseen, it's a button; when it needs you, the bell rings, ranked by urgency.</span></div></div>
+      <div class="row"><div class="ic">👆</div><div><b><span class="zh">点一下就回复</span><span class="en">Tap to reply</span></b><span class="zh">能猜到你怎么答，就给你按钮；有事找你，就摇一下铃铛，按轻重缓急排好；点开通知说出决定，它就去办。</span><span class="en">When your answer can be foreseen, it's a button; when it needs you, the bell rings, ranked by urgency; open the notice, say what you decide, and it gets done.</span></div></div>
       <div class="row"><div class="ic">↪️</div><div><b><span class="zh">在新会话里接着做</span><span class="en">Continue in a new chat</span></b><span class="zh">一个会话走不下去，新会话先读完旧的和它的文件，再接着干。</span><span class="en">When a chat can't go on, a new one reads the old one and its files first, then carries on.</span></div></div>
       <div class="row"><div class="ic">🕶️</div><div><b><span class="zh">无痕会话</span><span class="en">Incognito</span></b><span class="zh">零散的快问快答放这里，不进 Recents、不碰记忆，30 天后自动删除。</span><span class="en">For quick one‑offs: out of Recents, never touches memory, gone after 30 days.</span></div></div>
     </div>
@@ -335,7 +335,7 @@ html.zh h1.h2s{letter-spacing:-.005em}
   </div>
   <div class="three">
     <div class="card rv"><h3><span class="zh">重启不断线</span><span class="en">Restart‑proof</span></h3><p><span class="zh">关掉浏览器它还在跑；服务器重启时，正在进行的回合照常跑完，新版本起来后接回来。所以在 Loom 里改 Loom、部署 Loom 都很安全。</span><span class="en">Close the browser, it runs on; restart the server and the turn in flight finishes and is taken back. Changing and shipping Loom from inside Loom is safe.</span></p></div>
-    <div class="card rv"><h3><span class="zh">睡一觉，更懂你</span><span class="en">Sleeps on it</span></h3><p><span class="zh">每天凌晨回看白天的对话，整理记忆、提议新 skill，写一份晨报；只提议不越权，一键撤销。</span><span class="en">Each night it replays the day, tidies memory, proposes skills and leaves a report; it only proposes, and every change can be undone.</span></p></div>
+    <div class="card rv"><h3><span class="zh">睡一觉，更懂你</span><span class="en">Sleeps on it</span></h3><p><span class="zh">每天凌晨回看白天的对话，整理记忆、提议新 skill；有要你拍板的才发一条通知，没事不打扰；只提议不越权，一键撤销。</span><span class="en">Each night it replays the day, tidies memory and proposes skills; one notice a night, only when it needs you; it only proposes, and every change can be undone.</span></p></div>
     <div class="card rv"><h3><span class="zh">招几个 AI 员工</span><span class="en">Hire AI employees</span></h3><p><span class="zh">给它 KPI 和预算，靠心跳定时醒来推进工作，每周交周报；说过一次的规矩所有员工都知道，也能安排在你的某台电脑上干活。招人直接在对话里说；读邮件、网页的员工可以上硬权限，被诱导也越不了权。</span><span class="en">Give one KPIs and a budget; a heartbeat wakes it to push them on, with a weekly report. Tell one a rule and all of them know; seat one on a computer of yours. Hire one by describing it in a chat; give one that reads mail or web pages hard permissions it can't be talked out of.</span></p></div>
   </div>
 </div></section>
@@ -350,17 +350,17 @@ html.zh h1.h2s{letter-spacing:-.005em}
 <b>❯</b> mix phx.server            # :4000</pre>
   </div>
   <div class="commits rv">
+    <div><span>82a012b</span>Agent switches: which CLIs this Loom offers</div>
+    <div><span>77a97d9</span>CodeBuddy and Grok as agents, one ACP module</div>
+    <div><span>2427b37</span>Terminals on your own devices</div>
+    <div><span>7013b68</span>Passkeys, one login per device, approval to sign in</div>
+    <div><span>bd9f32b</span>The bell carries out your decision itself</div>
     <div><span>1f44b07</span>Security fixes from an AWS Continuum scan</div>
     <div><span>521ae3a</span>Composer +: reference a recent chat</div>
     <div><span>03cdb52</span>Share a chat as one long image</div>
     <div><span>bdf74c3</span>Meeting mode: the agent learns the hotwords</div>
     <div><span>52da68a</span>loom-home: voice server with MQTT home devices</div>
-    <div><span>b22a5a1</span>Employees: hard permissions, hiring in a chat</div>
-    <div><span>5eca386</span>Android node: screen control and `loom-node control`</div>
-    <div><span>44ffb2d</span>Incognito sessions: sandboxed, out of Recents</div>
-    <div><span>90f9586</span>Continue in a new chat: by fork or by reading it</div>
-    <div><span>cdd104d</span>The bell: notices by priority, posted by agents</div>
-    <div style="color:var(--dim)">… 288 commits since 2026‑07‑29</div>
+    <div style="color:var(--dim)">… 341 commits since 2026‑07‑29</div>
   </div>
 </div></section>
 
@@ -379,7 +379,7 @@ html.zh h1.h2s{letter-spacing:-.005em}
 <tr class="tx"><th><span class="zh">内存</span><span class="en">Memory</span></th><td class="me"><span class="txt hi"><span class="zh">服务端整体 ~340 MB<br>手机上只是一个网页</span><span class="en">whole server ~340 MB<br>a web page on the phone</span></span></td><td><span class="txt"><span class="zh">桌面端 ~2.4 GB 起<br>（用户报告）</span><span class="en">desktop ~2.4 GB and up<br>(user reports)</span></span></td><td><span class="txt dim"><span class="zh">未公开</span><span class="en">not published</span></span></td><td><span class="txt dim"><span class="zh">未公开</span><span class="en">not published</span></span></td><td><span class="txt dim"><span class="zh">未公开</span><span class="en">not published</span></span></td><td><span class="txt dim"><span class="zh">未公开</span><span class="en">not published</span></span></td><td><span class="txt dim"><span class="zh">未公开</span><span class="en">not published</span></span></td><td><span class="txt dim"><span class="zh">未公开</span><span class="en">not published</span></span></td></tr>
 <tr class="tx"><th><span class="zh">存储</span><span class="en">Storage</span></th><td class="me"><span class="txt hi"><span class="zh">普通文件，0 数据库<br>复制文件夹就是备份</span><span class="en">plain files, no database<br>copy a folder to back up</span></span></td><td><span class="txt"><span class="zh">本地会话库不自动清理<br>（用户报告 17.5 GB）</span><span class="en">local session store never trimmed<br>(user report: 17.5 GB)</span></span></td><td><span class="txt dim"><span class="zh">未公开</span><span class="en">not published</span></span></td><td><span class="txt dim"><span class="zh">云端</span><span class="en">in the cloud</span></span></td><td><span class="txt dim"><span class="zh">云端</span><span class="en">in the cloud</span></span></td><td><span class="txt dim"><span class="zh">未公开</span><span class="en">not published</span></span></td><td><span class="txt dim"><span class="zh">未公开</span><span class="en">not published</span></span></td><td><span class="txt dim"><span class="zh">云端</span><span class="en">in the cloud</span></span></td></tr>
 <tr><th><span class="zh">跑在你自己的服务器</span><span class="en">Runs on your own server</span></th><td class="me"><span class="y"></span></td><td><span class="p"></span><small><span class="zh">自托管 runner 公测</span><span class="en">self‑hosted runner beta</span></small></td><td><span class="p"></span><small><span class="zh">可连本机</span><span class="en">can use your PC</span></small></td><td><span class="n"></span></td><td><span class="n"></span></td><td><span class="p"></span><small><span class="zh">本机 + 云沙箱</span><span class="en">PC + cloud sandbox</span></small></td><td><span class="p"></span><small><span class="zh">可连本机</span><span class="en">can use your PC</span></small></td><td><span class="n"></span></td></tr>
-<tr><th><span class="zh">模型随时换</span><span class="en">Switch models</span></th><td class="me"><span class="y"></span><small><span class="zh">Claude Code · Codex · Kiro</span><span class="en">Claude Code · Codex · Kiro</span></small></td><td><span class="n"></span></td><td><span class="n"></span></td><td><span class="n"></span></td><td><span class="n"></span></td><td><span class="y"></span><small><span class="zh">多模型</span><span class="en">several</span></small></td><td><span class="n"></span></td><td><span class="n"></span></td></tr>
+<tr><th><span class="zh">模型随时换</span><span class="en">Switch models</span></th><td class="me"><span class="y"></span><small><span class="zh">Claude Code · Codex · Kiro 等 6 个</span><span class="en">Claude Code · Codex · Kiro + 3 more</span></small></td><td><span class="n"></span></td><td><span class="n"></span></td><td><span class="n"></span></td><td><span class="n"></span></td><td><span class="y"></span><small><span class="zh">多模型</span><span class="en">several</span></small></td><td><span class="n"></span></td><td><span class="n"></span></td></tr>
 <tr><th><span class="zh">不绑厂家账号</span><span class="en">No vendor account</span></th><td class="me"><span class="y"></span><small><span class="zh">agent 用你自己的登录</span><span class="en">agents use your own login</span></small></td><td><span class="n"></span></td><td><span class="n"></span></td><td><span class="n"></span></td><td><span class="n"></span></td><td><span class="n"></span></td><td><span class="n"></span></td><td><span class="n"></span></td></tr>
 <tr><th><span class="zh">接你的电脑和手机</span><span class="en">Your computers & phone</span></th><td class="me"><span class="y"></span><small><span class="zh">Mac · Win · Linux · Android</span><span class="en">Mac · Win · Linux · Android</span></small></td><td><span class="p"></span><small><span class="zh">自托管机器</span><span class="en">self‑hosted hosts</span></small></td><td><span class="y"></span><small><span class="zh">Mac / Windows</span><span class="en">Mac / Windows</span></small></td><td><span class="p"></span><small><span class="zh">Mac</span><span class="en">Mac</span></small></td><td><span class="n"></span></td><td><span class="p"></span><small><span class="zh">本机</span><span class="en">this PC</span></small></td><td><span class="y"></span><small><span class="zh">最多 7 台电脑</span><span class="en">up to 7 PCs</span></small></td><td><span class="n"></span></td></tr>
 <tr><th><span class="zh">接家里的灯、摄像头</span><span class="en">Home lights & cameras</span></th><td class="me"><span class="y"></span><small><span class="zh">写个 skill</span><span class="en">add a skill</span></small></td><td><span class="n"></span></td><td><span class="n"></span></td><td><span class="n"></span></td><td><span class="n"></span></td><td><span class="n"></span></td><td><span class="n"></span></td><td><span class="n"></span></td></tr>
