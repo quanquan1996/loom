@@ -58,8 +58,15 @@ UNFINISHED = re.compile(r"(?:[，,、]|把|的|和|跟|或者|还有|然后|那�
                         r"|我想|我要|帮我|给我|让|被|从|往|向|对于|关于|嗯|呃|额)[。.!！]?$")
 
 
+# Whole answers that happen to end on 的 (好的, 是的, 对的, 挺好的…) are complete.
+COMPLETE = re.compile(r"(?:好|是|对|真|会|行|有|没|可以|知道|明白|当然)的[。.!！?？]?$")
+
+
 def unfinished(text):
-    return bool(UNFINISHED.search(text.strip()))
+    t = text.strip()
+    if COMPLETE.search(t):
+        return False
+    return bool(UNFINISHED.search(t))
 
 
 def new_vad():
@@ -386,7 +393,8 @@ class Session:
                 self.utt = max(self.cut, seg_start - 24000, self.pcm_base)
             self.cut = seg_end
             samples = self.pcm[max(0, self.utt - self.pcm_base): seg_end - self.pcm_base]
-            dump_wav(samples)
+            if CFG.get("dump_utt"):  # debug only: keeps the last 30 utterances as wav (off by default)
+                dump_wav(samples)
             t0 = time.monotonic()
             text = await asyncio.get_running_loop().run_in_executor(None, transcribe, samples)
             log.info("asr %.2fs audio in %.3fs%s: %s", len(samples) / 16000, time.monotonic() - t0,
