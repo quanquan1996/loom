@@ -5,7 +5,9 @@
 VERSION := $(shell git describe --always --dirty 2>/dev/null || echo dev)
 OUT     := ../priv/node
 TARGETS := darwin-arm64 darwin-amd64 linux-arm64 linux-amd64 windows-arm64 windows-amd64 android-arm64
-FLAGS   := -trimpath -ldflags "-s -w -X main.version=$(VERSION)"
+FLAGS   = -trimpath -ldflags "-s -w -X main.version=$(VERSION) $(if $(findstring android,$@),-checklinkname=0)"
+# -checklinkname=0 on Android: pion's network-interface helper there
+# (github.com/wlynxg/anet) links to a net internal, which the linker refuses by default.
 
 all: $(TARGETS)
 
