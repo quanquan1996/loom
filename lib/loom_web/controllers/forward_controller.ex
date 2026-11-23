@@ -19,7 +19,8 @@ defmodule LoomWeb.ForwardController do
           node_name: name,
           port: port,
           channel: channel,
-          ip: LoomWeb.ClientAddress.of(conn)
+          ip: LoomWeb.ClientAddress.of(conn),
+          rtc: params["rtc"] == "1"
         },
         # noVNC doesn't ping and a still screen sends nothing; the switch's
         # own idle clock is what ends a forgotten one.

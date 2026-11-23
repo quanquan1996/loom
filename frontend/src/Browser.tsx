@@ -30,6 +30,75 @@ function arrowCursor() {
 }
 arrowCursor()
 
+/** Public STUN servers, for the browser to learn its address beyond its NAT. */
+const STUN = ["stun:stun.l.google.com:19302", "stun:stun.cloudflare.com:3478", "stun:stun.miwifi.com:3478"]
+
+/** A device's screen connection: straight to it, or relayed through loom. */
+type DeviceLink = { chan: WebSocket | RTCDataChannel; ws: WebSocket; pc?: RTCPeerConnection; via: "direct" | "relay" }
+
+function within<T>(ms: number, p: Promise<T>): Promise<T> {
+  return Promise.race([p, new Promise<T>((_, no) => setTimeout(() => no(new Error("timed out")), ms))])
+}
+
+/**
+ * Open a device's forwarded port, peer to peer when the browser and the device
+ * can reach each other (`LoomWeb.ForwardSocket`, "Peer to peer"): the
+ * WebSocket carries the WebRTC offer and answer, then stays open beside the
+ * data channel so switching forwarding off still ends it. When no channel
+ * opens in a few seconds, the same WebSocket carries the screen instead.
+ */
+async function openDevice(url: string): Promise<DeviceLink> {
+  const ws = new WebSocket(url + "&rtc=1")
+  ws.binaryType = "arraybuffer"
+  // Registered before noVNC's onmessage, so a late handshake message never reaches it.
+  const texts: ((m: { type: string; sdp?: string; message?: string }) => void)[] = []
+  ws.addEventListener("message", (e) => {
+    if (typeof e.data !== "string") return
+    e.stopImmediatePropagation()
+    try {
+      const m = JSON.parse(e.data)
+      texts.forEach((f) => f(m))
+    } catch {}
+  })
+  await new Promise<void>((ok, no) => {
+    ws.addEventListener("open", () => ok(), { once: true })
+    ws.addEventListener("close", () => no(new Error("closed")), { once: true })
+  })
+  if (typeof RTCPeerConnection === "undefined") {
+    ws.send(JSON.stringify({ type: "fallback" }))
+    return { chan: ws, ws, via: "relay" }
+  }
+  const pc = new RTCPeerConnection({ iceServers: [{ urls: STUN }] })
+  try {
+    const dc = pc.createDataChannel("vnc", { ordered: true })
+    dc.binaryType = "arraybuffer"
+    const opened = new Promise<void>((ok, no) => {
+      dc.addEventListener("open", () => ok(), { once: true })
+      dc.addEventListener("close", () => no(new Error("closed")), { once: true })
+    })
+    await pc.setLocalDescription(await pc.createOffer())
+    await within(
+      2500,
+      new Promise<void>((ok) => {
+        if (pc.iceGatheringState === "complete") ok()
+        pc.addEventListener("icegatheringstatechange", () => pc.iceGatheringState === "complete" && ok())
+      }),
+    ).catch(() => {})
+    const answer = new Promise<string>((ok, no) =>
+      texts.push((m) => (m.type === "answer" && m.sdp ? ok(m.sdp) : m.type === "error" && no(new Error(m.message)))),
+    )
+    ws.send(JSON.stringify({ type: "offer", sdp: JSON.stringify(pc.localDescription) }))
+    await pc.setRemoteDescription(JSON.parse(await within(8000, answer)))
+    await within(5000, opened)
+    return { chan: dc, ws, pc, via: "direct" }
+  } catch {
+    pc.close()
+    if (ws.readyState !== WebSocket.OPEN) throw new Error("closed")
+    ws.send(JSON.stringify({ type: "fallback" }))
+    return { chan: ws, ws, via: "relay" }
+  }
+}
+
 /** One of the user's devices whose screen the pane shows instead, over its forwarded port. */
 export type DesktopTarget = { id: string; name: string }
 
@@ -74,6 +143,8 @@ export function Browser({
   const [user, setUser] = useState("")
   const [pass, setPass] = useState("")
   const [why, setWhy] = useState<string | null>(null)
+  // How a device's screen travels: straight to it, or through loom.
+  const [via, setVia] = useState<"direct" | "relay" | null>(null)
 
   useEffect(() => {
     const el = screen.current
@@ -84,31 +155,77 @@ export function Browser({
       ? `${proto}//${location.host}/devices/${device.id}/forward?token=${token}`
       : `${proto}//${location.host}/browser/vnc?token=${token}`
     if (narrow && !device) url += `&w=${el.clientWidth}&h=${el.clientHeight}`
-    const r = new RFB(el, url, { wsProtocols: [] })
-    r.background = "transparent"
-    r.showDotCursor = true
-    // A replaced connection's goodbye arrives after its successor started.
-    r.addEventListener("connect", () => {
-      if (rfb.current !== r) return
-      setState("connected")
-      setAsked(null)
-      setWhy(null)
-    })
-    r.addEventListener("disconnect", () => rfb.current === r && setState("closed"))
-    r.addEventListener("credentialsrequired", (e) => {
-      if (rfb.current !== r) return
-      setAsked((e as CustomEvent<{ types: string[] }>).detail.types)
-    })
-    r.addEventListener("securityfailure", (e) => {
-      if (rfb.current !== r) return
-      const detail = (e as CustomEvent<{ reason?: string }>).detail
-      setWhy(detail.reason || "wrong name or password")
-    })
-    rfb.current = r
+    let r: RFB | null = null
+    let link: DeviceLink | null = null
+    let gone = false
+    let touched = 0
+    // Peer to peer, loom doesn't see the user's keys: tell it they're at work.
+    const touch = () => {
+      const now = Date.now()
+      if (link?.via !== "direct" || now - touched < 60_000) return
+      touched = now
+      if (link.ws.readyState === WebSocket.OPEN) link.ws.send(JSON.stringify({ type: "touch" }))
+    }
+    el.addEventListener("pointerdown", touch, true)
+    el.addEventListener("keydown", touch, true)
+
+    const start = (target: string | WebSocket | RTCDataChannel) => {
+      const c = new RFB(el, target as string, { wsProtocols: [] })
+      r = c
+      c.background = "transparent"
+      c.showDotCursor = true
+      // A replaced connection's goodbye arrives after its successor started.
+      c.addEventListener("connect", () => {
+        if (rfb.current !== c) return
+        setState("connected")
+        setAsked(null)
+        setWhy(null)
+      })
+      c.addEventListener("disconnect", () => {
+        if (rfb.current !== c) return
+        setState("closed")
+        link?.ws.close()
+        link?.pc?.close()
+      })
+      c.addEventListener("credentialsrequired", (e) => {
+        if (rfb.current !== c) return
+        setAsked((e as CustomEvent<{ types: string[] }>).detail.types)
+      })
+      c.addEventListener("securityfailure", (e) => {
+        if (rfb.current !== c) return
+        const detail = (e as CustomEvent<{ reason?: string }>).detail
+        setWhy(detail.reason || "wrong name or password")
+      })
+      rfb.current = c
+    }
+
     setState("connecting")
+    setVia(null)
+    if (device) {
+      openDevice(url).then(
+        (l) => {
+          if (gone) {
+            l.ws.close()
+            l.pc?.close()
+            return
+          }
+          link = l
+          setVia(l.via)
+          // The switch going off closes the socket; a direct channel goes with it.
+          if (l.via === "direct") l.ws.addEventListener("close", () => l.pc?.close())
+          start(l.chan)
+        },
+        () => !gone && setState("closed"),
+      )
+    } else start(url)
     return () => {
+      gone = true
+      el.removeEventListener("pointerdown", touch, true)
+      el.removeEventListener("keydown", touch, true)
       rfb.current = null
-      r.disconnect()
+      r?.disconnect()
+      link?.ws.close()
+      link?.pc?.close()
     }
     // A device's screen is the size it is, so the pane's shape doesn't matter
     // to it: turning the phone (which crosses `narrow`) only rescales, rather
@@ -167,6 +284,14 @@ export function Browser({
             </button>
           )}
           {device ? device.name : "browser"}
+          {device && via && state === "connected" && (
+            <span
+              className="browser-state"
+              title={via === "direct" ? "Straight to the device, peer to peer" : "Relayed through loom; no direct path"}
+            >
+              {via}
+            </span>
+          )}
           {state !== "connected" && (
             <span className="browser-state">
               {state === "closed" ? "disconnected" : asked ? "password needed" : "connecting…"}

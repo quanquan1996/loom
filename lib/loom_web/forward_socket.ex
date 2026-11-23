@@ -10,6 +10,23 @@ defmodule LoomWeb.ForwardSocket do
   and closes the moment it is switched off, times out, or the device drops.
   The user's keys and pointer keep the switch's idle clock going; the screen
   merely changing does not, so a forgotten pane still lets it lapse.
+
+  ## Peer to peer (`?rtc=1`)
+
+  Opened with `rtc=1`, the socket first carries a WebRTC handshake instead,
+  as JSON text frames, so the bytes can go straight between the browser and
+  the device (`node/rtc.go`) rather than through loom:
+
+    - browser → `{"type": "offer", "sdp": …}`, passed to the device as
+      `forward_rtc`; its answer comes back as `{"type": "answer", "sdp": …}`
+    - browser → `{"type": "touch"}` while the user works the screen, since
+      loom no longer sees their keys; it restarts the idle clock
+    - browser → `{"type": "fallback"}`: the channel didn't open, so open the
+      port the usual way and carry the bytes here after all
+    - → browser `{"type": "error", "message": …}` when the device can't
+
+  The socket stays open alongside the data channel: closing it, or the switch
+  going off, cancels the forward on the device either way.
   """
   @behaviour WebSock
 
@@ -21,26 +38,32 @@ defmodule LoomWeb.ForwardSocket do
   @touch_every :timer.seconds(60)
 
   @impl true
-  def init(%{node_id: node_id, node_name: name, port: port, channel: channel, ip: ip}) do
+  def init(%{node_id: node_id, node_name: name, port: port, channel: channel, ip: ip} = args) do
     id = "fw_" <> Base.url_encode64(:crypto.strong_rand_bytes(9), padding: false)
     Phoenix.PubSub.subscribe(Loom.PubSub, "forwards")
     Process.monitor(channel)
-    send(channel, {:node_send, self(), id, "forward_open", %{"port" => port}})
-    timer = Process.send_after(self(), :open_timeout, @open_timeout)
-    Logger.info("Forward #{id}: #{ip} → #{name}:#{port}")
+    rtc = Map.get(args, :rtc, false)
+    Logger.info("Forward #{id}: #{ip} → #{name}:#{port}#{if rtc, do: " (peer to peer)"}")
 
-    {:ok,
-     %{
-       id: id,
-       node_id: node_id,
-       name: name,
-       port: port,
-       channel: channel,
-       open: false,
-       timer: timer,
-       pending: [],
-       touched: 0
-     }}
+    s = %{
+      id: id,
+      node_id: node_id,
+      name: name,
+      port: port,
+      channel: channel,
+      open: false,
+      rtc: rtc,
+      timer: nil,
+      pending: [],
+      touched: 0
+    }
+
+    {:ok, if(rtc, do: s, else: open(s))}
+  end
+
+  defp open(s) do
+    send(s.channel, {:node_send, self(), s.id, "forward_open", %{"port" => s.port}})
+    %{s | rtc: false, timer: Process.send_after(self(), :open_timeout, @open_timeout)}
   end
 
   # Input before the device has opened the port waits, in order.
@@ -53,6 +76,28 @@ defmodule LoomWeb.ForwardSocket do
     {:ok, touch(s, data)}
   end
 
+  def handle_in({text, opcode: :text}, %{rtc: true} = s) do
+    case Jason.decode(text) do
+      {:ok, %{"type" => "offer", "sdp" => sdp}} when is_binary(sdp) ->
+        send(
+          s.channel,
+          {:node_send, self(), s.id, "forward_rtc", %{"port" => s.port, "data" => sdp}}
+        )
+
+        {:ok, s}
+
+      {:ok, %{"type" => "touch"}} ->
+        {:ok, touch(s, <<4>>)}
+
+      {:ok, %{"type" => "fallback"}} ->
+        Logger.info("Forward #{s.id}: no peer-to-peer channel, relaying")
+        {:ok, open(s)}
+
+      _ ->
+        {:ok, s}
+    end
+  end
+
   def handle_in(_text, s), do: {:ok, s}
 
   @impl true
@@ -61,6 +106,13 @@ defmodule LoomWeb.ForwardSocket do
     s.pending |> Enum.reverse() |> Enum.each(&send_in(s, &1))
     {:ok, %{s | open: true, pending: []}}
   end
+
+  def handle_info({:node_reply, id, "forward_rtc_answer", %{"data" => sdp}}, %{id: id, rtc: true} = s),
+    do: {:push, {:text, Jason.encode!(%{type: "answer", sdp: sdp})}, s}
+
+  # Before falling back, a device's refusal is for the browser to weigh.
+  def handle_info({:node_reply, id, "error", %{"message" => message}}, %{id: id, rtc: true} = s),
+    do: {:push, {:text, Jason.encode!(%{type: "error", message: message})}, s}
 
   def handle_info({:node_reply, id, "forward_out", %{"data" => data}}, %{id: id} = s) do
     case Base.decode64(data) do

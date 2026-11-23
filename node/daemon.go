@@ -185,11 +185,12 @@ type session struct {
 	writes   map[string]*upload
 	terms    map[string]*term
 	forwards map[string]*forward
+	rtcs     map[string]*rtcForward
 	wg       sync.WaitGroup
 }
 
 func newSession(c *conn, cfg *config) *session {
-	return &session{c: c, cfg: cfg, execs: map[string]*job{}, writes: map[string]*upload{}, terms: map[string]*term{}, forwards: map[string]*forward{}}
+	return &session{c: c, cfg: cfg, execs: map[string]*job{}, writes: map[string]*upload{}, terms: map[string]*term{}, forwards: map[string]*forward{}, rtcs: map[string]*rtcForward{}}
 }
 
 func (s *session) serve(parent context.Context) error {
@@ -213,6 +214,10 @@ func (s *session) serve(parent context.Context) error {
 	for id, d := range s.forwards {
 		delete(s.forwards, id)
 		d.close()
+	}
+	for id, f := range s.rtcs {
+		delete(s.rtcs, id)
+		f.close()
 	}
 	s.mu.Unlock()
 	s.wg.Wait()
@@ -261,6 +266,10 @@ func (s *session) handle(event string, payload json.RawMessage) {
 			delete(s.forwards, r.ID)
 			d.close()
 		}
+		if f := s.rtcs[r.ID]; f != nil {
+			delete(s.rtcs, r.ID)
+			f.close()
+		}
 		s.mu.Unlock()
 	case "read":
 		s.wg.Add(1)
@@ -281,7 +290,17 @@ func (s *session) handle(event string, payload json.RawMessage) {
 	case "pty_resize":
 		s.ptyResize(r)
 	case "forward_open":
+		// The browser gave up on a peer-to-peer channel and falls back to loom.
+		s.mu.Lock()
+		if f := s.rtcs[r.ID]; f != nil {
+			delete(s.rtcs, r.ID)
+			f.close()
+		}
+		s.mu.Unlock()
 		s.forwardOpen(r)
+	case "forward_rtc":
+		s.wg.Add(1)
+		go func() { defer s.wg.Done(); s.forwardRTC(r) }()
 	case "forward_in":
 		s.forwardInput(r)
 	default:

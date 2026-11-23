@@ -23,6 +23,8 @@ defmodule LoomWeb.NodeChannel do
       `pty_resize` the same way as any request
     - "forward_opened", "forward_out" `{id, data}`, "forward_closed": a
       forwarded port, for `LoomWeb.ForwardSocket`; it sends `forward_in`
+    - "forward_rtc_answer" `{id, data}`: the device's answer to the browser's
+      WebRTC offer (`forward_rtc`), when the forward goes peer to peer
 
   "exit", "done", "written", "pty_exit", "forward_closed" and "error" end a
   request.
@@ -68,7 +70,7 @@ defmodule LoomWeb.NodeChannel do
 
   def handle_in(event, %{"id" => id} = payload, socket)
       when event in ~w(out exit chunk done written error pty_opened pty_out pty_exit
-                         forward_opened forward_out forward_closed) do
+                         forward_opened forward_out forward_closed forward_rtc_answer) do
     case socket.assigns.requests do
       %{^id => {pid, ref}} ->
         send(pid, {:node_reply, id, event, Map.delete(payload, "id")})
