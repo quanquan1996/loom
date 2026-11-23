@@ -93,7 +93,10 @@ async function openDevice(url: string, fallback = true): Promise<DeviceLink | nu
     )
     ws.send(JSON.stringify({ type: "offer", sdp: JSON.stringify(pc.localDescription) }))
     await pc.setRemoteDescription(JSON.parse(await within(6000, answer)))
-    await within(3000, opened)
+    // A first try gives up soon, the screen relayed meanwhile; a retry, while
+    // the relay already shows it, waits longer: guessed ports (rtc.go) take a
+    // few seconds of checks to find the one that answers.
+    await within(fallback ? 3000 : 12_000, opened)
     return { chan: dc, ws, pc, via: "direct" }
   } catch {
     pc.close()
@@ -106,7 +109,7 @@ async function openDevice(url: string, fallback = true): Promise<DeviceLink | nu
 
 // While relayed, how long until trying for a direct channel again: the network
 // may change under a phone (Wi-Fi to 5G), so keep trying, ever less often.
-const RETRY_MS = [15_000, 30_000, 60_000, 120_000, 300_000]
+const RETRY_MS = [3_000, 15_000, 30_000, 60_000, 120_000, 300_000]
 
 /** One of the user's devices whose screen the pane shows instead, over its forwarded port. */
 export type DesktopTarget = { id: string; name: string }

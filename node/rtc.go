@@ -6,6 +6,7 @@ import (
 	"log"
 	"net"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -45,6 +46,8 @@ const (
 	// Stop reading the port while this much waits to be sent to the browser.
 	rtcHighWater = 1 << 20
 	rtcLowWater  = 256 << 10
+	// How many ports past the highest one STUN saw to offer as guesses.
+	rtcPredict = 64
 )
 
 type rtcForward struct {
@@ -143,7 +146,9 @@ func (s *session) forwardRTC(r request) {
 	case <-gathered:
 	case <-time.After(rtcGatherTimeout):
 	}
-	sdp, _ := json.Marshal(pc.LocalDescription())
+	local := *pc.LocalDescription()
+	local.SDP = predictPorts(local.SDP, rtcPredict)
+	sdp, _ := json.Marshal(local)
 	s.c.push(s.ctx, "forward_rtc_answer", map[string]any{"id": r.ID, "data": string(sdp)})
 
 	s.wg.Add(1)
@@ -225,4 +230,69 @@ func (s *session) rtcPipe(r request, f *rtcForward, dc *webrtc.DataChannel, end 
 		}
 		end("port closed")
 	}()
+}
+
+// predictPorts adds guessed server-reflexive candidates to an answer, for a
+// device behind a NAT that hands out a new public port for every destination
+// (symmetric, as carrier-grade NATs often are). STUN then sees one port, and
+// the browser a different one, a little higher; a browser behind a NAT that
+// only lets in replies from ports it sent to never lets ours in. Offering the
+// next ports too makes the browser send checks to them, which opens its NAT to
+// the port ours really uses toward it; ICE takes it from there (the reply, or
+// our own check arriving as a peer-reflexive candidate). Guesses that miss
+// are a few dropped packets. When every STUN server saw the same port the
+// NAT keeps ports, the real candidate is right, and nothing is added.
+func predictPorts(sdp string, n int) string {
+	type seen struct {
+		min, max, count int
+		prio            uint64
+	}
+	refl := map[string]*seen{}
+	var order []string
+	lines := strings.Split(sdp, "\r\n")
+	last := -1
+	for i, l := range lines {
+		f := strings.Fields(strings.TrimPrefix(l, "a=candidate:"))
+		if !strings.HasPrefix(l, "a=candidate:") || len(f) < 8 {
+			continue
+		}
+		last = i
+		if strings.ToLower(f[2]) != "udp" || f[7] != "srflx" || strings.Contains(f[4], ":") {
+			continue
+		}
+		port, err1 := strconv.Atoi(f[5])
+		prio, err2 := strconv.ParseUint(f[3], 10, 32)
+		if err1 != nil || err2 != nil {
+			continue
+		}
+		r := refl[f[4]]
+		if r == nil {
+			r = &seen{min: port, max: port, prio: prio}
+			refl[f[4]] = r
+			order = append(order, f[4])
+		}
+		r.count++
+		r.min, r.max = min(r.min, port), max(r.max, port)
+		r.prio = min(r.prio, prio)
+	}
+	if last < 0 {
+		return sdp
+	}
+	var add []string
+	for _, ip := range order {
+		r := refl[ip]
+		if r.count > 1 && r.min == r.max {
+			continue
+		}
+		for k := 1; k <= n && r.max+k <= 65535; k++ {
+			add = append(add, "a=candidate:pp"+strconv.Itoa(k)+" 1 udp "+
+				strconv.FormatUint(r.prio-uint64(k), 10)+" "+ip+" "+strconv.Itoa(r.max+k)+
+				" typ srflx raddr 0.0.0.0 rport 0")
+		}
+	}
+	if len(add) == 0 {
+		return sdp
+	}
+	out := append(append(append([]string{}, lines[:last+1]...), add...), lines[last+1:]...)
+	return strings.Join(out, "\r\n")
 }
