@@ -1014,7 +1014,7 @@ function App() {
         )}
 
         {side === "desktop" && desktop && (
-          <div className="side-column">
+          <div className="side-column desktop-side">
             <Suspense fallback={null}>
               <Browser
                 key={desktop.id}

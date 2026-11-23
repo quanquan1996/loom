@@ -110,13 +110,16 @@ export function Browser({
       rfb.current = null
       r.disconnect()
     }
-  }, [attempt, narrow, device?.id])
+    // A device's screen is the size it is, so the pane's shape doesn't matter
+    // to it: turning the phone (which crosses `narrow`) only rescales, rather
+    // than reconnecting and asking for the password again.
+  }, [attempt, device ? device.id : narrow])
 
   // A phone turned on its side wants a window of the other shape. The screen's
   // orientation, not the pane's: the keyboard coming up squashes the pane
   // without the phone having turned. Connect again once the pane has settled.
   useEffect(() => {
-    if (!narrow) return
+    if (!narrow || device) return
     let timer: number | undefined
     const turned = () => {
       clearTimeout(timer)
@@ -131,7 +134,7 @@ export function Browser({
       clearTimeout(timer)
       target.removeEventListener(event, turned)
     }
-  }, [narrow])
+  }, [narrow, device])
 
   useEffect(() => {
     const r = rfb.current
@@ -200,8 +203,9 @@ export function Browser({
             </button>
           )}
           {!narrow && (
-            <button className="pane-btn" onClick={onClose} title="Close">
+            <button className="pane-btn pane-exit" onClick={onClose} title={device ? "Disconnect and close" : "Close"}>
               <X />
+              <span>{device ? "Disconnect" : "Close"}</span>
             </button>
           )}
         </span>
