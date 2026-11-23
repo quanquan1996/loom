@@ -1,4 +1,4 @@
-import { X } from "lucide-react"
+import { ChevronRight, Monitor, X } from "lucide-react"
 import { useEffect, useState } from "react"
 import { createPortal } from "react-dom"
 import { DEVICE_ICONS, DeviceIcon, ICON_LABELS, deviceIcon } from "./DeviceIcon"
@@ -45,6 +45,8 @@ export function DevicesDialog({
   const [error, setError] = useState<string | null>(null)
   // The device whose install commands are on screen, and its code.
   const [install, setInstall] = useState<{ id: string; code: string } | null>(null)
+  // The device whose settings are open.
+  const [openId, setOpenId] = useState<string | null>(null)
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose()
@@ -145,6 +147,8 @@ export function DevicesDialog({
                 <div key={d.id}>
                   <DeviceRow
                     device={d}
+                    open={openId === d.id}
+                    onToggle={() => setOpenId((id) => (id === d.id ? null : d.id))}
                     onRename={(value) => rename(d, value)}
                     onReinstall={() => reinstall(d)}
                     onRemove={() => remove(d)}
@@ -243,6 +247,8 @@ function IconPicker({ value, onChange }: { value: Device["icon"]; onChange: (ico
 
 function DeviceRow({
   device,
+  open,
+  onToggle,
   onRename,
   onReinstall,
   onRemove,
@@ -250,6 +256,9 @@ function DeviceRow({
   onVnc,
 }: {
   device: Device
+  // Its settings are shown: one device at a time, opened by tapping its row.
+  open: boolean
+  onToggle: () => void
   onRename: (name: string) => void
   onReinstall: () => void
   onRemove: () => void
@@ -271,83 +280,112 @@ function DeviceRow({
   const system = device.os ? `${device.os}/${device.arch}` : null
 
   return (
-    <div className="device">
-      <span
-        className={"dot" + (device.online ? " online" : "")}
-        title={device.online ? "online" : "offline"}
-      />
-      <DeviceIcon icon={deviceIcon(device)} />
-      <div className="device-body">
-        {editing ? (
-          <input
-            className="device-name-input"
-            value={draft}
-            autoFocus
-            onChange={(e) => setDraft(e.target.value)}
-            onBlur={commit}
-            onKeyDown={(e) => {
-              if (isComposing(e)) return
-              if (e.key === "Enter") commit()
-              if (e.key === "Escape") {
-                setDraft(device.name)
-                setEditing(false)
-              }
-            }}
-          />
-        ) : (
-          <span
-            className="device-name"
-            title="Double-click to rename"
-            onDoubleClick={() => {
-              setDraft(device.name)
-              setEditing(true)
-            }}
-          >
-            {device.name}
+    <div className={"device-item" + (open ? " open" : "")}>
+      <div
+        className="device"
+        role="button"
+        tabIndex={0}
+        aria-expanded={open}
+        onClick={() => !editing && onToggle()}
+        onKeyDown={(e) => !editing && (e.key === "Enter" || e.key === " ") && (e.preventDefault(), onToggle())}
+      >
+        <span
+          className={"dot" + (device.online ? " online" : "")}
+          title={device.online ? "online" : "offline"}
+        />
+        <DeviceIcon icon={deviceIcon(device)} />
+        <div className="device-body">
+          {editing ? (
+            <input
+              className="device-name-input"
+              value={draft}
+              autoFocus
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => setDraft(e.target.value)}
+              onBlur={commit}
+              onKeyDown={(e) => {
+                e.stopPropagation()
+                if (isComposing(e)) return
+                if (e.key === "Enter") commit()
+                if (e.key === "Escape") {
+                  setDraft(device.name)
+                  setEditing(false)
+                }
+              }}
+            />
+          ) : (
+            <span className="device-name">{device.name}</span>
+          )}
+          <span className="device-meta">
+            {[system, device.hostname, seen(device)].filter(Boolean).join(" · ")}
           </span>
-        )}
-        <span className="device-meta">
-          {[system, device.hostname, seen(device)].filter(Boolean).join(" · ")}
-        </span>
-        <span className="device-forward">
-          <button
-            className={"device-action" + (device.forward ? " on" : "")}
-            onClick={() => onForward(device.forward ? null : portNumber)}
-            disabled={!device.forward && portNumber === null}
-            title={
-              device.forward
-                ? `Forwarding port ${device.forward.port}; tap to switch off (it also goes off after 30 idle minutes)`
-                : "Forward a port on this device's own loopback (5900 is VNC)"
-            }
-          >
-            {device.forward ? `forward :${device.forward.port}` : "forward"}
-          </button>
-          {!device.forward && (
+        </div>
+        {device.forward && !open && <span className="device-badge">:{device.forward.port}</span>}
+        <ChevronRight className="device-chevron" />
+      </div>
+
+      {open && (
+        <div className="device-panel">
+          <div className="device-setting">
+            <div className="device-setting-text">
+              <span>Port forwarding</span>
+              <span className="device-setting-hint">
+                {device.forward
+                  ? `Port ${device.forward.port} on its loopback · off after 30 idle minutes`
+                  : "A port on its own loopback; 5900 is VNC"}
+              </span>
+            </div>
             <input
               className="device-port"
-              value={port}
+              value={device.forward ? String(device.forward.port) : port}
+              disabled={!!device.forward}
               onChange={(e) => setPort(e.target.value.trim())}
               inputMode="numeric"
               aria-label="Port"
-              title="Port on the device's loopback"
             />
-          )}
-          <button
-            className="device-action"
-            onClick={onVnc}
-            disabled={!device.forward || !device.online}
-            title={device.forward ? "Open its screen over VNC" : "Switch forwarding on first"}
-          >
-            VNC
-          </button>
-        </span>
-      </div>
-      <button className="device-action" onClick={onReinstall} title="New install command (replaces this device's token)">
-        install
-      </button>
-      <button className="session-del device-del" onClick={onRemove} title="Remove device">
-        <X />
-      </button>
+            <button
+              role="switch"
+              aria-checked={!!device.forward}
+              aria-label="Port forwarding"
+              className={"switch" + (device.forward ? " on" : "")}
+              disabled={!device.forward && portNumber === null}
+              onClick={() => onForward(device.forward ? null : portNumber)}
+            />
+          </div>
+          <div className="device-setting">
+            <div className="device-setting-text">
+              <span>Remote desktop</span>
+              <span className="device-setting-hint">
+                {!device.forward
+                  ? "Switch port forwarding on first"
+                  : device.online
+                    ? "Its screen over VNC, beside the chat"
+                    : "The device is offline"}
+              </span>
+            </div>
+            <button className="device-open" onClick={onVnc} disabled={!device.forward || !device.online}>
+              <Monitor />
+              VNC
+            </button>
+          </div>
+          <div className="device-links">
+            <button
+              onClick={() => {
+                setDraft(device.name)
+                setEditing(true)
+              }}
+            >
+              Rename
+            </button>
+            <button onClick={onReinstall} title="Replaces this device's token">
+              Install command
+            </button>
+            <button className="danger" onClick={onRemove}>
+              Remove
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
