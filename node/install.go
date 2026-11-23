@@ -78,6 +78,10 @@ func runInstall(args []string) int {
 	}
 
 	cfg := config{URL: strings.TrimRight(*origin, "/"), Token: tokenValue, Shell: *shell}
+	// What the owner chose to forward is theirs, not the install command's.
+	if old, err := loadConfig(); err == nil {
+		cfg.ForwardPorts = old.ForwardPorts
+	}
 	if err := writeConfig(cfg); err != nil {
 		return die("%v", err)
 	}

@@ -8,6 +8,8 @@ import {
   createDevice,
   deleteDevice,
   deviceInstallCode,
+  forwardOff,
+  forwardOn,
   installCommands,
   renameDevice,
   type Device,
@@ -27,12 +29,14 @@ export function DevicesDialog({
   devices,
   employees,
   onUpsert,
+  onOpenDesktop,
   onClose,
 }: {
   devices: Device[]
   // Those working on a device are named before it is removed: they stop.
   employees: Employee[]
   onUpsert: (device: Device) => void
+  onOpenDesktop: (device: Device) => void
   onClose: () => void
 }) {
   const [name, setName] = useState("")
@@ -94,6 +98,16 @@ export function DevicesDialog({
     }
   }
 
+  const forward = async (device: Device, port: number | null) => {
+    try {
+      const { node } = port === null ? await forwardOff(device.id) : await forwardOn(device.id, port)
+      onUpsert(node)
+      setError(null)
+    } catch (e) {
+      setError((e as Error).message)
+    }
+  }
+
   // The new name shows on the tap; the old one comes back if refused.
   const rename = async (device: Device, value: string) => {
     onUpsert({ ...device, name: value })
@@ -134,6 +148,8 @@ export function DevicesDialog({
                     onRename={(value) => rename(d, value)}
                     onReinstall={() => reinstall(d)}
                     onRemove={() => remove(d)}
+                    onForward={(port) => forward(d, port)}
+                    onVnc={() => onOpenDesktop(d)}
                   />
                   {install?.id === d.id && (
                     <InstallBox code={install.code} onDone={() => setInstall(null)} />
@@ -230,14 +246,21 @@ function DeviceRow({
   onRename,
   onReinstall,
   onRemove,
+  onForward,
+  onVnc,
 }: {
   device: Device
   onRename: (name: string) => void
   onReinstall: () => void
   onRemove: () => void
+  // A port to switch forwarding on to, or null for off.
+  onForward: (port: number | null) => void
+  onVnc: () => void
 }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(device.name)
+  const [port, setPort] = useState(String(device.forward?.port ?? 5900))
+  const portNumber = /^\d{1,5}$/.test(port) && +port >= 1 && +port <= 65535 ? +port : null
 
   const commit = () => {
     const value = draft.trim()
@@ -285,6 +308,38 @@ function DeviceRow({
         )}
         <span className="device-meta">
           {[system, device.hostname, seen(device)].filter(Boolean).join(" · ")}
+        </span>
+        <span className="device-forward">
+          <button
+            className={"device-action" + (device.forward ? " on" : "")}
+            onClick={() => onForward(device.forward ? null : portNumber)}
+            disabled={!device.forward && portNumber === null}
+            title={
+              device.forward
+                ? `Forwarding port ${device.forward.port}; tap to switch off (it also goes off after 30 idle minutes)`
+                : "Forward a port on this device's own loopback (5900 is VNC)"
+            }
+          >
+            {device.forward ? `forward :${device.forward.port}` : "forward"}
+          </button>
+          {!device.forward && (
+            <input
+              className="device-port"
+              value={port}
+              onChange={(e) => setPort(e.target.value.trim())}
+              inputMode="numeric"
+              aria-label="Port"
+              title="Port on the device's loopback"
+            />
+          )}
+          <button
+            className="device-action"
+            onClick={onVnc}
+            disabled={!device.forward || !device.online}
+            title={device.forward ? "Open its screen over VNC" : "Switch forwarding on first"}
+          >
+            VNC
+          </button>
         </span>
       </div>
       <button className="device-action" onClick={onReinstall} title="New install command (replaces this device's token)">

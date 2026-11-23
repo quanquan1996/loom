@@ -123,6 +123,8 @@ defmodule LoomWeb.Router do
     patch "/devices/:id", DevicesController, :update
     delete "/devices/:id", DevicesController, :delete
     post "/devices/:id/install", DevicesController, :install
+    post "/devices/:id/forward", DevicesController, :forward_on
+    delete "/devices/:id/forward", DevicesController, :forward_off
 
     get "/notices", NoticeController, :index
     post "/notices/:id/read", NoticeController, :read
@@ -199,6 +201,11 @@ defmodule LoomWeb.Router do
   # token itself, as a WebSocket can't carry the header `RequireAuth` reads.
   scope "/browser", LoomWeb do
     get "/vnc", BrowserController, :vnc
+  end
+
+  # A device's forwarded port (its VNC), the same way; see `LoomWeb.ForwardSocket`.
+  scope "/devices", LoomWeb do
+    get "/:id/forward", ForwardController, :socket
   end
 
   # The UI itself. Last so it can never shadow an API route, and only `/` —

@@ -39,6 +39,9 @@ type config struct {
 	Shell string `json:"shell"`
 	// Optional; see mqtt.go. Absent means no broker and no open port.
 	MQTT *mqttConfig `json:"mqtt,omitempty"`
+	// Loopback ports loom may forward to (see forward.go). Unset: 5900, for
+	// VNC. [] turns forwarding off. Kept across a reinstall.
+	ForwardPorts []int `json:"forward_ports"`
 }
 
 // stateDir is where loom-node keeps what it writes as it runs: its logs, and
@@ -177,15 +180,16 @@ type session struct {
 	cfg *config
 	ctx context.Context
 
-	mu     sync.Mutex
-	execs  map[string]*job
-	writes map[string]*upload
-	terms  map[string]*term
-	wg     sync.WaitGroup
+	mu       sync.Mutex
+	execs    map[string]*job
+	writes   map[string]*upload
+	terms    map[string]*term
+	forwards map[string]*forward
+	wg       sync.WaitGroup
 }
 
 func newSession(c *conn, cfg *config) *session {
-	return &session{c: c, cfg: cfg, execs: map[string]*job{}, writes: map[string]*upload{}, terms: map[string]*term{}}
+	return &session{c: c, cfg: cfg, execs: map[string]*job{}, writes: map[string]*upload{}, terms: map[string]*term{}, forwards: map[string]*forward{}}
 }
 
 func (s *session) serve(parent context.Context) error {
@@ -206,6 +210,10 @@ func (s *session) serve(parent context.Context) error {
 		delete(s.terms, id)
 		t.kill()
 	}
+	for id, d := range s.forwards {
+		delete(s.forwards, id)
+		d.close()
+	}
 	s.mu.Unlock()
 	s.wg.Wait()
 	return err
@@ -222,6 +230,7 @@ type request struct {
 	Final   bool   `json:"final"`
 	Cols    int    `json:"cols"`
 	Rows    int    `json:"rows"`
+	Port    int    `json:"port"`
 }
 
 func (s *session) handle(event string, payload json.RawMessage) {
@@ -248,6 +257,10 @@ func (s *session) handle(event string, payload json.RawMessage) {
 			delete(s.terms, r.ID)
 			t.kill()
 		}
+		if d := s.forwards[r.ID]; d != nil {
+			delete(s.forwards, r.ID)
+			d.close()
+		}
 		s.mu.Unlock()
 	case "read":
 		s.wg.Add(1)
@@ -267,6 +280,10 @@ func (s *session) handle(event string, payload json.RawMessage) {
 		s.ptyInput(r)
 	case "pty_resize":
 		s.ptyResize(r)
+	case "forward_open":
+		s.forwardOpen(r)
+	case "forward_in":
+		s.forwardInput(r)
 	default:
 		log.Printf("ignoring unknown event %q", event)
 	}

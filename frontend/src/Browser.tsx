@@ -3,6 +3,9 @@ import RFB from "@novnc/novnc"
 import { ArrowRightToLine, ChevronLeft, CornerDownLeft, Delete, Keyboard, Maximize, Minimize, RefreshCw, Send, X, ZoomIn, ZoomOut } from "lucide-react"
 import { getToken } from "./api"
 
+/** One of the user's devices whose screen the pane shows instead, over its forwarded port. */
+export type DesktopTarget = { id: string; name: string }
+
 /**
  * Loom's own browser — the Chromium that agents drive over CDP — shown here so
  * the user can take it over: log in to a site once, get past a check that
@@ -12,6 +15,10 @@ import { getToken } from "./api"
  * `Loom.Browser`), so sites lay themselves out for a narrow screen and the
  * page fills the pane, rather than a desktop screen shrunk to unreadable.
  *
+ * Given a `device`, the same pane shows that device's own screen instead: the
+ * VNC server on it, through its forwarded port (`LoomWeb.ForwardSocket`). Its
+ * VNC asks for its own password (a Mac's, its account name and password).
+ *
  * Mounted only while shown, so a closed pane holds no connection open.
  */
 export function Browser({
@@ -19,11 +26,13 @@ export function Browser({
   maximized,
   onToggleMaximized,
   onClose,
+  device,
 }: {
   narrow: boolean
   maximized: boolean
   onToggleMaximized: () => void
   onClose: () => void
+  device?: DesktopTarget
 }) {
   const screen = useRef<HTMLDivElement>(null)
   const rfb = useRef<RFB | null>(null)
@@ -33,25 +42,47 @@ export function Browser({
   const [fit, setFit] = useState(true)
   const [typing, setTyping] = useState(false)
   const [text, setText] = useState("")
+  // What the device's VNC asks for before it shows the screen.
+  const [asked, setAsked] = useState<string[] | null>(null)
+  const [user, setUser] = useState("")
+  const [pass, setPass] = useState("")
+  const [why, setWhy] = useState<string | null>(null)
 
   useEffect(() => {
     const el = screen.current
     if (!el) return
     const proto = location.protocol === "https:" ? "wss:" : "ws:"
-    let url = `${proto}//${location.host}/browser/vnc?token=${encodeURIComponent(getToken() ?? "")}`
-    if (narrow) url += `&w=${el.clientWidth}&h=${el.clientHeight}`
+    const token = encodeURIComponent(getToken() ?? "")
+    let url = device
+      ? `${proto}//${location.host}/devices/${device.id}/forward?token=${token}`
+      : `${proto}//${location.host}/browser/vnc?token=${token}`
+    if (narrow && !device) url += `&w=${el.clientWidth}&h=${el.clientHeight}`
     const r = new RFB(el, url, { wsProtocols: [] })
     r.background = "transparent"
     // A replaced connection's goodbye arrives after its successor started.
-    r.addEventListener("connect", () => rfb.current === r && setState("connected"))
+    r.addEventListener("connect", () => {
+      if (rfb.current !== r) return
+      setState("connected")
+      setAsked(null)
+      setWhy(null)
+    })
     r.addEventListener("disconnect", () => rfb.current === r && setState("closed"))
+    r.addEventListener("credentialsrequired", (e) => {
+      if (rfb.current !== r) return
+      setAsked((e as CustomEvent<{ types: string[] }>).detail.types)
+    })
+    r.addEventListener("securityfailure", (e) => {
+      if (rfb.current !== r) return
+      const detail = (e as CustomEvent<{ reason?: string }>).detail
+      setWhy(detail.reason || "wrong name or password")
+    })
     rfb.current = r
     setState("connecting")
     return () => {
       rfb.current = null
       r.disconnect()
     }
-  }, [attempt, narrow])
+  }, [attempt, narrow, device?.id])
 
   // A phone turned on its side wants a window of the other shape. The screen's
   // orientation, not the pane's: the keyboard coming up squashes the pane
@@ -104,7 +135,7 @@ export function Browser({
               <ChevronLeft />
             </button>
           )}
-          browser
+          {device ? device.name : "browser"}
           {state !== "connected" && <span className="browser-state">{state === "connecting" ? "connecting…" : "disconnected"}</span>}
         </span>
         <span className="pane-actions">
@@ -175,6 +206,41 @@ export function Browser({
           </button>
         </form>
       )}
+      {asked && state !== "closed" && (
+        <form
+          className="browser-type"
+          onSubmit={(e) => {
+            e.preventDefault()
+            rfb.current?.sendCredentials({ username: user, password: pass })
+            setPass("")
+            setAsked(null)
+          }}
+        >
+          {asked.includes("username") && (
+            <input
+              value={user}
+              onChange={(e) => setUser(e.target.value)}
+              placeholder="Account name"
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="username"
+              spellCheck={false}
+            />
+          )}
+          <input
+            type="password"
+            value={pass}
+            onChange={(e) => setPass(e.target.value)}
+            placeholder={asked.includes("username") ? "Password" : "VNC password"}
+            autoComplete="current-password"
+            autoFocus
+          />
+          <button type="submit" className="pane-btn" title="Log in">
+            <Send />
+          </button>
+        </form>
+      )}
+      {why && state === "closed" && <div className="browser-type">{why}</div>}
       <div className="browser-screen" ref={screen} />
     </div>
   )

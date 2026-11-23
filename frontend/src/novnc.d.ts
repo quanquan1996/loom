@@ -7,6 +7,7 @@ declare module "@novnc/novnc" {
     dragViewport: boolean
     background: string
     sendKey(keysym: number, code: string | null, down?: boolean): void
+    sendCredentials(creds: { username?: string; password?: string; target?: string }): void
     disconnect(): void
   }
 }

@@ -21,8 +21,11 @@ defmodule LoomWeb.NodeChannel do
     - "pty_opened", "pty_out" `{id, data}`, "pty_exit" `{id, code}`: a
       terminal, for `Loom.Terminal.Session`; it sends `pty_in` and
       `pty_resize` the same way as any request
+    - "forward_opened", "forward_out" `{id, data}`, "forward_closed": a
+      forwarded port, for `LoomWeb.ForwardSocket`; it sends `forward_in`
 
-  "exit", "done", "written", "pty_exit" and "error" end a request.
+  "exit", "done", "written", "pty_exit", "forward_closed" and "error" end a
+  request.
 
   A removed device that connects (see `Loom.Nodes`, "Removing a device") joins
   only to be pushed "uninstall"; its "uninstalled" ends its token, and the
@@ -36,7 +39,7 @@ defmodule LoomWeb.NodeChannel do
 
   require Logger
 
-  @final ~w(exit done written pty_exit error)
+  @final ~w(exit done written pty_exit forward_closed error)
 
   @impl true
   def join("node", info, %{assigns: %{wipe: {token, name}}} = socket) do
@@ -64,7 +67,8 @@ defmodule LoomWeb.NodeChannel do
   end
 
   def handle_in(event, %{"id" => id} = payload, socket)
-      when event in ~w(out exit chunk done written error pty_opened pty_out pty_exit) do
+      when event in ~w(out exit chunk done written error pty_opened pty_out pty_exit
+                         forward_opened forward_out forward_closed) do
     case socket.assigns.requests do
       %{^id => {pid, ref}} ->
         send(pid, {:node_reply, id, event, Map.delete(payload, "id")})

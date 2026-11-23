@@ -131,6 +131,7 @@ type Props = {
   onOpenTasks: () => void
   devices: Device[]
   onUpsertDevice: (device: Device) => void
+  onOpenDesktop: (device: Device) => void
   push: Push
   // Desktop only, so null on a phone; see keys.tsx.
   vim: { on: boolean; toggle: () => void } | null
@@ -183,6 +184,7 @@ export function Sidebar({
   onOpenTasks,
   devices,
   onUpsertDevice,
+  onOpenDesktop,
   push,
   vim,
   activeId,
@@ -603,6 +605,10 @@ export function Sidebar({
           devices={devices}
           employees={employees}
           onUpsert={onUpsertDevice}
+          onOpenDesktop={(d) => {
+            setDevicesOpen(false)
+            onOpenDesktop(d)
+          }}
           onClose={() => setDevicesOpen(false)}
         />
       )}

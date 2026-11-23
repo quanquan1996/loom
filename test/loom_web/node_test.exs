@@ -298,4 +298,57 @@ defmodule LoomWeb.NodeTest do
       assert %{"size" => 7} = Task.await(task) |> json_response(200)
     end
   end
+
+  describe "port forwarding" do
+    test "is off until switched on, and the switch is in the summary" do
+      {node, socket} = online()
+      assert {:error, :off} = Nodes.forward(node.id)
+      assert %{forward: nil} = Enum.find(Nodes.list(), &(&1.id == node.id))
+
+      assert {:ok, %{forward: %{port: 5900}}} = Nodes.forward_on(node.id, 5900)
+      assert {:ok, 5900, channel} = Nodes.forward(node.id)
+      assert channel == socket.channel_pid
+
+      assert {:ok, %{forward: nil}} = Nodes.forward_off(node.id)
+      assert {:error, :off} = Nodes.forward(node.id)
+      assert {:error, _} = Nodes.forward_on(node.id, 70_000)
+    end
+
+    test "the socket opens the port on the device, relays, and ends when switched off" do
+      {node, _socket} = online()
+      {:ok, _} = Nodes.forward_on(node.id, 5900)
+      init = %{node_id: node.id, node_name: node.name, port: 5900, channel: self(), ip: "1.2.3.4"}
+
+      {:ok, s} = LoomWeb.ForwardSocket.init(init)
+      assert_received {:node_send, _, id, "forward_open", %{"port" => 5900}}
+
+      # Input before the device has opened waits, then goes in order.
+      {:ok, s} = LoomWeb.ForwardSocket.handle_in({"RFB", opcode: :binary}, s)
+      refute_received {:node_send, _, _, "forward_in", _}
+      {:ok, s} = LoomWeb.ForwardSocket.handle_info({:node_reply, id, "forward_opened", %{}}, s)
+      assert_received {:node_send, _, ^id, "forward_in", %{"data" => "UkZC"}}
+
+      assert {:push, {:binary, "hi"}, s} =
+               LoomWeb.ForwardSocket.handle_info(
+                 {:node_reply, id, "forward_out", %{"data" => "aGk="}},
+                 s
+               )
+
+      {:ok, _} = Nodes.forward_off(node.id)
+      assert_receive {:forward_off, off_id}
+
+      assert {:stop, :normal, {1000, _}, _} =
+               LoomWeb.ForwardSocket.handle_info({:forward_off, off_id}, s)
+    end
+
+    test "the WebSocket route wants a login and a switched-on device" do
+      {node, _socket} = online()
+      assert build_conn() |> get("/devices/#{node.id}/forward") |> Map.get(:status) == 401
+
+      token = Loom.Auth.mint_token()
+
+      assert build_conn() |> get("/devices/#{node.id}/forward?token=#{token}") |> Map.get(:status) ==
+               409
+    end
+  end
 end

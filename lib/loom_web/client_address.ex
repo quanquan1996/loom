@@ -18,6 +18,18 @@ defmodule LoomWeb.ClientAddress do
 
   @type net :: {tuple(), non_neg_integer()}
 
+  @doc "The client of `conn`, as a string: per the header, or the peer for a direct connection."
+  def of(%Plug.Conn{} = conn) do
+    hops =
+      conn
+      |> Plug.Conn.get_req_header("x-forwarded-for")
+      |> Enum.join(",")
+      |> String.split(",", trim: true)
+      |> Enum.map(&String.trim/1)
+
+    pick(hops, trusted()) || conn.remote_ip |> :inet.ntoa() |> to_string()
+  end
+
   @doc """
   The configured list, parsed once per value. A bad entry is dropped with a
   warning rather than stopping the start: the worst it does is show a
@@ -35,7 +47,10 @@ defmodule LoomWeb.ClientAddress do
         {nets, bad} = parse(raw)
 
         if bad != [],
-          do: Logger.warning("LOOM_TRUSTED_PROXIES: not an IP or CIDR block, ignored: #{Enum.join(bad, ", ")}")
+          do:
+            Logger.warning(
+              "LOOM_TRUSTED_PROXIES: not an IP or CIDR block, ignored: #{Enum.join(bad, ", ")}"
+            )
 
         :persistent_term.put(__MODULE__, {raw, nets})
         nets

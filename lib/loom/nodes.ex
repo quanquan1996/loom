@@ -31,6 +31,14 @@ defmodule Loom.Nodes do
   it next comes back. The token goes when the device says it is done, or at
   once for a daemon too old to know how, which is then simply refused.
 
+  ## Port forwarding
+
+  The user can switch on forwarding to one loopback port of a device (5900,
+  for VNC, unless they pick another), for `LoomWeb.ForwardSocket` to carry.
+  The switch lives only in memory: off when loom starts, off again after
+  `@forward_idle` without traffic, and off when the user says so. The device
+  has the last word on which ports it allows (see `node/forward.go`).
+
   ## Broadcasts
 
   On the lobby topic (`Loom.Agent.lobby_topic/0`), for the sidebar:
@@ -52,6 +60,7 @@ defmodule Loom.Nodes do
   # one in Devices is all it costs the user, and a guesser has to start over.
   @miss_max 20
   @name_format ~r/^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$/
+  @forward_idle :timer.minutes(30)
 
   def start_link(opts) do
     GenServer.start_link(__MODULE__, opts, name: Keyword.get(opts, :name, @name))
@@ -101,6 +110,26 @@ defmodule Loom.Nodes do
   """
   def connected(id, pid, info, server \\ @name),
     do: GenServer.call(server, {:connected, id, pid, info})
+
+  @doc """
+  Switch port forwarding on for a device, to `port` on its loopback, for
+  `@forward_idle` from now: `{:ok, summary}`. Asked again, the port changes and
+  the clock restarts.
+  """
+  def forward_on(id, port, server \\ @name), do: GenServer.call(server, {:forward_on, id, port})
+
+  @doc "Switch it off: `{:ok, summary}`. Open forwards notice and close."
+  def forward_off(id, server \\ @name), do: GenServer.call(server, {:forward_off, id})
+
+  @doc """
+  The forward of a device by id, if switched on: `{:ok, port, channel}` where
+  `channel` is its `LoomWeb.NodeChannel`, `{:error, :off}` or
+  `{:error, :offline}`.
+  """
+  def forward(id, server \\ @name), do: GenServer.call(server, {:forward, id})
+
+  @doc "Traffic through a forward: its idle clock starts over."
+  def forward_touch(id, server \\ @name), do: GenServer.cast(server, {:forward_touch, id})
 
   @doc """
   The channel for a device, by name: `{:ok, pid}`, `{:offline, summary}` or
@@ -164,7 +193,9 @@ defmodule Loom.Nodes do
 
     {nodes, wipes} = load(path)
     nodes = Map.new(nodes, &{&1.id, &1})
-    {:ok, %{path: path, nodes: nodes, wipes: wipes, online: %{}, codes: %{}, misses: []}}
+
+    {:ok,
+     %{path: path, nodes: nodes, wipes: wipes, online: %{}, codes: %{}, misses: [], forwards: %{}}}
   end
 
   @impl true
@@ -219,6 +250,7 @@ defmodule Loom.Nodes do
     case fetch(id, state) do
       {:ok, node} ->
         state = drop_connection(id, state)
+        state = forward_stop(id, "device removed", state)
         codes = for {_code, {owner, _}} = entry <- state.codes, owner != id, into: %{}, do: entry
 
         wipes =
@@ -331,6 +363,45 @@ defmodule Loom.Nodes do
     end
   end
 
+  def handle_call({:forward_on, id, port}, _from, state) do
+    with {:ok, node} <- fetch(id, state),
+         :ok <- check_port(port) do
+      state = %{
+        state
+        | forwards: Map.put(state.forwards, id, %{port: port, until: forward_until()})
+      }
+
+      Process.send_after(self(), {:forward_expire, id}, @forward_idle)
+      Logger.info("Nodes: port forwarding on for #{node.name}, port #{port}")
+      announce(node, state)
+      {:reply, {:ok, summary(node, state)}, state}
+    else
+      error -> {:reply, error, state}
+    end
+  end
+
+  def handle_call({:forward_off, id}, _from, state) do
+    case fetch(id, state) do
+      {:ok, node} ->
+        state = forward_stop(id, "switched off", state)
+        {:reply, {:ok, summary(node, state)}, state}
+
+      error ->
+        {:reply, error, state}
+    end
+  end
+
+  def handle_call({:forward, id}, _from, state) do
+    reply =
+      case {state.forwards[id], state.online[id]} do
+        {nil, _} -> {:error, :off}
+        {_, nil} -> {:error, :offline}
+        {%{port: port}, {pid, _ref}} -> {:ok, port, pid}
+      end
+
+    {:reply, reply, state}
+  end
+
   def handle_call({:lookup, name}, _from, state) do
     reply =
       case Enum.find(Map.values(state.nodes), &same_name?(&1.name, name)) do
@@ -348,6 +419,31 @@ defmodule Loom.Nodes do
   end
 
   @impl true
+  def handle_cast({:forward_touch, id}, state) do
+    case state.forwards do
+      %{^id => f} -> {:noreply, put_in(state.forwards[id], %{f | until: forward_until()})}
+      _ -> {:noreply, state}
+    end
+  end
+
+  @impl true
+  def handle_info({:forward_expire, id}, state) do
+    case state.forwards do
+      %{^id => %{until: until}} ->
+        left = until - System.monotonic_time(:millisecond)
+
+        if left > 0 do
+          Process.send_after(self(), {:forward_expire, id}, left)
+          {:noreply, state}
+        else
+          {:noreply, forward_stop(id, "idle for #{div(@forward_idle, 60_000)} minutes", state)}
+        end
+
+      _ ->
+        {:noreply, state}
+    end
+  end
+
   def handle_info({:DOWN, ref, :process, _pid, _reason}, state) do
     case Enum.find(state.online, fn {_id, {_pid, r}} -> r == ref end) do
       {id, _} ->
@@ -378,7 +474,40 @@ defmodule Loom.Nodes do
     node
     |> Map.drop([:token_hash])
     |> Map.put(:online, Map.has_key?(state.online, node.id))
+    |> Map.put(:forward, forward_summary(state.forwards[node.id]))
   end
+
+  defp forward_summary(nil), do: nil
+  defp forward_summary(%{port: port}), do: %{port: port}
+
+  # The idle clock: a timer per switch-on, which re-arms itself while traffic
+  # keeps pushing `until` forward (see `{:forward_expire, id}`).
+  defp forward_until, do: System.monotonic_time(:millisecond) + @forward_idle
+
+  defp forward_stop(id, why, state) do
+    case Map.pop(state.forwards, id) do
+      {nil, _} ->
+        state
+
+      {_f, forwards} ->
+        state = %{state | forwards: forwards}
+        Phoenix.PubSub.broadcast(Loom.PubSub, "forwards", {:forward_off, id})
+
+        case state.nodes do
+          %{^id => node} ->
+            Logger.info("Nodes: port forwarding off for #{node.name} (#{why})")
+            announce(node, state)
+
+          _ ->
+            :ok
+        end
+
+        state
+    end
+  end
+
+  defp check_port(port) when is_integer(port) and port in 1..65_535, do: :ok
+  defp check_port(_), do: {:error, "a port is a number from 1 to 65535"}
 
   defp announce(node, state) do
     Phoenix.PubSub.broadcast(
@@ -441,7 +570,8 @@ defmodule Loom.Nodes do
 
   defp reported(_value, _max), do: nil
 
-  defp persisted_changed?(before, after_), do: Map.take(before, @persisted) != Map.take(after_, @persisted)
+  defp persisted_changed?(before, after_),
+    do: Map.take(before, @persisted) != Map.take(after_, @persisted)
 
   defp same_name?(a, b) when is_binary(a) and is_binary(b),
     do: String.downcase(a) == String.downcase(b)

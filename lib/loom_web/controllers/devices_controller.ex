@@ -10,6 +10,8 @@ defmodule LoomWeb.DevicesController do
   """
   use LoomWeb, :controller
 
+  require Logger
+
   alias Loom.Nodes
 
   def index(conn, _params), do: json(conn, %{nodes: Nodes.list()})
@@ -41,6 +43,47 @@ defmodule LoomWeb.DevicesController do
       {:error, reason} -> refuse(conn, reason)
     end
   end
+
+  @doc "Switch port forwarding on (`port`, 5900 unless given) or off; see `Loom.Nodes`."
+  def forward_on(conn, %{"id" => id} = params) do
+    port = Map.get(params, "port", 5900)
+
+    with {:ok, port} <- port_number(port),
+         {:ok, node} <- Nodes.forward_on(id, port) do
+      Logger.info(
+        "Devices: #{LoomWeb.ClientAddress.of(conn)} switched forwarding on for #{node.name}:#{port}"
+      )
+
+      json(conn, %{node: node})
+    else
+      {:error, reason} -> refuse(conn, reason)
+    end
+  end
+
+  def forward_off(conn, %{"id" => id}) do
+    case Nodes.forward_off(id) do
+      {:ok, node} ->
+        Logger.info(
+          "Devices: #{LoomWeb.ClientAddress.of(conn)} switched forwarding off for #{node.name}"
+        )
+
+        json(conn, %{node: node})
+
+      {:error, reason} ->
+        refuse(conn, reason)
+    end
+  end
+
+  defp port_number(port) when is_integer(port), do: {:ok, port}
+
+  defp port_number(port) when is_binary(port) do
+    case Integer.parse(port) do
+      {n, ""} -> {:ok, n}
+      _ -> {:error, "a port is a number from 1 to 65535"}
+    end
+  end
+
+  defp port_number(_), do: {:error, "a port is a number from 1 to 65535"}
 
   defp refuse(conn, :not_found), do: conn |> put_status(404) |> json(%{error: "no such device"})
   defp refuse(conn, reason), do: conn |> put_status(422) |> json(%{error: reason})

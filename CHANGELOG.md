@@ -17,6 +17,17 @@ that ran live. Format after [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added
+- **Port forwarding and VNC for your devices.** Under Devices, each device has a
+  **forward** switch (a port on the device's own loopback, 5900 by default) and a
+  separate **VNC** button that opens the device's screen in the side pane, through
+  noVNC, over the connection `loom-node` already keeps — nothing is opened on the
+  home router. The switch is off when loom starts and goes off after 30 minutes
+  without keys or pointer. The device decides what may be forwarded:
+  `forward_ports` in its `loom-node` config (unset = `[5900]`, `[]` = off), only
+  ever on 127.0.0.1. A Mac needs Screen Sharing on; Windows a VNC server such as
+  TightVNC listening on loopback.
+
 ## [0.7.0] – 2026-11-21
 
 ### Added

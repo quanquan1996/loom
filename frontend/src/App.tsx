@@ -21,6 +21,7 @@ import { isDream, scopeOf, Sleep, type SleepTab } from "./Sleep"
 import { EmployeePage, HireDialog, isEmployeeSession, type EmployeeTab } from "./Employees"
 import { Terminal } from "./Terminal"
 import { TerminalPick } from "./TerminalPick"
+import type { DesktopTarget } from "./Browser"
 // noVNC is only for the browser pane, so it loads when that is first opened.
 const Browser = lazy(() => import("./Browser").then((m) => ({ default: m.Browser })))
 import { lastActive, useLobby } from "./useLobby"
@@ -108,7 +109,7 @@ function SidebarResize() {
 }
 
 // The right-hand side shows one thing at a time: the terminals or the canvas.
-type Side = "terminal" | "canvas" | "browser" | null
+type Side = "terminal" | "canvas" | "browser" | "desktop" | null
 
 function loadCanvases(): Record<string, CanvasItem> {
   try {
@@ -229,6 +230,8 @@ function App() {
   const [drawerOpen, setDrawerOpen] = useState(false)
 
   const [side, setSide] = useState<Side>(null)
+  // The device whose screen the "desktop" side shows.
+  const [desktop, setDesktop] = useState<DesktopTarget | null>(null)
   const terminalOpen = side === "terminal"
 
   // The right-hand column across the whole window, chat and sidebar hidden —
@@ -772,6 +775,11 @@ function App() {
       }}
       devices={devices}
       onUpsertDevice={upsertDevice}
+      onOpenDesktop={(d) => {
+        if (narrow) setDrawerOpen(false)
+        setDesktop({ id: d.id, name: d.name })
+        setSide("desktop")
+      }}
       push={push}
       vim={narrow ? null : { on: vim, toggle: () => setVim((v) => !v) }}
       activeId={activeId}
@@ -996,6 +1004,21 @@ function App() {
           <div className="side-column">
             <Suspense fallback={null}>
               <Browser
+                narrow={narrow}
+                maximized={maximized}
+                onToggleMaximized={toggleFull}
+                onClose={() => setSide(null)}
+              />
+            </Suspense>
+          </div>
+        )}
+
+        {side === "desktop" && desktop && (
+          <div className="side-column">
+            <Suspense fallback={null}>
+              <Browser
+                key={desktop.id}
+                device={desktop}
                 narrow={narrow}
                 maximized={maximized}
                 onToggleMaximized={toggleFull}
