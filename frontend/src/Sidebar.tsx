@@ -603,7 +603,6 @@ export function Sidebar({
       {devicesOpen && (
         <DevicesDialog
           devices={devices}
-          employees={employees}
           onUpsert={onUpsertDevice}
           onOpenDesktop={(d) => {
             setDevicesOpen(false)

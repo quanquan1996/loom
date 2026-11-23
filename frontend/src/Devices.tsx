@@ -6,14 +6,11 @@ import { isComposing } from "./ime"
 import {
   androidInstall,
   createDevice,
-  deleteDevice,
-  deviceInstallCode,
   forwardOff,
   forwardOn,
   installCommands,
   renameDevice,
   type Device,
-  type Employee,
 } from "./api"
 
 /**
@@ -27,14 +24,11 @@ import {
  */
 export function DevicesDialog({
   devices,
-  employees,
   onUpsert,
   onOpenDesktop,
   onClose,
 }: {
   devices: Device[]
-  // Those working on a device are named before it is removed: they stop.
-  employees: Employee[]
   onUpsert: (device: Device) => void
   onOpenDesktop: (device: Device) => void
   onClose: () => void
@@ -72,31 +66,6 @@ export function DevicesDialog({
       setError((e as Error).message)
     } finally {
       setAdding(false)
-    }
-  }
-
-  const reinstall = async (device: Device) => {
-    try {
-      const { code } = await deviceInstallCode(device.id)
-      setError(null)
-      setInstall({ id: device.id, code })
-    } catch (e) {
-      setError((e as Error).message)
-    }
-  }
-
-  const remove = async (device: Device) => {
-    const working = employees.filter((e) => e.workstation === device.id).map((e) => e.name)
-    const stops = working.length
-      ? `\n\nIt is the workstation of ${working.join(", ")}, who will stop working until given another.`
-      : ""
-    if (!confirm(`Remove ${device.name}? loom-node uninstalls itself from it: right away if it is online, otherwise the next time it connects.${stops}`)) return
-    try {
-      await deleteDevice(device.id)
-      if (install?.id === device.id) setInstall(null)
-      setError(null)
-    } catch (e) {
-      setError((e as Error).message)
     }
   }
 
@@ -150,8 +119,6 @@ export function DevicesDialog({
                     open={openId === d.id}
                     onToggle={() => setOpenId((id) => (id === d.id ? null : d.id))}
                     onRename={(value) => rename(d, value)}
-                    onReinstall={() => reinstall(d)}
-                    onRemove={() => remove(d)}
                     onForward={(port) => forward(d, port)}
                     onVnc={() => onOpenDesktop(d)}
                   />
@@ -250,8 +217,6 @@ function DeviceRow({
   open,
   onToggle,
   onRename,
-  onReinstall,
-  onRemove,
   onForward,
   onVnc,
 }: {
@@ -260,8 +225,6 @@ function DeviceRow({
   open: boolean
   onToggle: () => void
   onRename: (name: string) => void
-  onReinstall: () => void
-  onRemove: () => void
   // A port to switch forwarding on to, or null for off.
   onForward: (port: number | null) => void
   onVnc: () => void
@@ -339,14 +302,7 @@ function DeviceRow({
       {open && (
         <div className="device-panel">
           <div className="device-setting">
-            <div className="device-setting-text">
-              <span>Port forwarding</span>
-              <span className="device-setting-hint">
-                {device.forward
-                  ? `Port ${device.forward.port} on its loopback · off after 30 idle minutes`
-                  : "A port on its own loopback; 5900 is VNC"}
-              </span>
-            </div>
+            <span className="device-setting-label">Port forwarding</span>
             <input
               className="device-port"
               value={device.forward ? String(device.forward.port) : port}
@@ -354,6 +310,7 @@ function DeviceRow({
               onChange={(e) => setPort(e.target.value.trim())}
               inputMode="numeric"
               aria-label="Port"
+              title="A port on the device's own loopback; 5900 is VNC. Goes off after 30 idle minutes."
             />
             <button
               role="switch"
@@ -364,38 +321,15 @@ function DeviceRow({
               onClick={() => onForward(device.forward ? null : portNumber)}
             />
           </div>
-          <div className="device-setting">
-            <div className="device-setting-text">
-              <span>Remote desktop</span>
-              <span className="device-setting-hint">
-                {!device.forward
-                  ? "Switch port forwarding on first"
-                  : device.online
-                    ? "Its screen over VNC, beside the chat"
-                    : "The device is offline"}
-              </span>
-            </div>
-            <button className="device-open" onClick={onVnc} disabled={!device.forward || !device.online}>
-              <Monitor />
-              VNC
-            </button>
-          </div>
-          <div className="device-links">
-            <button
-              onClick={() => {
-                setDraft(device.name)
-                setEditing(true)
-              }}
-            >
-              Rename
-            </button>
-            <button onClick={onReinstall} title="Replaces this device's token">
-              Install command
-            </button>
-            <button className="danger" onClick={onRemove}>
-              Remove
-            </button>
-          </div>
+          <button
+            className="device-rename"
+            onClick={() => {
+              setDraft(device.name)
+              setEditing(true)
+            }}
+          >
+            Rename
+          </button>
         </div>
       )}
     </div>
