@@ -1012,12 +1012,20 @@ defmodule Loom.Notices do
     if new?,
       do:
         "[Loom: this session is notice #{n["id"]} in the user's bell, posted by " <>
-          "#{n["source"]["name"]} #{from}; it needs: #{n["needs"]}. The message above " <>
-          "is its brief. Act on it with `loom-notice act #{n["id"]} …`.]",
+          "#{n["source"]["name"]} #{from}; it needs: #{n["needs"]}. Its brief, which the " <>
+          "user sees as this chat's first message, is below; that is all of it, so " <>
+          "anything more comes from its context, not from guessing. Act on it with " <>
+          "`loom-notice act #{n["id"]} …`.]\n\n" <> brief_text(n),
       else:
-        "[Loom: #{n["source"]["name"]} updated notice #{n["id"]}; the message above " <>
-          "is its new brief (priority #{n["priority"]}, needs: #{n["needs"]}).]"
+        "[Loom: #{n["source"]["name"]} updated notice #{n["id"]}; its new brief " <>
+          "(priority #{n["priority"]}, needs: #{n["needs"]}), as the user now sees it:]\n\n" <>
+          brief_text(n)
   end
+
+  # The brief the user sees is only shown, never sent to the backend; the
+  # agent gets this copy of it (without the reply buttons).
+  defp brief_text(n),
+    do: Enum.join(Enum.reject([n["summary"], n["detail"]], &is_nil/1), "\n\n")
 
   defp where(session) do
     cwd =
