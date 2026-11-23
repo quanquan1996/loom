@@ -23,6 +23,15 @@ defmodule LoomWeb.DevicesController do
     end
   end
 
+  def update(conn, %{"id" => id, "forward_port" => port}) do
+    with {:ok, port} <- port_number(port),
+         {:ok, node} <- Nodes.set_forward_port(id, port) do
+      json(conn, %{node: node})
+    else
+      {:error, reason} -> refuse(conn, reason)
+    end
+  end
+
   def update(conn, %{"id" => id} = params) do
     case Nodes.rename(id, params["name"]) do
       {:ok, node} -> json(conn, %{node: node})
@@ -46,7 +55,7 @@ defmodule LoomWeb.DevicesController do
 
   @doc "Switch port forwarding on (`port`, 5900 unless given) or off; see `Loom.Nodes`."
   def forward_on(conn, %{"id" => id} = params) do
-    port = Map.get(params, "port", 5900)
+    port = Map.get(params, "port") || remembered_port(id)
 
     with {:ok, port} <- port_number(port),
          {:ok, node} <- Nodes.forward_on(id, port) do
@@ -72,6 +81,10 @@ defmodule LoomWeb.DevicesController do
       {:error, reason} ->
         refuse(conn, reason)
     end
+  end
+
+  defp remembered_port(id) do
+    Enum.find_value(Nodes.list(), 5900, &(&1.id == id && &1.forward_port))
   end
 
   defp port_number(port) when is_integer(port), do: {:ok, port}

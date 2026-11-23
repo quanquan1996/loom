@@ -314,6 +314,16 @@ defmodule LoomWeb.NodeTest do
       assert {:error, _} = Nodes.forward_on(node.id, 70_000)
     end
 
+    test "the port is 5900 until the user picks another, then theirs" do
+      {node, _socket} = online()
+      assert %{forward_port: 5900} = Enum.find(Nodes.list(), &(&1.id == node.id))
+      assert {:ok, %{forward_port: 5901}} = Nodes.set_forward_port(node.id, 5901)
+      {:ok, _} = Nodes.forward_on(node.id, 5902)
+      {:ok, _} = Nodes.forward_off(node.id)
+      assert %{forward_port: 5902, forward: nil} = Enum.find(Nodes.list(), &(&1.id == node.id))
+      assert {:error, _} = Nodes.set_forward_port(node.id, 0)
+    end
+
     test "the socket opens the port on the device, relays, and ends when switched off" do
       {node, _socket} = online()
       {:ok, _} = Nodes.forward_on(node.id, 5900)

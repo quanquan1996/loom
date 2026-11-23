@@ -50,7 +50,7 @@ defmodule Loom.Nodes do
   require Logger
 
   @name __MODULE__
-  @persisted ~w(id name icon token_hash created_at os arch hostname version last_seen_at)a
+  @persisted ~w(id name icon token_hash created_at os arch hostname version last_seen_at forward_port)a
   # The mark the Devices dialog draws before a device's name, picked when it is
   # added and fixed from then on. Unset, it follows the os the device reports.
   @icons ~w(windows mac android linux bot)
@@ -117,6 +117,13 @@ defmodule Loom.Nodes do
   the clock restarts.
   """
   def forward_on(id, port, server \\ @name), do: GenServer.call(server, {:forward_on, id, port})
+
+  @doc """
+  The port this device forwards to when switched on, kept with the device:
+  5900 until the user picks another, then theirs. `{:ok, summary}`.
+  """
+  def set_forward_port(id, port, server \\ @name),
+    do: GenServer.call(server, {:set_forward_port, id, port})
 
   @doc "Switch it off: `{:ok, summary}`. Open forwards notice and close."
   def forward_off(id, server \\ @name), do: GenServer.call(server, {:forward_off, id})
@@ -222,7 +229,8 @@ defmodule Loom.Nodes do
         arch: nil,
         hostname: nil,
         version: nil,
-        last_seen_at: nil
+        last_seen_at: nil,
+        forward_port: nil
       }
 
       state = save(put_in(state.nodes[node.id], node))
@@ -363,9 +371,22 @@ defmodule Loom.Nodes do
     end
   end
 
+  def handle_call({:set_forward_port, id, port}, _from, state) do
+    with {:ok, node} <- fetch(id, state),
+         :ok <- check_port(port) do
+      {node, state} = remember_port(node, port, state)
+      announce(node, state)
+      {:reply, {:ok, summary(node, state)}, state}
+    else
+      error -> {:reply, error, state}
+    end
+  end
+
   def handle_call({:forward_on, id, port}, _from, state) do
     with {:ok, node} <- fetch(id, state),
          :ok <- check_port(port) do
+      {node, state} = remember_port(node, port, state)
+
       state = %{
         state
         | forwards: Map.put(state.forwards, id, %{port: port, until: forward_until()})
@@ -475,6 +496,16 @@ defmodule Loom.Nodes do
     |> Map.drop([:token_hash])
     |> Map.put(:online, Map.has_key?(state.online, node.id))
     |> Map.put(:forward, forward_summary(state.forwards[node.id]))
+    |> Map.put(:forward_port, Map.get(node, :forward_port) || 5900)
+  end
+
+  defp remember_port(node, port, state) do
+    if Map.get(node, :forward_port) == port do
+      {node, state}
+    else
+      node = Map.put(node, :forward_port, port)
+      {node, save(put_in(state.nodes[node.id], node))}
+    end
   end
 
   defp forward_summary(nil), do: nil

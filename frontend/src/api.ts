@@ -1136,6 +1136,8 @@ export type Device = {
   last_seen_at: string | null
   // Port forwarding to the device's own loopback, while switched on.
   forward: { port: number } | null
+  // The port forwarding uses when switched on: 5900 until the user picks another.
+  forward_port: number
 }
 
 // The server words its refusals ("there is already a device called mac", "that
@@ -1189,6 +1191,10 @@ export function deleteDevice(id: string): Promise<void> {
 /** Switch a device's port forwarding on (to `port` on its loopback) or off. */
 export function forwardOn(id: string, port: number): Promise<{ node: Device }> {
   return apiCall(`/api/devices/${id}/forward`, { method: "POST", body: JSON.stringify({ port }) })
+}
+
+export function setForwardPort(id: string, port: number): Promise<{ node: Device }> {
+  return apiCall(`/api/devices/${id}`, { method: "PATCH", body: JSON.stringify({ forward_port: port }) })
 }
 
 export function forwardOff(id: string): Promise<{ node: Device }> {
