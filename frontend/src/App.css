@@ -515,6 +515,35 @@
   color: var(--fg);
 }
 
+/* "P2P", or how its open screen travels: before the rest of the second line. */
+.device-link {
+  margin-right: 6px;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--fg) 10%, transparent);
+  font-size: 0.75rem;
+}
+
+.device-link.direct {
+  background: color-mix(in srgb, #34c759 22%, transparent);
+  color: #34c759;
+}
+
+/* The connect button while VNC is off: there, but quieter. */
+.device-quick.off {
+  opacity: 0.45;
+}
+
+.device-hint {
+  margin-left: 8px;
+  color: #0a84ff;
+  font-size: 0.75rem;
+}
+
+.device-setting.hint .switch {
+  box-shadow: 0 0 0 2px #0a84ff;
+}
+
 .device-port {
   flex: 0 0 auto;
   width: 3.8em;

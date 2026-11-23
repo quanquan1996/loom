@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react"
 import RFB from "@novnc/novnc"
 import { ArrowRightToLine, ChevronLeft, CornerDownLeft, Delete, Keyboard, Maximize, Minimize, RefreshCw, Send, X, ZoomIn, ZoomOut } from "lucide-react"
 import { getToken } from "./api"
+import { reportVia, type Via } from "./deviceVia"
 
 /**
  * A plain arrow for screens that send no pointer of their own: a Mac's Screen
@@ -153,7 +154,12 @@ export function Browser({
   const [pass, setPass] = useState("")
   const [why, setWhy] = useState<string | null>(null)
   // How a device's screen travels: straight to it, or through loom.
-  const [via, setVia] = useState<"direct" | "relay" | "retrying" | null>(null)
+  const [via, setVia] = useState<Via | null>(null)
+  useEffect(() => {
+    if (!device) return
+    reportVia(device.id, state === "connected" ? via : null)
+    return () => reportVia(device.id, null)
+  }, [device?.id, via, state])
   // What the user logged in with, for this pane only: moving to a direct
   // channel, or back after a drop, logs in again without asking.
   const creds = useRef<{ username: string; password: string } | null>(null)

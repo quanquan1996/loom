@@ -3,6 +3,7 @@ import { useEffect, useState } from "react"
 import { createPortal } from "react-dom"
 import { DEVICE_ICONS, DeviceIcon, ICON_LABELS, deviceIcon } from "./DeviceIcon"
 import { isComposing } from "./ime"
+import { deviceVia, type Via } from "./deviceVia"
 import {
   androidInstall,
   createDevice,
@@ -251,6 +252,18 @@ function DeviceRow({
 }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(device.name)
+  // The connect button was tapped with VNC off: the panel says what to switch on.
+  const [hint, setHint] = useState(false)
+  useEffect(() => {
+    if (!open || device.forward) setHint(false)
+  }, [open, device.forward])
+  // How its screen travels right now, while open in the pane.
+  const [via, setVia] = useState<Via | undefined>(deviceVia.get(device.id))
+  useEffect(() => {
+    const update = () => setVia(deviceVia.get(device.id))
+    window.addEventListener("loom-device-via", update)
+    return () => window.removeEventListener("loom-device-via", update)
+  }, [device.id])
   const [port, setPort] = useState(String(device.forward_port))
   useEffect(() => setPort(String(device.forward_port)), [device.forward_port])
   const portNumber = /^\d{1,5}$/.test(port) && +port >= 1 && +port <= 65535 ? +port : null
@@ -306,17 +319,33 @@ function DeviceRow({
             <span className="device-name">{device.name}</span>
           )}
           <span className="device-meta">
+            {device.p2p && (
+              <span
+                className={"device-link" + (via === "direct" ? " direct" : "")}
+                title={
+                  via === "direct"
+                    ? "Its screen is open, straight to the device"
+                    : via
+                      ? "Its screen is open through loom; trying for a direct path"
+                      : "P2P on: its screen goes straight to it when the network allows"
+                }
+              >
+                {via === "direct" ? "direct" : via ? "relay" : "P2P"}
+              </span>
+            )}
             {[system, device.hostname, seen(device)].filter(Boolean).join(" · ")}
           </span>
         </div>
-        {device.forward && device.online && (
+        {device.online && (
           <button
-            className="device-quick"
-            title="Open its screen over VNC"
+            className={"device-quick" + (device.forward ? "" : " off")}
+            title={device.forward ? "Open its screen over VNC" : "Switch VNC on to open its screen"}
             aria-label={`Open ${device.name}'s screen`}
             onClick={(e) => {
               e.stopPropagation()
-              onVnc()
+              if (device.forward) return onVnc()
+              if (!open) onToggle()
+              setHint(true)
             }}
           >
             <Monitor />
@@ -327,8 +356,11 @@ function DeviceRow({
 
       {open && (
         <div className="device-panel">
-          <div className="device-setting">
-            <span className="device-setting-label">VNC port</span>
+          <div className={"device-setting" + (hint ? " hint" : "")}>
+            <span className="device-setting-label">
+              VNC
+              {hint && <span className="device-hint">Switch on to connect</span>}
+            </span>
             <input
               className="device-port"
               value={device.forward ? String(device.forward.port) : port}
@@ -338,16 +370,13 @@ function DeviceRow({
               onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
               inputMode="numeric"
               aria-label="VNC port"
-              title={device.forward ? "Switch forwarding off to change the port" : "A port on the device's own loopback; kept for next time"}
+              title={device.forward ? "Switch VNC off to change the port" : "The VNC port on the device; kept for next time"}
             />
-          </div>
-          <div className="device-setting">
-            <span className="device-setting-label">Port forwarding</span>
             <button
               role="switch"
               aria-checked={!!device.forward}
-              aria-label="Port forwarding"
-              title={device.forward ? `Forwarding port ${device.forward.port}; off after 30 idle minutes` : `Forward port ${port}`}
+              aria-label="VNC"
+              title={device.forward ? `Open on port ${device.forward.port}; off after 30 idle minutes` : `Open port ${port} to loom`}
               className={"switch" + (device.forward ? " on" : "")}
               disabled={!device.forward && portNumber === null}
               onClick={() => onForward(device.forward ? null : portNumber)}
