@@ -1,4 +1,5 @@
 import { ChevronLeft, Maximize, Minimize, Plus, X } from "lucide-react"
+import { refreshP2p } from "./p2p"
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react"
 import { Canvas } from "./Canvas"
 import { moved, touches, type CanvasItem } from "./canvasItems"
@@ -208,6 +209,7 @@ function App() {
   const backends = useBackends()
   useEffect(() => {
     if (authed) void refreshBackends()
+    if (authed) void refreshP2p()
   }, [authed])
   const [settingsOpen, setSettingsOpen] = useState(false)
 

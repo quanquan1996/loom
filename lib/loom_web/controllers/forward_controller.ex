@@ -20,7 +20,9 @@ defmodule LoomWeb.ForwardController do
           port: port,
           channel: channel,
           ip: LoomWeb.ClientAddress.of(conn),
-          rtc: params["rtc"] == "1"
+          rtc: params["rtc"] == "1",
+          # Peer to peer only while Settings has it on (`Loom.P2P`).
+          p2p: Loom.P2P.on?()
         },
         # noVNC doesn't ping and a still screen sends nothing; the switch's
         # own idle clock is what ends a forgotten one.

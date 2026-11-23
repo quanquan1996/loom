@@ -26,8 +26,9 @@ defmodule LoomWeb.ForwardSocket do
     - → browser `{"type": "error", "message": …}` when the device can't; the
       browser then falls back
 
-  The VNC pane always tries: a direct channel lives only as long as the page
-  and this socket, and leaves nothing open behind it.
+  Only while Settings has P2P on (`Loom.P2P`); otherwise an offer is answered
+  with an error and the browser falls back. A direct channel lives only as
+  long as the page and this socket, and leaves nothing open behind it.
 
   The socket stays open alongside the data channel: closing it, or the switch
   going off, cancels the forward on the device either way.
@@ -47,6 +48,7 @@ defmodule LoomWeb.ForwardSocket do
     Phoenix.PubSub.subscribe(Loom.PubSub, "forwards")
     Process.monitor(channel)
     rtc = Map.get(args, :rtc, false)
+    p2p = Map.get(args, :p2p, true)
     Logger.info("Forward #{id}: #{ip} → #{name}:#{port}#{if rtc, do: " (peer to peer)"}")
 
     s = %{
@@ -57,6 +59,7 @@ defmodule LoomWeb.ForwardSocket do
       channel: channel,
       open: false,
       rtc: rtc,
+      p2p: p2p,
       timer: nil,
       pending: [],
       touched: 0
@@ -82,13 +85,16 @@ defmodule LoomWeb.ForwardSocket do
 
   def handle_in({text, opcode: :text}, %{rtc: true} = s) do
     case Jason.decode(text) do
-      {:ok, %{"type" => "offer", "sdp" => sdp}} when is_binary(sdp) ->
+      {:ok, %{"type" => "offer", "sdp" => sdp}} when is_binary(sdp) and s.p2p ->
         send(
           s.channel,
           {:node_send, self(), s.id, "forward_rtc", %{"port" => s.port, "data" => sdp}}
         )
 
         {:ok, s}
+
+      {:ok, %{"type" => "offer"}} ->
+        {:push, {:text, Jason.encode!(%{type: "error", message: "P2P is off in Settings"})}, s}
 
       {:ok, %{"type" => "touch"}} ->
         {:ok, touch(s, <<4>>)}

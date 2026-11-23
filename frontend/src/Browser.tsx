@@ -3,6 +3,7 @@ import RFB from "@novnc/novnc"
 import { ArrowRightToLine, ChevronLeft, CornerDownLeft, Delete, Keyboard, Maximize, Minimize, RefreshCw, Send, X, ZoomIn, ZoomOut } from "lucide-react"
 import { getToken } from "./api"
 import { reportVia, type Via } from "./deviceVia"
+import { p2pOn, subscribeP2p } from "./p2p"
 
 /**
  * A plain arrow for screens that send no pointer of their own: a Mac's Screen
@@ -237,7 +238,7 @@ export function Browser({
     // a direct channel opens.
     const later = () => {
       clearTimeout(retry)
-      if (gone || link?.via !== "relay") return
+      if (gone || !p2pOn() || link?.via !== "relay") return
       retry = window.setTimeout(upgrade, RETRY_MS[Math.min(tries++, RETRY_MS.length - 1)])
     }
     const upgrade = async () => {
@@ -258,17 +259,37 @@ export function Browser({
       if (link?.via === "relay") upgrade()
     }
     window.addEventListener("online", online)
+    // P2P switched in Settings while the screen is open: off closes a direct
+    // channel at once (back through loom); on tries for one.
+    const unsubscribe = subscribeP2p(() => {
+      if (!p2pOn() && link && link.via !== "relay") {
+        // Unhooked first, so its goodbye doesn't read as the screen closing.
+        rfb.current = null
+        r?.disconnect()
+        const old = link
+        link = null
+        drop(old)
+        connect()
+      } else if (p2pOn() && link?.via === "relay") {
+        tries = 0
+        upgrade()
+      }
+    })
 
     const connect = () => {
       setState("connecting")
       setVia(null)
       if (!device) return start(url)
-      const opening = openDevice(url)
+      const relayed = (): DeviceLink => {
+        const ws = new WebSocket(url)
+        return { chan: ws, ws, via: "relay" }
+      }
+      const opening = p2pOn() ? openDevice(url) : Promise.resolve(relayed())
       opening.then(
         (l) => {
           if (gone || !l) return drop(l)
           link = l
-          setVia(l.via)
+          setVia(p2pOn() ? l.via : null)
           // The switch going off closes the socket; a direct channel goes with it.
           if (l.via === "direct") l.ws.addEventListener("close", () => l.pc?.close())
           start(l.chan)
@@ -283,6 +304,7 @@ export function Browser({
       gone = true
       clearTimeout(retry)
       window.removeEventListener("online", online)
+      unsubscribe()
       el.removeEventListener("pointerdown", touch, true)
       el.removeEventListener("keydown", touch, true)
       rfb.current = null

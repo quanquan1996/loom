@@ -114,6 +114,8 @@ defmodule LoomWeb.Router do
 
     get "/backends", BackendsController, :show
     put "/backends", BackendsController, :update
+    get "/p2p", P2PController, :show
+    put "/p2p", P2PController, :update
 
     get "/layout", LayoutController, :show
     put "/layout", LayoutController, :update

@@ -1,4 +1,5 @@
 import { ArchiveRestore, ChevronLeft, ChevronRight, Moon, Sun, Trash2, X } from "lucide-react"
+import { saveP2p, useP2p } from "./p2p"
 import { useEffect, useState, type ReactNode } from "react"
 import { createPortal } from "react-dom"
 import type { AgentBackend, AgentInfo, Project } from "./api"
@@ -102,6 +103,8 @@ export function SettingsDialog({
             <TextSizes settings={settings} onChange={onChange} />
 
             <Agents />
+
+            <P2pRow />
 
             <BossRow onOpen={() => setPage("boss")} />
 
@@ -361,6 +364,21 @@ function Incognito({
         </div>
       ))}
     </div>
+  )
+}
+
+function P2pRow() {
+  const on = useP2p()
+  return (
+    <Row label="P2P" hint="A device's screen goes straight to it when the network allows; through loom otherwise.">
+      <button
+        role="switch"
+        aria-checked={on}
+        aria-label="P2P"
+        className={"switch" + (on ? " on" : "")}
+        onClick={() => void saveP2p(!on)}
+      />
+    </Row>
   )
 }
 

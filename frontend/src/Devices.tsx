@@ -3,6 +3,7 @@ import { useEffect, useState } from "react"
 import { createPortal } from "react-dom"
 import { DEVICE_ICONS, DeviceIcon, ICON_LABELS, deviceIcon } from "./DeviceIcon"
 import { deviceVia, type Via } from "./deviceVia"
+import { useP2p } from "./p2p"
 import {
   androidInstall,
   createDevice,
@@ -235,6 +236,7 @@ function DeviceRow({
   }, [open, device.forward])
   // How its screen travels right now, while open in the pane.
   const [via, setVia] = useState<Via | undefined>(deviceVia.get(device.id))
+  const p2p = useP2p()
   useEffect(() => {
     const update = () => setVia(deviceVia.get(device.id))
     window.addEventListener("loom-device-via", update)
@@ -296,7 +298,7 @@ function DeviceRow({
           <div className={"device-setting" + (hint ? " hint" : "")}>
             <span className="device-setting-label">
               VNC
-              {via && (
+              {p2p && via && (
                 <span
                   className={"device-link" + (via === "direct" ? " direct" : "")}
                   title={via === "direct" ? "Its screen goes straight to the device, peer to peer" : "Its screen goes through loom; trying for a direct path"}
