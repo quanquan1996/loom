@@ -45,9 +45,10 @@ function within<T>(ms: number, p: Promise<T>): Promise<T> {
  * can reach each other (`LoomWeb.ForwardSocket`, "Peer to peer"): the
  * WebSocket carries the WebRTC offer and answer, then stays open beside the
  * data channel so switching forwarding off still ends it. When no channel
- * opens in a few seconds, the same WebSocket carries the screen instead.
+ * opens in a few seconds, the same WebSocket carries the screen instead — or,
+ * for a retry while relayed already (`fallback` false), it closes and null.
  */
-async function openDevice(url: string): Promise<DeviceLink> {
+async function openDevice(url: string, fallback = true): Promise<DeviceLink | null> {
   const ws = new WebSocket(url + "&rtc=1")
   ws.binaryType = "arraybuffer"
   // Registered before noVNC's onmessage, so a late handshake message never reaches it.
@@ -65,6 +66,7 @@ async function openDevice(url: string): Promise<DeviceLink> {
     ws.addEventListener("close", () => no(new Error("closed")), { once: true })
   })
   if (typeof RTCPeerConnection === "undefined") {
+    if (!fallback) return ws.close(), null
     ws.send(JSON.stringify({ type: "fallback" }))
     return { chan: ws, ws, via: "relay" }
   }
@@ -93,14 +95,19 @@ async function openDevice(url: string): Promise<DeviceLink> {
     return { chan: dc, ws, pc, via: "direct" }
   } catch {
     pc.close()
+    if (!fallback) return ws.close(), null
     if (ws.readyState !== WebSocket.OPEN) throw new Error("closed")
     ws.send(JSON.stringify({ type: "fallback" }))
     return { chan: ws, ws, via: "relay" }
   }
 }
 
+// While relayed, how long until trying for a direct channel again: the network
+// may change under a phone (Wi-Fi to 5G), so keep trying, ever less often.
+const RETRY_MS = [15_000, 30_000, 60_000, 120_000, 300_000]
+
 /** One of the user's devices whose screen the pane shows instead, over its forwarded port. */
-export type DesktopTarget = { id: string; name: string }
+export type DesktopTarget = { id: string; name: string; p2p?: boolean }
 
 /**
  * Loom's own browser — the Chromium that agents drive over CDP — shown here so
@@ -136,6 +143,8 @@ export function Browser({
   const [attempt, setAttempt] = useState(0)
   // Fit the whole screen in the pane, or show it at 1:1 and pan by dragging.
   const [fit, setFit] = useState(true)
+  // Each new connection under the pane, for the view settings to reach it.
+  const [gen, setGen] = useState(0)
   const [typing, setTyping] = useState(false)
   const [text, setText] = useState("")
   // What the device's VNC asks for before it shows the screen.
@@ -144,7 +153,10 @@ export function Browser({
   const [pass, setPass] = useState("")
   const [why, setWhy] = useState<string | null>(null)
   // How a device's screen travels: straight to it, or through loom.
-  const [via, setVia] = useState<"direct" | "relay" | null>(null)
+  const [via, setVia] = useState<"direct" | "relay" | "retrying" | null>(null)
+  // What the user logged in with, for this pane only: moving to a direct
+  // channel, or back after a drop, logs in again without asking.
+  const creds = useRef<{ username: string; password: string } | null>(null)
 
   useEffect(() => {
     const el = screen.current
@@ -159,6 +171,8 @@ export function Browser({
     let link: DeviceLink | null = null
     let gone = false
     let touched = 0
+    let retry: number | undefined
+    let tries = 0
     // Peer to peer, loom doesn't see the user's keys: tell it they're at work.
     const touch = () => {
       const now = Date.now()
@@ -169,8 +183,14 @@ export function Browser({
     el.addEventListener("pointerdown", touch, true)
     el.addEventListener("keydown", touch, true)
 
+    const drop = (l: DeviceLink | null) => {
+      l?.ws.close()
+      l?.pc?.close()
+    }
+
     const start = (target: string | WebSocket | RTCDataChannel) => {
       const c = new RFB(el, target as string, { wsProtocols: [] })
+      const old = r
       r = c
       c.background = "transparent"
       c.showDotCursor = true
@@ -181,51 +201,91 @@ export function Browser({
         setAsked(null)
         setWhy(null)
       })
-      c.addEventListener("disconnect", () => {
+      c.addEventListener("disconnect", (e) => {
         if (rfb.current !== c) return
-        setState("closed")
-        link?.ws.close()
-        link?.pc?.close()
+        const wasDirect = link?.via === "direct"
+        drop(link)
+        link = null
+        // A direct channel lost with the network: connect again, straight away.
+        if (wasDirect && !(e as CustomEvent<{ clean: boolean }>).detail.clean && !gone) connect()
+        else setState("closed")
       })
       c.addEventListener("credentialsrequired", (e) => {
         if (rfb.current !== c) return
+        // Moving to a direct channel, or back after a drop: log in as before.
+        if (creds.current) return c.sendCredentials(creds.current)
         setAsked((e as CustomEvent<{ types: string[] }>).detail.types)
       })
       c.addEventListener("securityfailure", (e) => {
         if (rfb.current !== c) return
+        creds.current = null
         const detail = (e as CustomEvent<{ reason?: string }>).detail
         setWhy(detail.reason || "wrong name or password")
       })
       rfb.current = c
+      setGen((n) => n + 1)
+      old?.disconnect()
     }
 
-    setState("connecting")
-    setVia(null)
-    if (device) {
-      openDevice(url).then(
+    // Relayed with P2P on: try again in the background, and move over when
+    // a direct channel opens.
+    const later = () => {
+      clearTimeout(retry)
+      if (gone || !device?.p2p || link?.via !== "relay") return
+      retry = window.setTimeout(upgrade, RETRY_MS[Math.min(tries++, RETRY_MS.length - 1)])
+    }
+    const upgrade = async () => {
+      if (gone || link?.via !== "relay") return
+      setVia("retrying")
+      const l = await openDevice(url, false).catch(() => null)
+      if (gone || link?.via !== "relay") return drop(l)
+      if (!l) return setVia("relay"), later()
+      const old = link
+      link = l
+      setVia("direct")
+      l.ws.addEventListener("close", () => l.pc?.close())
+      start(l.chan)
+      drop(old)
+    }
+    const online = () => {
+      tries = 0
+      if (link?.via === "relay") upgrade()
+    }
+    window.addEventListener("online", online)
+
+    const connect = () => {
+      setState("connecting")
+      setVia(null)
+      if (!device) return start(url)
+      const relayed = (): DeviceLink => {
+        const ws = new WebSocket(url)
+        return { chan: ws, ws, via: "relay" }
+      }
+      const opening = device.p2p ? openDevice(url) : Promise.resolve(relayed())
+      opening.then(
         (l) => {
-          if (gone) {
-            l.ws.close()
-            l.pc?.close()
-            return
-          }
+          if (gone || !l) return drop(l)
           link = l
-          setVia(l.via)
+          setVia(device.p2p ? l.via : null)
           // The switch going off closes the socket; a direct channel goes with it.
           if (l.via === "direct") l.ws.addEventListener("close", () => l.pc?.close())
           start(l.chan)
+          later()
         },
         () => !gone && setState("closed"),
       )
-    } else start(url)
+    }
+    connect()
+
     return () => {
       gone = true
+      clearTimeout(retry)
+      window.removeEventListener("online", online)
       el.removeEventListener("pointerdown", touch, true)
       el.removeEventListener("keydown", touch, true)
       rfb.current = null
       r?.disconnect()
-      link?.ws.close()
-      link?.pc?.close()
+      drop(link)
     }
     // A device's screen is the size it is, so the pane's shape doesn't matter
     // to it: turning the phone (which crosses `narrow`) only rescales, rather
@@ -259,7 +319,7 @@ export function Browser({
     r.scaleViewport = fit
     r.clipViewport = !fit
     r.dragViewport = !fit && narrow
-  }, [fit, narrow, attempt, state])
+  }, [fit, narrow, attempt, state, gen])
 
   // A phone's keyboard won't come up for a canvas, so text goes in through a
   // field of our own and is typed into the page key by key.
@@ -287,9 +347,13 @@ export function Browser({
           {device && via && state === "connected" && (
             <span
               className="browser-state"
-              title={via === "direct" ? "Straight to the device, peer to peer" : "Relayed through loom; no direct path"}
+              title={
+                via === "direct"
+                  ? "Straight to the device, peer to peer"
+                  : "Through loom: no direct path yet; trying again now and then"
+              }
             >
-              {via}
+              {via === "retrying" ? "relay · retrying" : via}
             </span>
           )}
           {state !== "connected" && (
@@ -373,7 +437,8 @@ export function Browser({
             className="vnc-login"
             onSubmit={(e) => {
               e.preventDefault()
-              rfb.current?.sendCredentials({ username: user, password: pass })
+              creds.current = { username: user, password: pass }
+              rfb.current?.sendCredentials(creds.current)
               setPass("")
               setAsked(null)
             }}

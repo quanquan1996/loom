@@ -9,7 +9,8 @@ defmodule LoomWeb.ForwardController do
   def socket(conn, %{"id" => id} = params) do
     with {:ok, _login} <- Loom.Auth.verify_token(params["token"]),
          {:ok, port, channel} <- Loom.Nodes.forward(id) do
-      name = Enum.find_value(Loom.Nodes.list(), id, &(&1.id == id && &1.name))
+      node = Enum.find(Loom.Nodes.list(), &(&1.id == id))
+      name = (node && node.name) || id
 
       conn
       |> WebSockAdapter.upgrade(
@@ -20,7 +21,9 @@ defmodule LoomWeb.ForwardController do
           port: port,
           channel: channel,
           ip: LoomWeb.ClientAddress.of(conn),
-          rtc: params["rtc"] == "1"
+          rtc: params["rtc"] == "1",
+          # Peer to peer only where the user switched it on for this device.
+          p2p: node != nil and node.p2p
         },
         # noVNC doesn't ping and a still screen sends nothing; the switch's
         # own idle clock is what ends a forgotten one.

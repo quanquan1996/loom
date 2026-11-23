@@ -1138,6 +1138,8 @@ export type Device = {
   forward: { port: number } | null
   // The port forwarding uses when switched on: 5900 until the user picks another.
   forward_port: number
+  // Forwards try a direct, peer-to-peer channel first (`LoomWeb.ForwardSocket`).
+  p2p: boolean
 }
 
 // The server words its refusals ("there is already a device called mac", "that
@@ -1195,6 +1197,10 @@ export function forwardOn(id: string, port: number): Promise<{ node: Device }> {
 
 export function setForwardPort(id: string, port: number): Promise<{ node: Device }> {
   return apiCall(`/api/devices/${id}`, { method: "PATCH", body: JSON.stringify({ forward_port: port }) })
+}
+
+export function setP2p(id: string, on: boolean): Promise<{ node: Device }> {
+  return apiCall(`/api/devices/${id}`, { method: "PATCH", body: JSON.stringify({ p2p: on }) })
 }
 
 export function forwardOff(id: string): Promise<{ node: Device }> {

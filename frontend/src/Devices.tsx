@@ -8,6 +8,8 @@ import {
   createDevice,
   forwardOff,
   forwardOn,
+  setForwardPort,
+  setP2p,
   installCommands,
   renameDevice,
   type Device,
@@ -79,6 +81,18 @@ export function DevicesDialog({
     }
   }
 
+  // A setting shows on the tap; the old value comes back if refused.
+  const change = async (device: Device, patch: Partial<Device>, call: () => Promise<{ node: Device }>) => {
+    onUpsert({ ...device, ...patch })
+    try {
+      onUpsert((await call()).node)
+      setError(null)
+    } catch (e) {
+      onUpsert(device)
+      setError((e as Error).message)
+    }
+  }
+
   // The new name shows on the tap; the old one comes back if refused.
   const rename = async (device: Device, value: string) => {
     onUpsert({ ...device, name: value })
@@ -120,6 +134,8 @@ export function DevicesDialog({
                     onToggle={() => setOpenId((id) => (id === d.id ? null : d.id))}
                     onRename={(value) => rename(d, value)}
                     onForward={(port) => forward(d, port)}
+                    onPort={(port) => change(d, { forward_port: port }, () => setForwardPort(d.id, port))}
+                    onP2p={(on) => change(d, { p2p: on }, () => setP2p(d.id, on))}
                     onVnc={() => onOpenDesktop(d)}
                   />
                   {install?.id === d.id && (
@@ -218,6 +234,8 @@ function DeviceRow({
   onToggle,
   onRename,
   onForward,
+  onPort,
+  onP2p,
   onVnc,
 }: {
   device: Device
@@ -227,12 +245,20 @@ function DeviceRow({
   onRename: (name: string) => void
   // A port to switch forwarding on to, or null for off.
   onForward: (port: number | null) => void
+  onPort: (port: number) => void
+  onP2p: (on: boolean) => void
   onVnc: () => void
 }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(device.name)
-  const [port, setPort] = useState(String(device.forward?.port ?? 5900))
+  const [port, setPort] = useState(String(device.forward_port))
+  useEffect(() => setPort(String(device.forward_port)), [device.forward_port])
   const portNumber = /^\d{1,5}$/.test(port) && +port >= 1 && +port <= 65535 ? +port : null
+  // A typed port is kept with the device once the box is left; a bad one reverts.
+  const keepPort = () => {
+    if (portNumber === null) setPort(String(device.forward_port))
+    else if (portNumber !== device.forward_port) onPort(portNumber)
+  }
 
   const commit = () => {
     const value = draft.trim()
@@ -302,23 +328,40 @@ function DeviceRow({
       {open && (
         <div className="device-panel">
           <div className="device-setting">
-            <span className="device-setting-label">Port forwarding</span>
+            <span className="device-setting-label">VNC port</span>
             <input
               className="device-port"
               value={device.forward ? String(device.forward.port) : port}
               disabled={!!device.forward}
               onChange={(e) => setPort(e.target.value.trim())}
+              onBlur={keepPort}
+              onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
               inputMode="numeric"
-              aria-label="Port"
-              title="A port on the device's own loopback; 5900 is VNC. Goes off after 30 idle minutes."
+              aria-label="VNC port"
+              title={device.forward ? "Switch forwarding off to change the port" : "A port on the device's own loopback; kept for next time"}
             />
+          </div>
+          <div className="device-setting">
+            <span className="device-setting-label">Port forwarding</span>
             <button
               role="switch"
               aria-checked={!!device.forward}
               aria-label="Port forwarding"
+              title={device.forward ? `Forwarding port ${device.forward.port}; off after 30 idle minutes` : `Forward port ${port}`}
               className={"switch" + (device.forward ? " on" : "")}
               disabled={!device.forward && portNumber === null}
               onClick={() => onForward(device.forward ? null : portNumber)}
+            />
+          </div>
+          <div className="device-setting">
+            <span className="device-setting-label">P2P</span>
+            <button
+              role="switch"
+              aria-checked={device.p2p}
+              aria-label="Peer to peer"
+              title="Connect straight to the device when the network allows; through loom otherwise"
+              className={"switch" + (device.p2p ? " on" : "")}
+              onClick={() => onP2p(!device.p2p)}
             />
           </div>
           <button

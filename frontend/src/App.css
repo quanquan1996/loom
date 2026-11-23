@@ -466,16 +466,34 @@
 /* A device's settings, under its row: Settings-style lines, then links. */
 .device-panel {
   margin: 0 0 6px;
-  padding: 0 10px 6px 57px;
+  padding: 2px 10px 4px 57px;
   border-radius: 0 0 6px 6px;
   background: var(--bg-card);
+  font-size: 0.846rem;
 }
 
 .device-setting {
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-height: 40px;
+  gap: 8px;
+  min-height: 30px;
+}
+
+/* Smaller than Settings' own: three lines under one row. */
+.device-panel .switch {
+  width: 34px;
+  height: 20px;
+}
+
+.device-panel .switch::after {
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+}
+
+.device-panel .switch.on::after {
+  transform: translateX(14px);
 }
 
 .device-setting-label {
@@ -499,8 +517,8 @@
 
 .device-port {
   flex: 0 0 auto;
-  width: 3.6em;
-  padding: 3px 4px;
+  width: 3.8em;
+  padding: 2px 4px;
   border: 0;
   border-radius: 6px;
   background: color-mix(in srgb, var(--fg) 8%, transparent);

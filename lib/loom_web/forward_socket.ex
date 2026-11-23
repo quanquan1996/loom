@@ -23,7 +23,9 @@ defmodule LoomWeb.ForwardSocket do
       loom no longer sees their keys; it restarts the idle clock
     - browser → `{"type": "fallback"}`: the channel didn't open, so open the
       port the usual way and carry the bytes here after all
-    - → browser `{"type": "error", "message": …}` when the device can't
+    - → browser `{"type": "error", "message": …}` when the device can't, or
+      peer to peer is switched off for it (`Loom.Nodes.set_p2p/2`); the
+      browser then falls back
 
   The socket stays open alongside the data channel: closing it, or the switch
   going off, cancels the forward on the device either way.
@@ -43,6 +45,7 @@ defmodule LoomWeb.ForwardSocket do
     Phoenix.PubSub.subscribe(Loom.PubSub, "forwards")
     Process.monitor(channel)
     rtc = Map.get(args, :rtc, false)
+    if rtc and not Map.get(args, :p2p, true), do: send(self(), :p2p_off)
     Logger.info("Forward #{id}: #{ip} → #{name}:#{port}#{if rtc, do: " (peer to peer)"}")
 
     s = %{
@@ -53,6 +56,7 @@ defmodule LoomWeb.ForwardSocket do
       channel: channel,
       open: false,
       rtc: rtc,
+      p2p: Map.get(args, :p2p, true),
       timer: nil,
       pending: [],
       touched: 0
@@ -78,7 +82,7 @@ defmodule LoomWeb.ForwardSocket do
 
   def handle_in({text, opcode: :text}, %{rtc: true} = s) do
     case Jason.decode(text) do
-      {:ok, %{"type" => "offer", "sdp" => sdp}} when is_binary(sdp) ->
+      {:ok, %{"type" => "offer", "sdp" => sdp}} when is_binary(sdp) and s.p2p ->
         send(
           s.channel,
           {:node_send, self(), s.id, "forward_rtc", %{"port" => s.port, "data" => sdp}}
@@ -126,6 +130,9 @@ defmodule LoomWeb.ForwardSocket do
 
   def handle_info({:node_reply, id, "error", %{"message" => message}}, %{id: id} = s),
     do: close(s, 1011, message)
+
+  def handle_info(:p2p_off, %{rtc: true} = s),
+    do: {:push, {:text, Jason.encode!(%{type: "error", message: "peer to peer is off for #{s.name}"})}, s}
 
   def handle_info(:open_timeout, %{open: false} = s),
     do:
