@@ -1988,29 +1988,6 @@
 
 .pane-node { opacity: 0.6; font-weight: normal; }
 
-/* Closing the browser or a device's screen says so in words: an X alone was
-   missed among the pane's other icons. */
-.pane-btn.pane-exit {
-  width: auto;
-  gap: 4px;
-  margin-left: 4px;
-  padding: 0 10px 0 7px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  font-family: inherit;
-  font-size: 0.846rem;
-}
-
-.pane-btn.pane-exit svg {
-  width: 14px;
-  height: 14px;
-}
-
-.pane-btn.pane-exit:hover {
-  color: var(--fg);
-  border-color: var(--fg-dim);
-}
-
 /* A phone on its side is wider than `narrow`, so it gets the desktop layout;
    a device's screen then takes the whole screen rather than a column of it. */
 @media (pointer: coarse) and (max-height: 520px) {

@@ -203,9 +203,8 @@ export function Browser({
             </button>
           )}
           {!narrow && (
-            <button className="pane-btn pane-exit" onClick={onClose} title={device ? "Disconnect and close" : "Close"}>
+            <button className="pane-btn" onClick={onClose} title="Close">
               <X />
-              <span>{device ? "Disconnect" : "Close"}</span>
             </button>
           )}
         </span>
