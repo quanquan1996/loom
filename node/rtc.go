@@ -39,7 +39,7 @@ const (
 	// A browser that never opens the channel (it gave up and fell back).
 	rtcOpenTimeout = 30 * time.Second
 	// How long gathering candidates may take before answering with what we have.
-	rtcGatherTimeout = 3 * time.Second
+	rtcGatherTimeout = 1500 * time.Millisecond
 	// Data channel messages: small enough for every browser's SCTP stack.
 	rtcChunk = 16 << 10
 	// Stop reading the port while this much waits to be sent to the browser.
