@@ -78,7 +78,7 @@ async function openDevice(url: string): Promise<DeviceLink> {
     })
     await pc.setLocalDescription(await pc.createOffer())
     await within(
-      2500,
+      1500,
       new Promise<void>((ok) => {
         if (pc.iceGatheringState === "complete") ok()
         pc.addEventListener("icegatheringstatechange", () => pc.iceGatheringState === "complete" && ok())
@@ -88,8 +88,8 @@ async function openDevice(url: string): Promise<DeviceLink> {
       texts.push((m) => (m.type === "answer" && m.sdp ? ok(m.sdp) : m.type === "error" && no(new Error(m.message)))),
     )
     ws.send(JSON.stringify({ type: "offer", sdp: JSON.stringify(pc.localDescription) }))
-    await pc.setRemoteDescription(JSON.parse(await within(8000, answer)))
-    await within(5000, opened)
+    await pc.setRemoteDescription(JSON.parse(await within(6000, answer)))
+    await within(3000, opened)
     return { chan: dc, ws, pc, via: "direct" }
   } catch {
     pc.close()
