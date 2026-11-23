@@ -324,14 +324,6 @@ defmodule LoomWeb.NodeTest do
       assert {:error, _} = Nodes.set_forward_port(node.id, 0)
     end
 
-    test "peer to peer is off until switched on, and kept" do
-      {node, _socket} = online()
-      assert %{p2p: false} = Enum.find(Nodes.list(), &(&1.id == node.id))
-      assert {:ok, %{p2p: true}} = Nodes.set_p2p(node.id, true)
-      assert %{p2p: true} = Enum.find(Nodes.list(), &(&1.id == node.id))
-      assert {:ok, %{p2p: false}} = Nodes.set_p2p(node.id, false)
-    end
-
     test "the socket opens the port on the device, relays, and ends when switched off" do
       {node, _socket} = online()
       {:ok, _} = Nodes.forward_on(node.id, 5900)

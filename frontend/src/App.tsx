@@ -777,7 +777,7 @@ function App() {
       onUpsertDevice={upsertDevice}
       onOpenDesktop={(d) => {
         if (narrow) setDrawerOpen(false)
-        setDesktop({ id: d.id, name: d.name, p2p: d.p2p })
+        setDesktop({ id: d.id, name: d.name })
         setSide("desktop")
       }}
       push={push}

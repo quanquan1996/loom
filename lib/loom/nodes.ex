@@ -50,7 +50,7 @@ defmodule Loom.Nodes do
   require Logger
 
   @name __MODULE__
-  @persisted ~w(id name icon token_hash created_at os arch hostname version last_seen_at forward_port p2p)a
+  @persisted ~w(id name icon token_hash created_at os arch hostname version last_seen_at forward_port)a
   # The mark the Devices dialog draws before a device's name, picked when it is
   # added and fixed from then on. Unset, it follows the os the device reports.
   @icons ~w(windows mac android linux bot)
@@ -124,14 +124,6 @@ defmodule Loom.Nodes do
   """
   def set_forward_port(id, port, server \\ @name),
     do: GenServer.call(server, {:set_forward_port, id, port})
-
-  @doc """
-  Let this device's forwards go peer to peer (`LoomWeb.ForwardSocket`, "Peer
-  to peer") or keep them relayed through loom: `{:ok, summary}`. Off until
-  the user switches it on.
-  """
-  def set_p2p(id, on, server \\ @name) when is_boolean(on),
-    do: GenServer.call(server, {:set_p2p, id, on})
 
   @doc "Switch it off: `{:ok, summary}`. Open forwards notice and close."
   def forward_off(id, server \\ @name), do: GenServer.call(server, {:forward_off, id})
@@ -238,8 +230,7 @@ defmodule Loom.Nodes do
         hostname: nil,
         version: nil,
         last_seen_at: nil,
-        forward_port: nil,
-        p2p: false
+        forward_port: nil
       }
 
       state = save(put_in(state.nodes[node.id], node))
@@ -391,19 +382,6 @@ defmodule Loom.Nodes do
     end
   end
 
-  def handle_call({:set_p2p, id, on}, _from, state) do
-    case fetch(id, state) do
-      {:ok, node} ->
-        node = Map.put(node, :p2p, on)
-        state = save(put_in(state.nodes[node.id], node))
-        announce(node, state)
-        {:reply, {:ok, summary(node, state)}, state}
-
-      error ->
-        {:reply, error, state}
-    end
-  end
-
   def handle_call({:forward_on, id, port}, _from, state) do
     with {:ok, node} <- fetch(id, state),
          :ok <- check_port(port) do
@@ -519,7 +497,6 @@ defmodule Loom.Nodes do
     |> Map.put(:online, Map.has_key?(state.online, node.id))
     |> Map.put(:forward, forward_summary(state.forwards[node.id]))
     |> Map.put(:forward_port, Map.get(node, :forward_port) || 5900)
-    |> Map.put(:p2p, Map.get(node, :p2p) == true)
   end
 
   defp remember_port(node, port, state) do

@@ -2,14 +2,13 @@ import { ChevronRight, Monitor, X } from "lucide-react"
 import { useEffect, useState } from "react"
 import { createPortal } from "react-dom"
 import { DEVICE_ICONS, DeviceIcon, ICON_LABELS, deviceIcon } from "./DeviceIcon"
-import { deviceVia, type Via } from "./deviceVia"
+import { deviceVia, p2pOn, setP2pOn, type Via } from "./deviceVia"
 import {
   androidInstall,
   createDevice,
   forwardOff,
   forwardOn,
   setForwardPort,
-  setP2p,
   installCommands,
   type Device,
 } from "./api"
@@ -120,7 +119,6 @@ export function DevicesDialog({
                     onToggle={() => setOpenId((id) => (id === d.id ? null : d.id))}
                     onForward={(port) => forward(d, port)}
                     onPort={(port) => change(d, { forward_port: port }, () => setForwardPort(d.id, port))}
-                    onP2p={(on) => change(d, { p2p: on }, () => setP2p(d.id, on))}
                     onVnc={() => onOpenDesktop(d)}
                   />
                   {install?.id === d.id && (
@@ -219,7 +217,6 @@ function DeviceRow({
   onToggle,
   onForward,
   onPort,
-  onP2p,
   onVnc,
 }: {
   device: Device
@@ -229,7 +226,6 @@ function DeviceRow({
   // A port to switch forwarding on to, or null for off.
   onForward: (port: number | null) => void
   onPort: (port: number) => void
-  onP2p: (on: boolean) => void
   onVnc: () => void
 }) {
   // The connect button was tapped with VNC off: the panel says what to switch on.
@@ -239,8 +235,10 @@ function DeviceRow({
   }, [open, device.forward])
   // How its screen travels right now, while open in the pane.
   const [via, setVia] = useState<Via | undefined>(deviceVia.get(device.id))
+  // P2P lasts as long as the page (`deviceVia.ts`).
+  const [p2p, setP2p] = useState(p2pOn.has(device.id))
   useEffect(() => {
-    const update = () => setVia(deviceVia.get(device.id))
+    const update = () => (setVia(deviceVia.get(device.id)), setP2p(p2pOn.has(device.id)))
     window.addEventListener("loom-device-via", update)
     return () => window.removeEventListener("loom-device-via", update)
   }, [device.id])
@@ -326,7 +324,7 @@ function DeviceRow({
           <div className="device-setting">
             <span className="device-setting-label">
               P2P
-              {device.p2p && via && (
+              {p2p && via && (
                 <span
                   className={"device-link" + (via === "direct" ? " direct" : "")}
                   title={via === "direct" ? "Its screen goes straight to the device" : "Its screen goes through loom; trying for a direct path"}
@@ -337,11 +335,11 @@ function DeviceRow({
             </span>
             <button
               role="switch"
-              aria-checked={device.p2p}
+              aria-checked={p2p}
               aria-label="Peer to peer"
               title="Connect straight to the device when the network allows; through loom otherwise"
-              className={"switch" + (device.p2p ? " on" : "")}
-              onClick={() => onP2p(!device.p2p)}
+              className={"switch" + (p2p ? " on" : "")}
+              onClick={() => setP2pOn(device.id, !p2p)}
             />
           </div>
         </div>

@@ -32,13 +32,6 @@ defmodule LoomWeb.DevicesController do
     end
   end
 
-  def update(conn, %{"id" => id, "p2p" => on}) when is_boolean(on) do
-    case Nodes.set_p2p(id, on) do
-      {:ok, node} -> json(conn, %{node: node})
-      {:error, reason} -> refuse(conn, reason)
-    end
-  end
-
   def update(conn, %{"id" => id} = params) do
     case Nodes.rename(id, params["name"]) do
       {:ok, node} -> json(conn, %{node: node})
