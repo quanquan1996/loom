@@ -242,42 +242,58 @@ export function Browser({
           </button>
         </form>
       )}
-      {asked && state !== "closed" && (
-        <form
-          className="browser-type"
-          onSubmit={(e) => {
-            e.preventDefault()
-            rfb.current?.sendCredentials({ username: user, password: pass })
-            setPass("")
-            setAsked(null)
-          }}
-        >
-          {asked.includes("username") && (
+      <div className="browser-stage">
+        <div className="browser-screen" ref={screen} />
+        {asked && state !== "closed" && (
+          <form
+            className="vnc-login"
+            onSubmit={(e) => {
+              e.preventDefault()
+              rfb.current?.sendCredentials({ username: user, password: pass })
+              setPass("")
+              setAsked(null)
+            }}
+          >
+            <div className="vnc-login-title">Log in to {device?.name ?? "the screen"}</div>
+            <div className="vnc-login-hint">
+              {asked.includes("username")
+                ? "Its own account name and password"
+                : "The password of its VNC server"}
+            </div>
+            {asked.includes("username") && (
+              <input
+                value={user}
+                onChange={(e) => setUser(e.target.value)}
+                placeholder="Account name"
+                autoCapitalize="off"
+                autoCorrect="off"
+                autoComplete="username"
+                spellCheck={false}
+              />
+            )}
             <input
-              value={user}
-              onChange={(e) => setUser(e.target.value)}
-              placeholder="Account name"
-              autoCapitalize="off"
-              autoCorrect="off"
-              autoComplete="username"
-              spellCheck={false}
+              type="password"
+              value={pass}
+              onChange={(e) => setPass(e.target.value)}
+              placeholder="Password"
+              autoComplete="current-password"
+              autoFocus
             />
-          )}
-          <input
-            type="password"
-            value={pass}
-            onChange={(e) => setPass(e.target.value)}
-            placeholder={asked.includes("username") ? "Password" : "VNC password"}
-            autoComplete="current-password"
-            autoFocus
-          />
-          <button type="submit" className="pane-btn" title="Log in">
-            <Send />
-          </button>
-        </form>
-      )}
-      {why && state === "closed" && <div className="browser-type">{why}</div>}
-      <div className="browser-screen" ref={screen} />
+            <button type="submit" className="vnc-login-go" disabled={pass === ""}>
+              Connect
+            </button>
+          </form>
+        )}
+        {why && state === "closed" && (
+          <div className="vnc-login">
+            <div className="vnc-login-title">Not connected</div>
+            <div className="vnc-login-hint">{why}</div>
+            <button className="vnc-login-go" onClick={() => setAttempt((n) => n + 1)}>
+              Try again
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

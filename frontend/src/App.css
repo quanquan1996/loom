@@ -66,6 +66,7 @@
 .sidebar-head,
 .chat-header,
 .side-column > .canvas > .pane-head,
+.side-column > .browser-pane > .pane-head,
 .terminal-pane:first-child > .pane-head {
   box-sizing: border-box;
   height: var(--head-h);
@@ -1419,6 +1420,7 @@
   .sidebar-head,
   .chat-header,
   .side-column > .canvas > .pane-head,
+  .side-column > .browser-pane > .pane-head,
   .terminal-pane:first-child > .pane-head {
     min-height: env(titlebar-area-height, 0px);
     -webkit-app-region: drag;
@@ -1452,6 +1454,7 @@
   }
 
   .app.maximized .side-column > .canvas > .pane-head,
+  .app.maximized .side-column > .browser-pane > .pane-head,
   .app.maximized .terminal-pane:first-child > .pane-head {
     padding-left: calc(var(--wco-left) + 10px);
   }
@@ -1462,6 +1465,7 @@
   }
 
   .app.side-open .side-column > .canvas > .pane-head,
+  .app.side-open .side-column > .browser-pane > .pane-head,
   .app.side-open .terminal-pane:first-child > .pane-head {
     padding-right: calc(var(--wco-right) + 6px);
   }
@@ -1472,7 +1476,65 @@
 .browser-state { margin-left: 8px; font-size: 0.85em; color: var(--fg-dim); }
 .browser-type { display: flex; gap: 4px; align-items: center; padding: 4px 6px; border-bottom: 1px solid var(--line); }
 .browser-type input { flex: 1; min-width: 0; font: inherit; font-size: 16px; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); }
+.browser-stage { position: relative; flex: 1; min-height: 0; display: flex; }
 .browser-screen { flex: 1; min-height: 0; background: #1a1a1a; }
+
+/* What a device's VNC asks before it shows the screen, over where the screen
+   will be. */
+.vnc-login {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(320px, calc(100% - 32px));
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px;
+  border-radius: 14px;
+  background: var(--bg-raised);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+  color: var(--fg);
+}
+
+.vnc-login-title {
+  font-weight: 600;
+  font-size: 1.05rem;
+}
+
+.vnc-login-hint {
+  margin-top: -6px;
+  color: var(--fg-dim);
+  font-size: 0.846rem;
+}
+
+.vnc-login input {
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  font-size: 16px;
+}
+
+.vnc-login-go {
+  margin-top: 4px;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--fg);
+  color: var(--bg);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.vnc-login-go:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
 
 .modal.project-dialog {
   width: min(34rem, 100%);
