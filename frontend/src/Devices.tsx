@@ -320,7 +320,19 @@ function DeviceRow({
             {[system, device.hostname, seen(device)].filter(Boolean).join(" · ")}
           </span>
         </div>
-        {device.forward && !open && <span className="device-badge">:{device.forward.port}</span>}
+        {device.forward && device.online && (
+          <button
+            className="device-quick"
+            title="Open its screen over VNC"
+            aria-label={`Open ${device.name}'s screen`}
+            onClick={(e) => {
+              e.stopPropagation()
+              onVnc()
+            }}
+          >
+            <Monitor />
+          </button>
+        )}
         <ChevronRight className="device-chevron" />
       </div>
 

@@ -409,11 +409,41 @@
   cursor: pointer;
 }
 
-.device-badge {
+/* Forwarding is on: the screen is a tap away, from the row itself. */
+.device-quick {
   flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  margin-right: 2px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: none;
   color: var(--fg-dim);
-  font-size: 0.846rem;
-  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.device-quick svg {
+  width: 18px;
+  height: 18px;
+}
+
+.device-quick:hover {
+  background: color-mix(in srgb, var(--fg) 10%, transparent);
+  color: var(--fg);
+}
+
+/* The row is a button: a ring for the keyboard only, none for a click. */
+.device:focus {
+  outline: none;
+}
+
+.device:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: -2px;
 }
 
 .device-chevron {
