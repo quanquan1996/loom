@@ -3,6 +3,33 @@ import RFB from "@novnc/novnc"
 import { ArrowRightToLine, ChevronLeft, CornerDownLeft, Delete, Keyboard, Maximize, Minimize, RefreshCw, Send, X, ZoomIn, ZoomOut } from "lucide-react"
 import { getToken } from "./api"
 
+/**
+ * A plain arrow for screens that send no pointer of their own: a Mac's Screen
+ * Sharing neither draws it into the picture nor sends its shape to a client
+ * that isn't Apple's, so without this the pointer is invisible. noVNC shows
+ * its "dot" only while the server's own cursor is empty, so the arrow takes
+ * the dot's place; a server that sends a cursor still has it shown.
+ */
+function arrowCursor() {
+  const w = 13, h = 20
+  const c = document.createElement("canvas")
+  c.width = w
+  c.height = h
+  const g = c.getContext("2d")
+  if (!g) return
+  g.beginPath()
+  for (const [x, y] of [[1, 1], [1, 16], [4.5, 12.5], [7, 18.5], [9.5, 17.5], [7, 11.5], [12, 11.5]]) g.lineTo(x, y)
+  g.closePath()
+  g.fillStyle = "#000"
+  g.fill()
+  g.strokeStyle = "#fff"
+  g.lineWidth = 1.2
+  g.stroke()
+  const rgbaPixels = new Uint8Array(g.getImageData(0, 0, w, h).data.buffer)
+  RFB.cursors.dot = { rgbaPixels, w, h, hotx: 1, hoty: 1 }
+}
+arrowCursor()
+
 /** One of the user's devices whose screen the pane shows instead, over its forwarded port. */
 export type DesktopTarget = { id: string; name: string }
 
@@ -59,6 +86,7 @@ export function Browser({
     if (narrow && !device) url += `&w=${el.clientWidth}&h=${el.clientHeight}`
     const r = new RFB(el, url, { wsProtocols: [] })
     r.background = "transparent"
+    r.showDotCursor = true
     // A replaced connection's goodbye arrives after its successor started.
     r.addEventListener("connect", () => {
       if (rfb.current !== r) return
@@ -136,7 +164,11 @@ export function Browser({
             </button>
           )}
           {device ? device.name : "browser"}
-          {state !== "connected" && <span className="browser-state">{state === "connecting" ? "connecting…" : "disconnected"}</span>}
+          {state !== "connected" && (
+            <span className="browser-state">
+              {state === "closed" ? "disconnected" : asked ? "password needed" : "connecting…"}
+            </span>
+          )}
         </span>
         <span className="pane-actions">
           {state === "closed" && (
