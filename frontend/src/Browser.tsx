@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react"
 import RFB from "@novnc/novnc"
 import { ArrowRightToLine, ChevronLeft, CornerDownLeft, Delete, Keyboard, Maximize, Minimize, RefreshCw, Send, X, ZoomIn, ZoomOut } from "lucide-react"
 import { getToken } from "./api"
-import { p2pOn, reportVia, type Via } from "./deviceVia"
+import { reportVia, type Via } from "./deviceVia"
 
 /**
  * A plain arrow for screens that send no pointer of their own: a Mac's Screen
@@ -189,7 +189,6 @@ export function Browser({
     el.addEventListener("pointerdown", touch, true)
     el.addEventListener("keydown", touch, true)
 
-    const p2p = () => !!device && p2pOn.has(device.id)
     const drop = (l: DeviceLink | null) => {
       l?.ws.close()
       l?.pc?.close()
@@ -238,7 +237,7 @@ export function Browser({
     // a direct channel opens.
     const later = () => {
       clearTimeout(retry)
-      if (gone || !p2p() || link?.via !== "relay") return
+      if (gone || link?.via !== "relay") return
       retry = window.setTimeout(upgrade, RETRY_MS[Math.min(tries++, RETRY_MS.length - 1)])
     }
     const upgrade = async () => {
@@ -259,40 +258,17 @@ export function Browser({
       if (link?.via === "relay") upgrade()
     }
     window.addEventListener("online", online)
-    // P2P is switched in the Devices dialog while the screen is open: off
-    // closes a direct channel at once (back through loom); on tries for one.
-    let wanted = p2p()
-    const switched = () => {
-      if (p2p() === wanted) return
-      wanted = p2p()
-      if (!wanted && link && link.via !== "relay") {
-        // Unhooked first, so its goodbye doesn't read as the screen closing.
-        rfb.current = null
-        r?.disconnect()
-        const old = link
-        link = null
-        drop(old)
-        connect()
-      }
-      else if (!wanted) setVia(null), clearTimeout(retry)
-      else if (link?.via === "relay") (tries = 0), upgrade()
-    }
-    window.addEventListener("loom-device-via", switched)
 
     const connect = () => {
       setState("connecting")
       setVia(null)
       if (!device) return start(url)
-      const relayed = (): DeviceLink => {
-        const ws = new WebSocket(url)
-        return { chan: ws, ws, via: "relay" }
-      }
-      const opening = p2p() ? openDevice(url) : Promise.resolve(relayed())
+      const opening = openDevice(url)
       opening.then(
         (l) => {
           if (gone || !l) return drop(l)
           link = l
-          setVia(p2p() ? l.via : null)
+          setVia(l.via)
           // The switch going off closes the socket; a direct channel goes with it.
           if (l.via === "direct") l.ws.addEventListener("close", () => l.pc?.close())
           start(l.chan)
@@ -307,7 +283,6 @@ export function Browser({
       gone = true
       clearTimeout(retry)
       window.removeEventListener("online", online)
-      window.removeEventListener("loom-device-via", switched)
       el.removeEventListener("pointerdown", touch, true)
       el.removeEventListener("keydown", touch, true)
       rfb.current = null

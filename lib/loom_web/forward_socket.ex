@@ -26,8 +26,8 @@ defmodule LoomWeb.ForwardSocket do
     - → browser `{"type": "error", "message": …}` when the device can't; the
       browser then falls back
 
-  Whether to try is the page's to say: P2P is a switch in the Devices dialog
-  that lives only as long as the page, so a reload leaves it off.
+  The VNC pane always tries: a direct channel lives only as long as the page
+  and this socket, and leaves nothing open behind it.
 
   The socket stays open alongside the data channel: closing it, or the switch
   going off, cancels the forward on the device either way.
