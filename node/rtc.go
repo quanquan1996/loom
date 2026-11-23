@@ -41,6 +41,8 @@ const (
 	rtcOpenTimeout = 30 * time.Second
 	// How long gathering candidates may take before answering with what we have.
 	rtcGatherTimeout = 1500 * time.Millisecond
+	// After the first server-reflexive candidate, how long to wait for more.
+	rtcGatherGrace = 300 * time.Millisecond
 	// Data channel messages: small enough for every browser's SCTP stack.
 	rtcChunk = 16 << 10
 	// Stop reading the port while this much waits to be sent to the browser.
@@ -137,14 +139,33 @@ func (s *session) forwardRTC(r request) {
 		return
 	}
 	gathered := webrtc.GatheringCompletePromise(pc)
+	// A STUN server that never answers (Google's, from China) would hold the
+	// answer for the whole timeout; once one has given our public address,
+	// the others get a moment more.
+	reflexive := make(chan struct{}, 1)
+	pc.OnICECandidate(func(c *webrtc.ICECandidate) {
+		if c != nil && c.Typ == webrtc.ICECandidateTypeSrflx {
+			select {
+			case reflexive <- struct{}{}:
+			default:
+			}
+		}
+	})
 	if err := pc.SetLocalDescription(answer); err != nil {
 		end("no answer")
 		s.fail(r.ID, err)
 		return
 	}
+	deadline := time.After(rtcGatherTimeout)
 	select {
 	case <-gathered:
-	case <-time.After(rtcGatherTimeout):
+	case <-deadline:
+	case <-reflexive:
+		select {
+		case <-gathered:
+		case <-deadline:
+		case <-time.After(rtcGatherGrace):
+		}
 	}
 	local := *pc.LocalDescription()
 	local.SDP = predictPorts(local.SDP, rtcPredict)

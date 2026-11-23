@@ -3,7 +3,7 @@ import RFB from "@novnc/novnc"
 import { ArrowRightToLine, ChevronLeft, CornerDownLeft, Delete, Keyboard, Maximize, Minimize, RefreshCw, Send, X, ZoomIn, ZoomOut } from "lucide-react"
 import { getToken } from "./api"
 import { reportVia, type Via } from "./deviceVia"
-import { p2pOn, subscribeP2p } from "./p2p"
+import { p2pOn, refreshP2p, subscribeP2p } from "./p2p"
 
 /**
  * A plain arrow for screens that send no pointer of their own: a Mac's Screen
@@ -81,11 +81,17 @@ async function openDevice(url: string, fallback = true): Promise<DeviceLink | nu
       dc.addEventListener("close", () => no(new Error("closed")), { once: true })
     })
     await pc.setLocalDescription(await pc.createOffer())
+    // Gathering ends when every STUN server answered, or gave up on; a slow
+    // or blocked one shouldn't hold the screen back. Once one has told us
+    // our public address, the rest get a moment more.
     await within(
       1500,
       new Promise<void>((ok) => {
         if (pc.iceGatheringState === "complete") ok()
         pc.addEventListener("icegatheringstatechange", () => pc.iceGatheringState === "complete" && ok())
+        pc.addEventListener("icecandidate", (e) => {
+          if (e.candidate?.type === "srflx") setTimeout(ok, 300)
+        })
       }),
     ).catch(() => {})
     const answer = new Promise<string>((ok, no) =>
@@ -96,7 +102,7 @@ async function openDevice(url: string, fallback = true): Promise<DeviceLink | nu
     // A first try gives up soon, the screen relayed meanwhile; a retry, while
     // the relay already shows it, waits longer: guessed ports (rtc.go) take a
     // few seconds of checks to find the one that answers.
-    await within(fallback ? 3000 : 12_000, opened)
+    await within(fallback ? 5000 : 12_000, opened)
     return { chan: dc, ws, pc, via: "direct" }
   } catch {
     pc.close()
@@ -198,21 +204,46 @@ export function Browser({
       l?.pc?.close()
     }
 
-    const start = (target: string | WebSocket | RTCDataChannel) => {
+    // `behind`: moving a screen already shown to a new channel (relayed to
+    // direct). The new connection logs in out of sight under the old one,
+    // which stays on screen and in use until the new one is ready: no blank,
+    // no flash. Should the new one fail first, the old one simply carries on.
+    const start = (target: string | WebSocket | RTCDataChannel, behind?: DeviceLink) => {
       const c = new RFB(el, target as string, { wsProtocols: [] })
       const old = r
       r = c
       c.background = "transparent"
       c.showDotCursor = true
+      const hidden = behind && old ? (el.lastElementChild as HTMLElement | null) : null
+      if (hidden) Object.assign(hidden.style, { position: "absolute", inset: "0", visibility: "hidden" })
       // A replaced connection's goodbye arrives after its successor started.
       c.addEventListener("connect", () => {
         if (rfb.current !== c) return
         setState("connected")
         setAsked(null)
         setWhy(null)
+        if (!hidden) return
+        // A moment for the first frame to land before it shows.
+        setTimeout(() => {
+          if (rfb.current !== c) return
+          Object.assign(hidden.style, { position: "", inset: "", visibility: "" })
+          old?.disconnect()
+          drop(behind!)
+        }, 300)
       })
       c.addEventListener("disconnect", (e) => {
         if (rfb.current !== c) return
+        if (hidden && hidden.style.visibility === "hidden" && old) {
+          // Failed out of sight: back to the old connection, still shown.
+          drop(link)
+          link = behind!
+          r = old
+          rfb.current = old
+          setGen((n) => n + 1)
+          setVia("relay")
+          later()
+          return
+        }
         const wasDirect = link?.via === "direct"
         drop(link)
         link = null
@@ -234,7 +265,7 @@ export function Browser({
       })
       rfb.current = c
       setGen((n) => n + 1)
-      old?.disconnect()
+      if (!hidden) old?.disconnect()
     }
 
     // Relayed with P2P on: try again in the background, and move over when
@@ -254,8 +285,9 @@ export function Browser({
       link = l
       setVia("direct")
       l.ws.addEventListener("close", () => l.pc?.close())
-      start(l.chan)
-      drop(old)
+      // Logged in already: swap out of sight. Not yet: nothing to keep.
+      if (creds.current && old) start(l.chan, old)
+      else start(l.chan), drop(old)
     }
     const online = () => {
       tries = 0
@@ -287,7 +319,10 @@ export function Browser({
         const ws = new WebSocket(url)
         return { chan: ws, ws, via: "relay" }
       }
-      const opening = p2pOn() ? openDevice(url) : Promise.resolve(relayed())
+      // Settings' switch, as it is now: another tab may have turned it on.
+      const opening = within(1500, refreshP2p())
+        .catch(() => {})
+        .then(() => (p2pOn() ? openDevice(url) : relayed()))
       opening.then(
         (l) => {
           if (gone || !l) return drop(l)
