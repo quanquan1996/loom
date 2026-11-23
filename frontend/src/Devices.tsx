@@ -2,7 +2,6 @@ import { ChevronRight, Monitor, X } from "lucide-react"
 import { useEffect, useState } from "react"
 import { createPortal } from "react-dom"
 import { DEVICE_ICONS, DeviceIcon, ICON_LABELS, deviceIcon } from "./DeviceIcon"
-import { isComposing } from "./ime"
 import { deviceVia, type Via } from "./deviceVia"
 import {
   androidInstall,
@@ -12,12 +11,11 @@ import {
   setForwardPort,
   setP2p,
   installCommands,
-  renameDevice,
   type Device,
 } from "./api"
 
 /**
- * The user's machines that agents can reach through `loom-node` — add, rename,
+ * The user's machines that agents can reach through `loom-node` — add,
  * remove, and get the command that installs one.
  *
  * Who is online comes from the lobby channel, so the dots change while the
@@ -94,19 +92,6 @@ export function DevicesDialog({
     }
   }
 
-  // The new name shows on the tap; the old one comes back if refused.
-  const rename = async (device: Device, value: string) => {
-    onUpsert({ ...device, name: value })
-    try {
-      const { node } = await renameDevice(device.id, value)
-      onUpsert(node)
-      setError(null)
-    } catch (e) {
-      onUpsert(device)
-      setError((e as Error).message)
-    }
-  }
-
   return createPortal(
     <div className="modal-scrim" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal devices" role="dialog" aria-label="Devices">
@@ -133,7 +118,6 @@ export function DevicesDialog({
                     device={d}
                     open={openId === d.id}
                     onToggle={() => setOpenId((id) => (id === d.id ? null : d.id))}
-                    onRename={(value) => rename(d, value)}
                     onForward={(port) => forward(d, port)}
                     onPort={(port) => change(d, { forward_port: port }, () => setForwardPort(d.id, port))}
                     onP2p={(on) => change(d, { p2p: on }, () => setP2p(d.id, on))}
@@ -233,7 +217,6 @@ function DeviceRow({
   device,
   open,
   onToggle,
-  onRename,
   onForward,
   onPort,
   onP2p,
@@ -243,15 +226,12 @@ function DeviceRow({
   // Its settings are shown: one device at a time, opened by tapping its row.
   open: boolean
   onToggle: () => void
-  onRename: (name: string) => void
   // A port to switch forwarding on to, or null for off.
   onForward: (port: number | null) => void
   onPort: (port: number) => void
   onP2p: (on: boolean) => void
   onVnc: () => void
 }) {
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState(device.name)
   // The connect button was tapped with VNC off: the panel says what to switch on.
   const [hint, setHint] = useState(false)
   useEffect(() => {
@@ -273,11 +253,6 @@ function DeviceRow({
     else if (portNumber !== device.forward_port) onPort(portNumber)
   }
 
-  const commit = () => {
-    const value = draft.trim()
-    if (value !== "" && value !== device.name) onRename(value)
-    setEditing(false)
-  }
 
   const system = device.os ? `${device.os}/${device.arch}` : null
 
@@ -288,8 +263,8 @@ function DeviceRow({
         role="button"
         tabIndex={0}
         aria-expanded={open}
-        onClick={() => !editing && onToggle()}
-        onKeyDown={(e) => !editing && (e.key === "Enter" || e.key === " ") && (e.preventDefault(), onToggle())}
+        onClick={onToggle}
+        onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), onToggle())}
       >
         <span
           className={"dot" + (device.online ? " online" : "")}
@@ -297,42 +272,8 @@ function DeviceRow({
         />
         <DeviceIcon icon={deviceIcon(device)} />
         <div className="device-body">
-          {editing ? (
-            <input
-              className="device-name-input"
-              value={draft}
-              autoFocus
-              onClick={(e) => e.stopPropagation()}
-              onChange={(e) => setDraft(e.target.value)}
-              onBlur={commit}
-              onKeyDown={(e) => {
-                e.stopPropagation()
-                if (isComposing(e)) return
-                if (e.key === "Enter") commit()
-                if (e.key === "Escape") {
-                  setDraft(device.name)
-                  setEditing(false)
-                }
-              }}
-            />
-          ) : (
-            <span className="device-name">{device.name}</span>
-          )}
+          <span className="device-name">{device.name}</span>
           <span className="device-meta">
-            {device.p2p && (
-              <span
-                className={"device-link" + (via === "direct" ? " direct" : "")}
-                title={
-                  via === "direct"
-                    ? "Its screen is open, straight to the device"
-                    : via
-                      ? "Its screen is open through loom; trying for a direct path"
-                      : "P2P on: its screen goes straight to it when the network allows"
-                }
-              >
-                {via === "direct" ? "direct" : via ? "relay" : "P2P"}
-              </span>
-            )}
             {[system, device.hostname, seen(device)].filter(Boolean).join(" · ")}
           </span>
         </div>
@@ -383,7 +324,17 @@ function DeviceRow({
             />
           </div>
           <div className="device-setting">
-            <span className="device-setting-label">P2P</span>
+            <span className="device-setting-label">
+              P2P
+              {device.p2p && via && (
+                <span
+                  className={"device-link" + (via === "direct" ? " direct" : "")}
+                  title={via === "direct" ? "Its screen goes straight to the device" : "Its screen goes through loom; trying for a direct path"}
+                >
+                  {via === "direct" ? "direct" : "relay"}
+                </span>
+              )}
+            </span>
             <button
               role="switch"
               aria-checked={device.p2p}
@@ -393,15 +344,6 @@ function DeviceRow({
               onClick={() => onP2p(!device.p2p)}
             />
           </div>
-          <button
-            className="device-rename"
-            onClick={() => {
-              setDraft(device.name)
-              setEditing(true)
-            }}
-          >
-            Rename
-          </button>
         </div>
       )}
     </div>
