@@ -55,6 +55,8 @@ defmodule LoomWeb.NodeChannel do
   end
 
   def join("node", info, socket) do
+    info = Map.put(info, "ip", socket.assigns[:ip])
+
     case Loom.Nodes.connected(socket.assigns.node_id, self(), info) do
       {:ok, node} -> {:ok, %{name: node.name}, assign(socket, :requests, %{})}
       {:error, _} -> {:error, %{reason: "unknown device"}}

@@ -51,6 +51,8 @@ defmodule LoomWeb.AgentChannel do
   def handle_in("submit", %{"text" => text} = params, socket) when is_binary(text) do
     case Agent.submit(socket.assigns.session_id, text,
            origin: socket.assigns.device,
+           where:
+             Loom.Whereabouts.describe(socket.assigns[:client_ip], socket.assigns[:user_agent]),
            client_msg_id: Map.get(params, "client_msg_id"),
            files: file_paths(params),
            refs: ref_ids(params)

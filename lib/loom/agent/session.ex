@@ -647,6 +647,9 @@ defmodule Loom.Agent.Session do
       # Told to the backend ahead of the next turn's message, once: what changed
       # about its project since the conversation began. See `moved_notice/2`.
       notice: nil,
+      # The last `Loom.Whereabouts` line the backend was given, so it is told
+      # where the user writes from only when that changes.
+      where_told: nil,
       # Set while the first message waits to be filed into a project.
       classifying: nil,
       title: nil,
@@ -1224,6 +1227,17 @@ defmodule Loom.Agent.Session do
     # paths, the user does not want to read them. A caller with a long prompt
     # of its own (`Loom.Dream`) shows a line and sends the whole of it.
     message = Keyword.get(opts, :prompt) || text |> Files.prompt(files) |> Refs.prompt(refs)
+
+    # Where the user is writing from, ahead of the message it applies to, and
+    # only when it differs from what this conversation was last told.
+    {message, state} =
+      case Keyword.get(opts, :where) do
+        where when is_binary(where) and where != state.where_told ->
+          {where <> "\n\n" <> message, %{state | where_told: where}}
+
+        _ ->
+          {message, state}
+      end
 
     cond do
       state.classifying != nil ->

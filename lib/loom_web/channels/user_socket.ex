@@ -6,10 +6,19 @@ defmodule LoomWeb.UserSocket do
   channel "agents", LoomWeb.LobbyChannel
 
   @impl true
-  def connect(%{"token" => token}, socket, _connect_info) do
+  def connect(%{"token" => token}, socket, connect_info) do
     case Loom.Auth.verify_token(token) do
-      {:ok, login} -> {:ok, assign(socket, :login, login)}
-      {:error, _} -> :error
+      {:ok, login} ->
+        {:ok,
+         assign(socket,
+           login: login,
+           # Where the user is writing from, for `Loom.Whereabouts`.
+           client_ip: LoomWeb.ClientAddress.of_socket(connect_info),
+           user_agent: String.slice(Map.get(connect_info, :user_agent) || "", 0, 300)
+         )}
+
+      {:error, _} ->
+        :error
     end
   end
 

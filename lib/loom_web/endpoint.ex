@@ -16,7 +16,12 @@ defmodule LoomWeb.Endpoint do
   # Compressed: opening a session replays its transcript, which is JSON and
   # several hundred KB for a long one, and shrinks to about a third.
   socket "/socket", LoomWeb.UserSocket,
-    websocket: [check_origin: false, compress: true],
+    websocket: [
+      check_origin: false,
+      compress: true,
+      # Where the user writes from (`Loom.Whereabouts`).
+      connect_info: [:x_headers, :peer_data, :user_agent]
+    ],
     longpoll: false
 
   # `loom-node daemon` on the user's own machines. Its own socket, so a device
@@ -27,6 +32,8 @@ defmodule LoomWeb.Endpoint do
   socket "/node", LoomWeb.NodeSocket,
     websocket: [
       check_origin: false,
+      # The device's public address, for `Loom.Whereabouts`.
+      connect_info: [:x_headers, :peer_data],
       timeout: 45_000,
       # Far above the largest legitimate device frame (a file-read chunk is
       # 256 KB raw, ~342 KB base64), so a crafted frame cannot be unbounded.

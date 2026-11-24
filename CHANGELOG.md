@@ -18,6 +18,11 @@ that ran live. Format after [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Added
+- **The agent knows where you write from.** Before a message, Loom tells the agent
+  which browser you use and, by matching public addresses with your online
+  devices, which device you are probably on and whether you are at home (devices
+  listed under `home` in `~/.loom/places.json`). Told again only when it changes,
+  so the agent can tell what it can do itself from what needs your hands.
 - **Port forwarding and VNC for your devices.** Under Devices, each device has a
   **forward** switch (a port on the device's own loopback, 5900 by default) and a
   separate **VNC** button that opens the device's screen in the side pane, through

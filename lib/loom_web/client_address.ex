@@ -31,6 +31,25 @@ defmodule LoomWeb.ClientAddress do
   end
 
   @doc """
+  The same for a socket, from its `connect_info` (`:x_headers` and
+  `:peer_data` asked for in the endpoint). Nil when neither is there.
+  """
+  def of_socket(connect_info) when is_map(connect_info) do
+    hops =
+      for {"x-forwarded-for", value} <- Map.get(connect_info, :x_headers) || [],
+          hop <- String.split(value, ",", trim: true),
+          do: String.trim(hop)
+
+    pick(hops, trusted()) ||
+      case connect_info do
+        %{peer_data: %{address: ip}} -> ip |> :inet.ntoa() |> to_string()
+        _ -> nil
+      end
+  end
+
+  def of_socket(_), do: nil
+
+  @doc """
   The configured list, parsed once per value. A bad entry is dropped with a
   warning rather than stopping the start: the worst it does is show a
   proxy's address where the client's should be.

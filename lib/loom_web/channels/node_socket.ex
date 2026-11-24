@@ -9,12 +9,17 @@ defmodule LoomWeb.NodeSocket do
   channel "node", LoomWeb.NodeChannel
 
   @impl true
-  def connect(%{"token" => token}, socket, _connect_info) do
+  def connect(%{"token" => token}, socket, connect_info) do
     case Loom.Nodes.authenticate(token) do
-      {:ok, id} -> {:ok, assign(socket, :node_id, id)}
+      {:ok, id} ->
+        {:ok, assign(socket, node_id: id, ip: LoomWeb.ClientAddress.of_socket(connect_info))}
+
       # A removed device, let in only to be told to uninstall itself.
-      {:wipe, name} -> {:ok, assign(socket, wipe: {token, name}, node_id: nil)}
-      :error -> :error
+      {:wipe, name} ->
+        {:ok, assign(socket, wipe: {token, name}, node_id: nil)}
+
+      :error ->
+        :error
     end
   end
 

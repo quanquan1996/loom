@@ -69,6 +69,13 @@ defmodule Loom.Nodes do
   @doc "Every device, oldest first, with `online`."
   def list(server \\ @name), do: GenServer.call(server, :list)
 
+  @doc """
+  The devices online now with the public address each connected from:
+  `[%{name:, os:, ip:}]`. In memory only, like `online`; for
+  `Loom.Whereabouts`.
+  """
+  def addresses(server \\ @name), do: GenServer.call(server, :addresses)
+
   @doc "Register a device. `{:ok, summary, install_code}` or `{:error, reason}`."
   def create(name, icon \\ nil, server \\ @name),
     do: GenServer.call(server, {:create, name, icon})
@@ -202,10 +209,28 @@ defmodule Loom.Nodes do
     nodes = Map.new(nodes, &{&1.id, &1})
 
     {:ok,
-     %{path: path, nodes: nodes, wipes: wipes, online: %{}, codes: %{}, misses: [], forwards: %{}}}
+     %{
+       path: path,
+       nodes: nodes,
+       wipes: wipes,
+       online: %{},
+       ips: %{},
+       codes: %{},
+       misses: [],
+       forwards: %{}
+     }}
   end
 
   @impl true
+  def handle_call(:addresses, _from, state) do
+    found =
+      for {id, ip} <- state.ips, Map.has_key?(state.online, id), node = state.nodes[id], node do
+        %{name: node.name, os: node.os, ip: ip}
+      end
+
+    {:reply, found, state}
+  end
+
   def handle_call(:list, _from, state) do
     nodes =
       state.nodes
@@ -357,6 +382,7 @@ defmodule Loom.Nodes do
           })
 
         state = %{state | online: Map.put(state.online, id, {pid, ref})}
+        state = %{state | ips: put_ip(state.ips, id, info["ip"])}
         state = put_in(state.nodes[id], merged)
         # Skip the full-registry re-encode and rewrite when nothing persisted
         # has actually changed, so a reconnect loop cannot drive one disk
@@ -468,7 +494,7 @@ defmodule Loom.Nodes do
   def handle_info({:DOWN, ref, :process, _pid, _reason}, state) do
     case Enum.find(state.online, fn {_id, {_pid, r}} -> r == ref end) do
       {id, _} ->
-        state = %{state | online: Map.delete(state.online, id)}
+        state = %{state | online: Map.delete(state.online, id), ips: Map.delete(state.ips, id)}
 
         state =
           case state.nodes do
@@ -490,6 +516,9 @@ defmodule Loom.Nodes do
   end
 
   # ── Helpers ─────────────────────────────────────────────────────────────
+
+  defp put_ip(ips, id, ip) when is_binary(ip), do: Map.put(ips, id, ip)
+  defp put_ip(ips, id, _ip), do: Map.delete(ips, id)
 
   defp summary(node, state) do
     node
